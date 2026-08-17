@@ -10,14 +10,18 @@
 # całym repo (patrz app/README.md). Reszta (runner, digest, feedback,
 # raporty, watcher danych, mail w trybie mock) działa identycznie.
 #
-# Użycie:
-#   ./bootstrap_install_vps.sh <adres-repo-git> [ścieżka-instalacji]
+# Użycie (adres repo opcjonalny — domyślnie repo projektu):
+#   ./bootstrap_install_vps.sh [adres-repo-git] [ścieżka-instalacji]
 # Przykład:
-#   ./bootstrap_install_vps.sh https://github.com/odczarujpowerbi/szkolenia-powerbi.git ~/AIWorker
+#   ./bootstrap_install_vps.sh
+#   ./bootstrap_install_vps.sh https://github.com/odczarujpowerbi/wirtualny-pracownik.git ~/AIWorker
 
 set -euo pipefail
 
-REPO_URL="${1:?Podaj adres repozytorium jako pierwszy argument.}"
+# Repo projektu — jedno miejsce do zmiany (zgodne z config/repo.yaml; ten skrypt
+# działa przed klonem, więc nie może wczytać tamtego pliku).
+REPO_URL="${1:-https://github.com/odczarujpowerbi/wirtualny-pracownik.git}"
+REPO_BRANCH="main"
 INSTALL_PATH="${2:-$HOME/AIWorker}"
 
 echo "=== 1. Sprawdzenie zależności systemowych ==="
@@ -30,15 +34,19 @@ done
 echo "git i python3 znalezione: $(git --version), $(python3 --version)"
 
 echo "=== 2. Klonowanie repozytorium ==="
-if [ -d "$INSTALL_PATH" ]; then
-    echo "UWAGA: $INSTALL_PATH już istnieje — pomijam klonowanie. Usuń ręcznie, jeśli chcesz świeżą kopię."
+# Repo ma kod w korzeniu — klonujemy do podfolderu wirtualny-pracownik/, żeby
+# lokalny układ to nadal $INSTALL_PATH/wirtualny-pracownik/app.
+REPO_DIR="$INSTALL_PATH/wirtualny-pracownik"
+if [ -d "$REPO_DIR" ]; then
+    echo "UWAGA: $REPO_DIR już istnieje — pomijam klonowanie. Usuń ręcznie, jeśli chcesz świeżą kopię."
 else
-    git clone "$REPO_URL" "$INSTALL_PATH"
+    mkdir -p "$INSTALL_PATH"
+    git clone --branch "$REPO_BRANCH" "$REPO_URL" "$REPO_DIR"
 fi
 
-APP_PATH="$INSTALL_PATH/wirtualny-pracownik/app"
+APP_PATH="$REPO_DIR/app"
 if [ ! -d "$APP_PATH" ]; then
-    echo "BŁĄD: nie znaleziono $APP_PATH — sprawdź czy podałeś właściwy adres repozytorium."
+    echo "BŁĄD: nie znaleziono $APP_PATH — sprawdź czy podałeś właściwy adres repozytorium (kod ma być w korzeniu repo, w folderze app/)."
     exit 1
 fi
 

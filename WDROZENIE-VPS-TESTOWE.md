@@ -33,12 +33,12 @@ Na VPS-ie, po zalogowaniu przez SSH:
 ```bash
 sudo apt update && sudo apt install -y git python3 python3-venv python3-pip
 
-curl -O https://raw.githubusercontent.com/odczarujpowerbi/szkolenia-powerbi/claude/new-repo-i29t2e/wirtualny-pracownik/app/bootstrap_install_vps.sh
+curl -O https://raw.githubusercontent.com/odczarujpowerbi/wirtualny-pracownik/main/app/bootstrap_install_vps.sh
 chmod +x bootstrap_install_vps.sh
-./bootstrap_install_vps.sh https://github.com/odczarujpowerbi/szkolenia-powerbi.git ~/AIWorker
+./bootstrap_install_vps.sh
 ```
 
-(Zamień branch w pierwszym `curl`, jeśli praca trafi już do `main` — na dziś kod żyje na `claude/new-repo-i29t2e`.)
+(Adres repo jest opcjonalny — domyślnie `odczarujpowerbi/wirtualny-pracownik` z gałęzi `main`. Podaj własny adres jako pierwszy argument, jeśli używasz forka.)
 
 Skrypt sam sprawdzi git/python3, sklonuje repo, założy wirtualne środowisko i zainstaluje zależności. Na końcu wypisze dokładnie te kroki:
 

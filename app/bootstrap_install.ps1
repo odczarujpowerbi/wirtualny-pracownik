@@ -14,21 +14,19 @@
 # Windows (Get-CimInstance, powercfg, sprawdzenie roli administratora) —
 # sprawdź je przy pierwszym realnym uruchomieniu.
 #
-# Użycie (PowerShell jako administrator):
+# Użycie (PowerShell jako administrator; -RepoUrl opcjonalny — domyślnie repo
+# projektu):
+#   .\bootstrap_install.ps1
 #   .\bootstrap_install.ps1 -RepoUrl "https://github.com/<org>/<repo>.git"
 
 param(
-    [Parameter(Mandatory = $true)]
-    [string]$RepoUrl,
+    # Repozytorium projektu — jedno miejsce do zmiany. Trzymaj zgodne z
+    # config/repo.yaml (ten skrypt działa PRZED klonem, nie może go wczytać).
+    [string]$RepoUrl = "https://github.com/odczarujpowerbi/wirtualny-pracownik.git",
 
     [string]$InstallPath = "C:\AIWorker",
 
-    # Cała ta praca dziś żyje na gałęzi claude/new-repo-i29t2e, NIE na main —
-    # bez tego `git clone` bierze domyślną gałąź repo, na której folderu
-    # wirtualny-pracownik/ może nie być wcale (realnie napotkane i naprawione
-    # w tej sesji: klon się udał, ale Push-Location dalej wywalał się, bo
-    # sklonowana gałąź nie miała tego folderu). Podmień, gdy praca trafi na main.
-    [string]$Branch = "claude/new-repo-i29t2e",
+    [string]$Branch = "main",
 
     [switch]$SkipSystemChecks
 )
@@ -92,18 +90,21 @@ Write-Host "Git i Python znalezione."
 
 Write-Host "=== 3. Klonowanie rdzenia (kod, ten sam dla każdego wdrożenia) ===" -ForegroundColor Cyan
 
-$appPath = Join-Path $InstallPath "wirtualny-pracownik\app"
+# Repo ma kod w korzeniu — klonujemy do podfolderu wirtualny-pracownik/, żeby
+# lokalny układ to nadal $InstallPath\wirtualny-pracownik\app.
+$repoDir = Join-Path $InstallPath "wirtualny-pracownik"
+$appPath = Join-Path $repoDir "app"
 if (Test-Path $appPath) {
     Write-Warning "$appPath już istnieje — pomijam klonowanie. Usuń ręcznie, jeśli chcesz świeżą kopię."
 } else {
     New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null
-    git clone --branch $Branch $RepoUrl $InstallPath
+    git clone --branch $Branch $RepoUrl $repoDir
     if ($LASTEXITCODE -ne 0) {
         Write-Error "git clone nie powiodło się (kod wyjścia $LASTEXITCODE). Sprawdź adres repozytorium, nazwę gałęzi ('$Branch') i dostęp do sieci — skrypt zatrzymany, żeby nie kontynuować na niepełnej kopii."
         exit 1
     }
     if (-not (Test-Path $appPath)) {
-        Write-Error "Klon się powiódł, ale $appPath nie istnieje na gałęzi '$Branch'. Sprawdź, czy to właściwa gałąź (dziś: claude/new-repo-i29t2e, nie main)."
+        Write-Error "Klon się powiódł, ale $appPath nie istnieje. Sprawdź, czy to właściwe repozytorium (kod projektu ma być w korzeniu repo, w folderze app/)."
         exit 1
     }
 }

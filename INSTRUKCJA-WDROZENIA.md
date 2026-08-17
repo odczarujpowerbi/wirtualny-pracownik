@@ -25,8 +25,8 @@ Jeśli w którymś miejscu coś nie zadziała tak, jak opisano — zatrzymaj si�
 Jeśli nie chcesz klikać przez każdy krok osobno, `bootstrap_all.ps1` robi Kroki 2-5 za Ciebie automatycznie — instaluje git/Python/Claude Code, pobiera projekt, zakłada folder na dostępy, i na koniec pokazuje **czytelne podsumowanie: który krok, ile trwał, czy się udał**:
 
 ```powershell
-irm https://raw.githubusercontent.com/odczarujpowerbi/szkolenia-powerbi/claude/new-repo-i29t2e/wirtualny-pracownik/app/bootstrap_all.ps1 -OutFile bootstrap_all.ps1
-.\bootstrap_all.ps1 -RepoUrl "https://github.com/odczarujpowerbi/szkolenia-powerbi.git"
+irm https://raw.githubusercontent.com/odczarujpowerbi/wirtualny-pracownik/main/app/bootstrap_all.ps1 -OutFile bootstrap_all.ps1
+.\bootstrap_all.ps1
 ```
 
 Wygląda to tak (przykład, wszystko się udało):
@@ -58,7 +58,7 @@ Instaluj w tej kolejności. Każdy program pobierasz z oficjalnej strony, klikas
 **Ważne dla maszyn wirtualnych/Windows Server:** świeża maszyna wirtualna (w odróżnieniu od zwykłego komputera dewelopera) zwykle **nie ma gita** — to pierwsza rzecz, która się wywali, jeśli spróbujesz od razu klonować repozytorium. Jeśli nie masz wygodnego dostępu do przeglądarki na tej maszynie (np. łączysz się samym pulpitem zdalnym), możesz zainstalować gita automatycznie, jednym poleceniem w PowerShell, zamiast pobierać instalator ręcznie:
 
 ```powershell
-irm https://raw.githubusercontent.com/odczarujpowerbi/szkolenia-powerbi/claude/new-repo-i29t2e/wirtualny-pracownik/app/bootstrap_install_git.ps1 -OutFile bootstrap_install_git.ps1
+irm https://raw.githubusercontent.com/odczarujpowerbi/wirtualny-pracownik/main/app/bootstrap_install_git.ps1 -OutFile bootstrap_install_git.ps1
 .\bootstrap_install_git.ps1
 ```
 
@@ -73,7 +73,7 @@ irm https://raw.githubusercontent.com/odczarujpowerbi/szkolenia-powerbi/claude/n
 Python też da się zainstalować automatycznie, jednym poleceniem (dodaje do PATH samo, bez zaznaczania okienek):
 
 ```powershell
-irm https://raw.githubusercontent.com/odczarujpowerbi/szkolenia-powerbi/claude/new-repo-i29t2e/wirtualny-pracownik/app/bootstrap_install_python.ps1 -OutFile bootstrap_install_python.ps1
+irm https://raw.githubusercontent.com/odczarujpowerbi/wirtualny-pracownik/main/app/bootstrap_install_python.ps1 -OutFile bootstrap_install_python.ps1
 .\bootstrap_install_python.ps1
 ```
 
@@ -88,14 +88,14 @@ irm https://claude.ai/install.ps1 | iex
 Albo automatycznie, tym samym skryptem co dalsze kroki (sam wykrywa, czy Claude Code już jest):
 
 ```powershell
-irm https://raw.githubusercontent.com/odczarujpowerbi/szkolenia-powerbi/claude/new-repo-i29t2e/wirtualny-pracownik/app/bootstrap_install_claude_code.ps1 -OutFile bootstrap_install_claude_code.ps1
+irm https://raw.githubusercontent.com/odczarujpowerbi/wirtualny-pracownik/main/app/bootstrap_install_claude_code.ps1 -OutFile bootstrap_install_claude_code.ps1
 .\bootstrap_install_claude_code.ps1
 ```
 
 **Claude Desktop (aplikacja z zakładkami Chat/Cowork/Code, w tym sesje w chmurze)** — opcjonalna, ale wygodna, jeśli wolisz interfejs okienkowy zamiast samego terminala:
 
 ```powershell
-irm https://raw.githubusercontent.com/odczarujpowerbi/szkolenia-powerbi/claude/new-repo-i29t2e/wirtualny-pracownik/app/bootstrap_install_claude_desktop.ps1 -OutFile bootstrap_install_claude_desktop.ps1
+irm https://raw.githubusercontent.com/odczarujpowerbi/wirtualny-pracownik/main/app/bootstrap_install_claude_desktop.ps1 -OutFile bootstrap_install_claude_desktop.ps1
 .\bootstrap_install_claude_desktop.ps1
 ```
 

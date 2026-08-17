@@ -25,26 +25,29 @@
 # wymuszona awaria kroku wymaganego (poprawnie przerywa) i opcjonalnego
 # (poprawnie ostrzega i leci dalej).
 #
-# Użycie:
+# Użycie (najprościej — repo domyślne z parametru $RepoUrl):
+#   .\bootstrap_all.ps1
+# albo wskazując inne repo/fork:
 #   .\bootstrap_all.ps1 -RepoUrl "https://github.com/<org>/<repo>.git"
 
 param(
-    [Parameter(Mandatory = $true)]
-    [string]$RepoUrl,
+    # Repozytorium projektu — jedno miejsce do zmiany przy forku/innym repo.
+    # Trzymaj zgodne z config/repo.yaml (ten skrypt działa PRZED klonem, więc
+    # nie może wczytać tamtego pliku). Baza raw niżej wylicza się z tej wartości.
+    [string]$RepoUrl = "https://github.com/odczarujpowerbi/wirtualny-pracownik.git",
 
     [string]$InstallPath = "C:\AIWorker",
 
-    # Praca dziś żyje na claude/new-repo-i29t2e, nie na main — patrz
-    # bootstrap_install.ps1 (realny błąd napotkany i naprawiony w tej sesji:
-    # klon bez podanej gałęzi brał domyślną main, na której nie ma jeszcze
-    # folderu wirtualny-pracownik/). Podmień, gdy praca trafi na main.
-    [string]$Branch = "claude/new-repo-i29t2e",
+    [string]$Branch = "main",
 
     [switch]$SkipClaudeCode
 )
 
 $ErrorActionPreference = "Stop"
-$RAW_BASE = "https://raw.githubusercontent.com/odczarujpowerbi/szkolenia-powerbi/claude/new-repo-i29t2e/wirtualny-pracownik/app"
+# Baza raw.githubusercontent wyliczana z $RepoUrl + $Branch — dzięki temu jedyna
+# wartość do zmiany przy forku to $RepoUrl. Kod leży w korzeniu repo, więc app/.
+$repoSlug = ($RepoUrl -replace '^https://github\.com/', '') -replace '\.git$', ''
+$RAW_BASE = "https://raw.githubusercontent.com/$repoSlug/$Branch/app"
 
 function Get-BootstrapScriptPath($name) {
     $localCandidate = Join-Path $PSScriptRoot $name

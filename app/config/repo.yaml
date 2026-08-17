@@ -1,0 +1,16 @@
+# Jedno zrodlo prawdy o repozytorium projektu.
+#
+# Zmien TU, zeby wskazac wlasny fork/inne repo — dokumentacja i skrypty
+# odwoluja sie do tych wartosci. UWAGA: skrypty bootstrap (bootstrap_all.ps1,
+# bootstrap_install.ps1, bootstrap_install_vps.sh) dzialaja PRZED sklonowaniem
+# repo, wiec nie moga wczytac tego pliku — maja te same wartosci jako domyslny
+# parametr $RepoUrl / REPO_URL. Przy zmianie repo zaktualizuj oba miejsca.
+#
+# raw_base sluzy do pobierania pojedynczych skryptow bootstrap na czystej
+# maszynie (przez irm/curl), zanim repo jest sklonowane. Kod projektu lezy w
+# korzeniu repo, wiec sciezki to bezposrednio app/<plik>.
+repo:
+  slug: odczarujpowerbi/wirtualny-pracownik
+  url: https://github.com/odczarujpowerbi/wirtualny-pracownik.git
+  branch: main
+  raw_base: https://raw.githubusercontent.com/odczarujpowerbi/wirtualny-pracownik/main

@@ -2,7 +2,7 @@
 
 Wirtualny pracownik działający niezależnie od laptopów zespołu: cyklicznie pobiera zadania, uruchamia skrypty, obsługuje aplikacje webowe i desktopowe (w tym Power BI), waliduje wyniki i zostawia pełny ślad audytowy.
 
-> **Status:** folder tymczasowy w repo `szkolenia-powerbi` — docelowo projekt zostanie przeniesiony do osobnego repozytorium (`odczarujpowerbi/wirtualny-pracownik`), gdy integracja GitHub uzyska uprawnienia do tworzenia nowych repozytoriów.
+> **Status:** projekt ma własne repozytorium `odczarujpowerbi/wirtualny-pracownik` (kod w korzeniu, gałąź `main`). Adres repo to jedna zmienna do zmiany przy forku — patrz `app/config/repo.yaml` oraz domyślny `-RepoUrl` w skryptach bootstrap.
 >
 > Pełna dokumentacja koncepcyjna (biznesowa i techniczna, v1.0, 6 sierpnia 2026): `Wirtualny_Pracownik_AI_Dokumentacja_Biznesowa_i_Techniczna.pdf` (przekazana przez właściciela projektu, nie dołączona do repo).
 >
@@ -64,7 +64,7 @@ Rozpocząć od 2–4 tygodniowego pilotażu na jednym, używanym komputerze z Wi
 - [ ] Zbudować intake z maila i innych źródeł (`email_intake_triage.py`, `task_routing_classifier.py`) — automatyczne tworzenie i rozdzielanie zadań, patrz PLAN-WDROZENIA.md sekcja 11
 - [ ] Uruchomić rejestr skilli i bota ulepszającego skille (`skill_registry.py`, `skill_improver_bot.py`)
 - [ ] Zbudować cotygodniowe raporty biznesowe (sprzedaż, wydatki reklamowe, finanse przez inFakt, widoczność w sieci) — dopiero po dojrzałym silniku walidacji, bo dotyka pieniędzy, patrz PLAN-WDROZENIA.md sekcja 18
-- [ ] Po potwierdzeniu kryteriów odbioru: przenieść folder do docelowego repozytorium `odczarujpowerbi/wirtualny-pracownik`
+- [x] Wydzielić projekt do własnego repozytorium `odczarujpowerbi/wirtualny-pracownik` (kod w korzeniu, `main`)
 
 ## Dalsza dokumentacja
 
