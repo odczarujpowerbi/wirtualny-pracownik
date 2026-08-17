@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Sekrety i srodowisko (nigdy w repo)
+.env
+.env.local
+secrets/
+**/secrets/
+app/config/role.json
+
+# Stan lokalny / runtime
+runs/
+**/runs/
+*.log
+
+# OS / edytory
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
