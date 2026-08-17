@@ -94,9 +94,30 @@ Write-Host "=== 3. Klonowanie rdzenia (kod, ten sam dla każdego wdrożenia) ===
 # lokalny układ to nadal $InstallPath\wirtualny-pracownik\app.
 $repoDir = Join-Path $InstallPath "wirtualny-pracownik"
 $appPath = Join-Path $repoDir "app"
-if (Test-Path $appPath) {
-    Write-Warning "$appPath już istnieje — pomijam klonowanie. Usuń ręcznie, jeśli chcesz świeżą kopię."
+if (Test-Path (Join-Path $repoDir ".git")) {
+    # Repo już jest — ZAWSZE nadpisujemy kod do stanu zdalnego (origin/$Branch),
+    # zamiast pomijać. reset --hard rusza TYLKO pliki wersjonowane, więc secrets/
+    # i runs/ (w .gitignore) zostają nietknięte — ponowny bootstrap nie kasuje
+    # Twoich sekretów ani stanu lokalnego.
+    Write-Host "$repoDir już istnieje — nadpisuję kod do origin/$Branch (secrets/ i runs/ zostają)."
+    git -C $repoDir remote set-url origin $RepoUrl
+    git -C $repoDir fetch origin $Branch
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "git fetch nie powiodło się (kod $LASTEXITCODE). Sprawdź adres repozytorium i dostęp do sieci."
+        exit 1
+    }
+    git -C $repoDir reset --hard "origin/$Branch"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "git reset --hard nie powiodło się (kod $LASTEXITCODE)."
+        exit 1
+    }
 } else {
+    if (Test-Path $repoDir) {
+        # Folder istnieje, ale to NIE repozytorium git (niepełna/uszkodzona kopia)
+        # — usuwamy i klonujemy świeżo.
+        Write-Warning "$repoDir istnieje, ale to nie repozytorium git — usuwam i klonuję świeżo."
+        Remove-Item $repoDir -Recurse -Force
+    }
     New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null
     git clone --branch $Branch $RepoUrl $repoDir
     if ($LASTEXITCODE -ne 0) {

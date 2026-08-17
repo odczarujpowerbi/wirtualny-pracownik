@@ -37,9 +37,18 @@ echo "=== 2. Klonowanie repozytorium ==="
 # Repo ma kod w korzeniu — klonujemy do podfolderu wirtualny-pracownik/, żeby
 # lokalny układ to nadal $INSTALL_PATH/wirtualny-pracownik/app.
 REPO_DIR="$INSTALL_PATH/wirtualny-pracownik"
-if [ -d "$REPO_DIR" ]; then
-    echo "UWAGA: $REPO_DIR już istnieje — pomijam klonowanie. Usuń ręcznie, jeśli chcesz świeżą kopię."
+if [ -d "$REPO_DIR/.git" ]; then
+    # Repo już jest — ZAWSZE nadpisujemy kod do origin/$REPO_BRANCH. reset --hard
+    # rusza tylko pliki wersjonowane, wiec secrets/ i runs/ (w .gitignore) zostaja.
+    echo "$REPO_DIR już istnieje — nadpisuję kod do origin/$REPO_BRANCH (secrets/ i runs/ zostają)."
+    git -C "$REPO_DIR" remote set-url origin "$REPO_URL"
+    git -C "$REPO_DIR" fetch origin "$REPO_BRANCH"
+    git -C "$REPO_DIR" reset --hard "origin/$REPO_BRANCH"
 else
+    if [ -d "$REPO_DIR" ]; then
+        echo "$REPO_DIR istnieje, ale to nie repozytorium git — usuwam i klonuję świeżo."
+        rm -rf "$REPO_DIR"
+    fi
     mkdir -p "$INSTALL_PATH"
     git clone --branch "$REPO_BRANCH" "$REPO_URL" "$REPO_DIR"
 fi
