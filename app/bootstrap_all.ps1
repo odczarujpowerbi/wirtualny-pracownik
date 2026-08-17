@@ -54,10 +54,12 @@ function Get-BootstrapScriptPath($name) {
     if (Test-Path $localCandidate) {
         return $localCandidate
     }
+    # Zawsze pobieramy ŚWIEŻĄ kopię do Temp (nadpisując starszą). Wcześniej
+    # skrypt REUŻYWAŁ starej kopii z Temp, jeśli tam była — po zmianie repo/gałęzi
+    # znaczyło to, że stara wersja (np. z gałęzią new-repo-i29t2e) była po cichu
+    # uruchamiana ponownie mimo poprawek w repo. Realny błąd napotkany na VM.
     $tempPath = Join-Path $env:TEMP $name
-    if (-not (Test-Path $tempPath)) {
-        Invoke-RestMethod -Uri "$RAW_BASE/$name" -OutFile $tempPath
-    }
+    Invoke-RestMethod -Uri "$RAW_BASE/$name" -OutFile $tempPath
     return $tempPath
 }
 
