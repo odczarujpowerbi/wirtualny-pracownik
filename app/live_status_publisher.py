@@ -1,7 +1,11 @@
 """
 Utrzymuje jeden, stały, nadpisywany wpis "status na żywo" per bot-rola w
 Projectly (PLAN-WDROZENIA.md sekcja 2 — moduł analizy pracy w toku, nie
-tylko zakończonych zadań). Harmonogram: co 1-2 min.
+tylko zakończonych zadań). Harmonogram: co 1-2 min (config/schedule.yaml).
+
+MCP: client.publish_status -> create/update_documentation (strona statusu per
+rola, nadpisywana). Cel/tytuł strony w config/projectly.yaml (live_status).
+Kolejki liczone LOKALNIE ze state_store (stan tej maszyny), nie z Projectly.
 """
 
 import platform

@@ -1,0 +1,75 @@
+# Konfiguracja integracji z Projectly przez MCP — "konfiguracja firmy"
+# (SKALOWANIE.md sekcja 2), wymieniana przy kopiowaniu do innej firmy.
+# projectly_client.py czyta ten plik; sam token/URL NIE tu, tylko w secrets/.env
+# (PROJECTLY_API_KEY, PROJECTLY_BASE_URL — patrz .env.example).
+
+# --- Rozpoznawanie kont AI (botów) ---
+# Runner bierze zadania przypisane do konta AI swojej roli. Dziś MCP NIE
+# wystawia pola "typ konta" (assignees[] to tylko {id, name}) — rozpoznajemy
+# konto AI po prefiksie nazwy. Gdy Projectly wystawi w MCP pole typu konta,
+# przełącz ai_account.by na "type" i uzupełnij ai_account.type_value.
+ai_account:
+  by: name_prefix          # name_prefix | type (gdy pojawi się w MCP)
+  name_prefix: "AI - "
+  type_value: "AI"         # używane dopiero gdy by = type
+
+# Mapa: rola maszyny (config/role.json, bootstrap_register.py) -> nazwa konta
+# AI w Projectly. Dev i Marketing istnieją dziś; reszta to plan (ZESPOL-BOTOW.md).
+role_to_account:
+  dev: "AI - Dev"
+  marketing: "AI - Marketing"
+  admin: "AI - Admin"          # planowane
+  asystent: "AI - Asystent"    # planowane
+  strateg: "AI - Strateg"      # planowane
+
+# Aliasy używane w kodzie (escalation.py, task_router.py) -> realne nazwy osób
+# w Projectly. "self" = konto AI tej maszyny (rozwiązywane z role_to_account).
+people_aliases:
+  pawel: "Paweł"
+  bot: "self"
+  unassigned_pool: ""          # pusty = bez przypisania (create_task przypisze wg uprawnień tokenu)
+
+# Domyślny człowiek dla eskalacji, gdy routing nie wskaże konkretnej osoby.
+escalation_default_assignee: "Paweł"
+
+# --- Zakres pollowania ---
+# Runner iteruje projekty i pyta o zadania status=todo przypisane do swojego
+# konta AI (filtr assigneeId po stronie serwera). Domyślnie tylko projekty
+# aktywne, żeby nie odpytywać zarchiwizowanych/szkiców.
+poll:
+  project_statuses: ["active"]   # które projekty pollować (status z list_projects)
+  task_status: "todo"
+
+# Strona dokumentacji na "status na żywo" per rola (live_status_publisher.py).
+# publish_status znajdzie/utworzy/nadpisze stronę o tym tytule w tym projekcie.
+# Zostaw status_project puste, żeby wyłączyć publikację statusu (tryb tylko-log).
+live_status:
+  project: "Administracyjne"
+  page_title_template: "Status na żywo — {role}"
+
+# --- Mapowanie schematu Projectly -> kontrakt wewnętrzny (get_new_tasks) ---
+# risk_level_hint NIE istnieje w Projectly; brak -> runner klasyfikuje jako
+# żółte (fail-closed). goal -> expected_result, effect -> acceptance_criteria.
+field_mapping:
+  task_id: id
+  title: title
+  expected_result: goal
+  acceptance_criteria: effect
+  default_risk_level_hint: yellow
+
+# --- Referencja: która funkcja MCP w jakiej sytuacji (zaszyta wiedza) ---
+# Nic tego nie parsuje — to mapa dla człowieka i dla agenta pracującego nad
+# kodem, spójna z docstringami w skryptach.
+mcp_tool_usage:
+  pobierz_nowe_zadania: get_project_tasks   # status=todo, assigneeId=konto AI; get_active_tasks to skrót bez goal/effect/dueDate
+  zmien_status:         update_task          # taskId + status (todo|in_progress|done)
+  komentarz_dodaj:      add_task_comment     # główny kanał dialogu z człowiekiem
+  komentarze_odczyt:    get_task_comments    # odczyt decyzji człowieka (human_response_validator)
+  utworz_zadanie:       create_task          # projectId + assigneeIds; potem link_tasks dla powiązania
+  powiaz_zadania:       link_tasks           # ciąg oryginał->eskalacja->kontynuacja (type: eskalacja|kontynuacja|blokuje|duplikat)
+  powiazania_odczyt:    get_task_relations
+  feedback_po_zadaniu:  update_task          # feedback + actualHours + completedAt + status=done (samoocena/domknięcie)
+  bloker_dodaj:         add_task_blocker     # bloker zewnętrzny (wolny tekst); bloker=zadanie -> link_tasks typ "blokuje"
+  status_na_zywo:       update_documentation # jedna strona per rola, nadpisywana (create_documentation gdy brak)
+  raport_tygodniowy:    get_week_report      # completedAt/actualHours/odchylenie estymacji — digest/retro
+  baza_wiedzy:          get_knowledge

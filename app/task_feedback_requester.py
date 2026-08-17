@@ -7,18 +7,18 @@ prosi o feedback i daje zadania ludziom w Projectly" — NIE istniał.
 Najbliżej był `escalation.py`, ale to eskalacja DECYZJI przed wykonaniem,
 nie prośba o feedback PO fakcie.
 
-Interfejs `client.post_comment`/`get_comments` już istnieje w
-`projectly_client.py` i czeka na realną implementację, odkąd komentarze w
-Projectly mają zostać podłączone — ten skrypt jest już gotowy, bez zmian,
-gdy tylko `ProjectlyClient` przestanie rzucać `NotImplementedError`
-(sprawdzone jeszcze raz w tej sesji: MCP Projectly na razie nie
-udostępnia komentarzy — patrz PROJECTLY-ROZWOJ.md).
+Narzędzia MCP (przez projectly_client): prośba o feedback to add_task_comment
+(pytanie w wątku) + create_task (osobne zadanie feedbackowe powiązane z
+oryginałem). Samą treść feedbacku człowiek/agent zapisuje potem w polu
+`feedback` zadania przez update_task (client.set_task_feedback) — komentarze i
+to pole są już dostępne w MCP (get_task_comments/add_task_comment,
+update_task.feedback), co potwierdzono na żywo w tej sesji.
 
-UCZCIWA GRANICA: Projectly nie ma dziś pola "feedback poproszony"
-(PROJECTLY-ROZWOJ.md) — ten skrypt pilnuje więc LOKALNIE
-(`runs/feedback_requested.json`), którym zadaniom już zadano pytanie, żeby
-nie pytać w kółko o to samo przy każdym uruchomieniu. To stan lokalny per
-maszyna (SKALOWANIE.md sekcja 2), nie substytut prawdziwego pola w Projectly.
+UCZCIWA GRANICA: Projectly nie ma pola "feedback POPROSZONY" (jest pole
+`feedback` na treść, ale nie flaga, że o niego zapytano) — ten skrypt pilnuje
+więc LOKALNIE (`runs/feedback_requested.json`), którym zadaniom już zadano
+pytanie, żeby nie pytać w kółko przy każdym uruchomieniu. To stan lokalny per
+maszyna (SKALOWANIE.md sekcja 2), nie substytut pola w Projectly.
 
 Mail leci zgodnie z `config/email_safety.yaml` — dziś zawsze do człowieka
 wewnątrz firmy (Paweł/Aldona), NIE bezpośrednio do assignee zadania.
@@ -63,6 +63,8 @@ def request_feedback_for_task(task, client=None, send_email=True):
         description=FEEDBACK_COMMENT,
         assigned_to=task.get("assignee", "unassigned_pool"),
         parent_task_id=task["task_id"],
+        project_id=task.get("project_id"),
+        relation_type="kontynuacja",
     )
 
     email_result = None

@@ -4,6 +4,14 @@ kontynuacja (PLAN-WDROZENIA.md sekcja 4, SKRYPTY.md kategoria C).
 Zawiera escalate_to_human, human_response_validator i continuation_task_creator
 w jednym module — w SKRYPTY.md to trzy osobne skrypty, tu trzymane razem,
 bo dzielą ten sam mały kontrakt danych i łatwiej je testować spójnie.
+
+Narzędzia MCP (przez projectly_client, config/projectly.yaml):
+    escalate_to_human       -> create_task + link_tasks (type "eskalacja")
+    human_response_validator -> get_comments (odczyt decyzji człowieka)
+    continuation_task_creator -> create_task + link_tasks (type "kontynuacja")
+Powiązania budują widoczny ciąg oryginał -> eskalacja -> kontynuacja
+(get_task_relations), zamiast trzech luźnych zadań. Wymaga project_id z
+zadania źródłowego (get_new_tasks niesie je w polu 'project_id').
 """
 
 import state_store
@@ -23,7 +31,14 @@ def escalate_to_human(task, reason, client, options=None, assignee="pawel"):
         description_lines.append("Opcje: " + "; ".join(options))
     description = "\n".join(description_lines)
 
-    new_id = client.create_task(title, description, assigned_to=assignee, parent_task_id=task["task_id"])
+    new_id = client.create_task(
+        title,
+        description,
+        assigned_to=assignee,
+        parent_task_id=task["task_id"],
+        project_id=task.get("project_id"),
+        relation_type="eskalacja",
+    )
     now = datetime.now(timezone.utc).isoformat()
     state_store.record_event(task["task_id"], "escalated_to_human", f"{new_id}: {reason}", now)
     return new_id
@@ -66,7 +81,14 @@ def continuation_task_creator(original_task, human_decision_text, client):
         f"Decyzja człowieka: {human_decision_text}\n"
         f"Kontynuuj wykonanie z tą decyzją wbudowaną w kontekst."
     )
-    new_id = client.create_task(title, description, assigned_to="bot", parent_task_id=original_task["task_id"])
+    new_id = client.create_task(
+        title,
+        description,
+        assigned_to="bot",
+        parent_task_id=original_task["task_id"],
+        project_id=original_task.get("project_id"),
+        relation_type="kontynuacja",
+    )
     now = datetime.now(timezone.utc).isoformat()
     state_store.record_event(original_task["task_id"], "continuation_created", new_id, now)
     return new_id
