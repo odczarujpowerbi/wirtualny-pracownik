@@ -23,6 +23,13 @@ param(
 
     [string]$InstallPath = "C:\AIWorker",
 
+    # Cała ta praca dziś żyje na gałęzi claude/new-repo-i29t2e, NIE na main —
+    # bez tego `git clone` bierze domyślną gałąź repo, na której folderu
+    # wirtualny-pracownik/ może nie być wcale (realnie napotkane i naprawione
+    # w tej sesji: klon się udał, ale Push-Location dalej wywalał się, bo
+    # sklonowana gałąź nie miała tego folderu). Podmień, gdy praca trafi na main.
+    [string]$Branch = "claude/new-repo-i29t2e",
+
     [switch]$SkipSystemChecks
 )
 
@@ -90,9 +97,13 @@ if (Test-Path $appPath) {
     Write-Warning "$appPath już istnieje — pomijam klonowanie. Usuń ręcznie, jeśli chcesz świeżą kopię."
 } else {
     New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null
-    git clone $RepoUrl $InstallPath
+    git clone --branch $Branch $RepoUrl $InstallPath
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "git clone nie powiodło się (kod wyjścia $LASTEXITCODE). Sprawdź adres repozytorium i dostęp do sieci — skrypt zatrzymany, żeby nie kontynuować na niepełnej kopii."
+        Write-Error "git clone nie powiodło się (kod wyjścia $LASTEXITCODE). Sprawdź adres repozytorium, nazwę gałęzi ('$Branch') i dostęp do sieci — skrypt zatrzymany, żeby nie kontynuować na niepełnej kopii."
+        exit 1
+    }
+    if (-not (Test-Path $appPath)) {
+        Write-Error "Klon się powiódł, ale $appPath nie istnieje na gałęzi '$Branch'. Sprawdź, czy to właściwa gałąź (dziś: claude/new-repo-i29t2e, nie main)."
         exit 1
     }
 }

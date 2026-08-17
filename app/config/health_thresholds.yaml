@@ -7,10 +7,20 @@ min_available_ram_percent: 10
 
 # Procesy, które POWINNY działać (dopasowanie po nazwie pliku w cmdline).
 # Brak dowolnego z nich na liście uruchomionych procesów -> status "critical".
-# Pusta lista = nie sprawdzaj (przydatne np. na maszynie testowej, gdzie
-# runner nie jest jeszcze uruchomiony w trybie ciągłym).
-expected_scripts:
-  - runner_loop.py
+#
+# UWAGA — zależy od tego, JAK uruchamiasz mechanizm:
+# - Zalecane: job_scheduler.py jako jedyny proces (odpala runner_loop.py
+#   itd. jako zwykłe wywołania funkcji, nie osobne procesy) -> ta lista
+#   powinna zostać PUSTA, bo "czy runner_loop.py działa jako osobny
+#   proces" nie ma tu sensu (nie ma go — jest funkcją w środku
+#   job_scheduler.py). Sprawdzanie samego job_scheduler.py z jego
+#   WNĘTRZA i tak nic by nie dało (gdyby padł, ten check by się nie wykonał).
+# - Klasyczne podejście (3 osobne `python x.py --loop` w Harmonogramie
+#   zadań) -> wpisz tu "runner_loop.py", bo wtedy to faktycznie osobny,
+#   sprawdzalny proces.
+#
+# Pusta lista = nie sprawdzaj (domyślne, pod job_scheduler.py).
+expected_scripts: []
 
 # Komu zgłosić alert (ta sama nazwa co w clients_routing.yaml/skills).
 alert_assignee: pawel

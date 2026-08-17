@@ -54,33 +54,17 @@ python bootstrap_register.py dev      # albo inna rola
 
 ## Uruchomienie cykliczne (zamiast Harmonogramu zadań Windows)
 
-Na Linuksie nie ma Harmonogramu zadań — dwie proste opcje:
-
-**Opcja A — cron, do szybkich testów:**
-
-```bash
-crontab -e
-```
-
-i dopisz (uruchamia pojedynczy przebieg co 5 minut, nie tryb `--loop`, plus monitor zdrowia maszyny co 2 minuty i cogodzinny raport statusu do Projectly):
-
-```
-*/5 * * * * cd ~/AIWorker/wirtualny-pracownik/app && venv/bin/python runner_loop.py >> runs/cron.log 2>&1
-*/2 * * * * cd ~/AIWorker/wirtualny-pracownik/app && venv/bin/python system_health_monitor.py >> runs/health.log 2>&1
-0 * * * * cd ~/AIWorker/wirtualny-pracownik/app && venv/bin/python machine_status_reporter.py >> runs/machine_status.log 2>&1
-```
-
-**Opcja B — systemd, do trybu ciągłego (`--loop`), z automatycznym restartem po awarii:**
+**Zalecane: `job_scheduler.py` — jeden proces, jeden serwis systemd.** To centralny scheduler, który sam w środku odpala wszystkie skrypty cykliczne (dziś: zadania z Projectly co 30s, monitor zdrowia co 2 min, raport statusu co godzinę) wg `config/schedule.yaml` — nie trzeba już osobnego wpisu cron/systemd na każdy skrypt, ani przy dzisiejszych trzech, ani przy kolejnych, które kiedyś dojdą.
 
 ```bash
 sudo tee /etc/systemd/system/wirtualny-pracownik.service << 'EOF'
 [Unit]
-Description=Wirtualny Pracownik AI — runner
+Description=Wirtualny Pracownik AI — scheduler
 After=network.target
 
 [Service]
 WorkingDirectory=%h/AIWorker/wirtualny-pracownik/app
-ExecStart=%h/AIWorker/wirtualny-pracownik/app/venv/bin/python runner_loop.py --loop
+ExecStart=%h/AIWorker/wirtualny-pracownik/app/venv/bin/python job_scheduler.py
 Restart=always
 RestartSec=10
 
@@ -93,51 +77,30 @@ sudo systemctl enable --now wirtualny-pracownik.service
 sudo systemctl status wirtualny-pracownik.service
 ```
 
-Analogicznie drugi serwis dla monitora zdrowia (ta sama recepta, inna nazwa i `ExecStart`):
+Sprawdzenie stanu i zmiana harmonogramu bez dotykania systemd:
 
 ```bash
-sudo tee /etc/systemd/system/wirtualny-pracownik-health.service << 'EOF'
-[Unit]
-Description=Wirtualny Pracownik AI — monitor zdrowia maszyny
-After=network.target
-
-[Service]
-WorkingDirectory=%h/AIWorker/wirtualny-pracownik/app
-ExecStart=%h/AIWorker/wirtualny-pracownik/app/venv/bin/python system_health_monitor.py --loop
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reload
-sudo systemctl enable --now wirtualny-pracownik-health.service
+cd ~/AIWorker/wirtualny-pracownik/app
+venv/bin/python job_scheduler.py --status
+venv/bin/python job_scheduler.py --set-interval system_health_monitor 60   # zadziała na żywo, bez restartu serwisu
 ```
 
-I trzeci serwis — cogodzinny raport statusu maszyny do Projectly:
+<details>
+<summary>Starsze podejście: osobny cron/systemd na każdy skrypt (rozwiń, jeśli wolisz to podejście)</summary>
 
-```bash
-sudo tee /etc/systemd/system/wirtualny-pracownik-status.service << 'EOF'
-[Unit]
-Description=Wirtualny Pracownik AI — raport statusu maszyny
-After=network.target
+**Cron, do szybkich testów** (`crontab -e`):
 
-[Service]
-WorkingDirectory=%h/AIWorker/wirtualny-pracownik/app
-ExecStart=%h/AIWorker/wirtualny-pracownik/app/venv/bin/python machine_status_reporter.py --loop
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reload
-sudo systemctl enable --now wirtualny-pracownik-status.service
+```
+*/5 * * * * cd ~/AIWorker/wirtualny-pracownik/app && venv/bin/python runner_loop.py >> runs/cron.log 2>&1
+*/2 * * * * cd ~/AIWorker/wirtualny-pracownik/app && venv/bin/python system_health_monitor.py >> runs/health.log 2>&1
+0 * * * * cd ~/AIWorker/wirtualny-pracownik/app && venv/bin/python machine_status_reporter.py >> runs/machine_status.log 2>&1
 ```
 
-Zacznij od cron — łatwiej podejrzeć, czy coś w ogóle działa, zanim zostawisz to bez nadzoru w trybie ciągłym. Docelowo obie pętle (zadania + zdrowie maszyny) mają działać niezależnie i cały czas — to one, razem, są tym "dzieje się samo", bez klikania.
+**Trzy osobne serwisy systemd** (ta sama recepta co wyżej, inna nazwa i `ExecStart` każdorazowo): `runner_loop.py --loop`, `system_health_monitor.py --loop`, `machine_status_reporter.py --loop`.
+
+</details>
+
+Zacznij od `job_scheduler.py --status` po chwili działania — łatwo podejrzeć, czy coś w ogóle działa, zanim zostawisz to bez nadzoru na dłużej.
 
 ## Co konkretnie przetestować w pierwszym tygodniu
 

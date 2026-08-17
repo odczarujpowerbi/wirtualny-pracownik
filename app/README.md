@@ -48,6 +48,7 @@ To nie jest pseudokod ani dokumentacja — to realny, uruchomiony i przetestowan
 | `bootstrap_install_python.ps1` | Instaluje Python 3.11+ (winget → fallback: instalator z python.org, cicha instalacja udokumentowanymi przełącznikami) | ⚠️ logika wykrywania przetestowana realnie; samo pobranie z python.org nietestowane (zablokowane w sieci tej sesji budowy, ten sam powód co Claude Desktop) |
 | `bootstrap_all.ps1` | Orkiestrator: uruchamia Kroki 2-5 jednym poleceniem, pokazuje numer/nazwę/status/czas trwania każdego kroku, zapisuje historię do `runs/bootstrap_history.json` | ✅ **przetestowany end-to-end realnie** (pełny udany przebieg, wymuszona awaria kroku wymaganego — poprawnie przerywa, `-SkipClaudeCode`) — po drodze złapał i naprawił 2 subtelne błędy PowerShella (zanieczyszczenie wartości zwracanej wyjściem podprocesu, `Format-Table -AutoSize` nic niewypisujące bez prawdziwej konsoli) |
 | `machine_status_reporter.py` | Cogodzinny raport statusu maszyny (wersje narzędzi, historia bootstrapu, RAM) do Projectly przez `client.publish_status()` | ✅ przetestowany z i bez historii bootstrapu; wysyłka w trybie mock — czeka na zapowiedzianą dedykowaną funkcję MCP po stronie Projectly |
+| `job_scheduler.py` | Centralny scheduler wszystkich skryptów cyklicznych — `config/schedule.yaml`, zmiana harmonogramu na żywo bez restartu, stan w `runs/scheduler_status.json` (`--status`) | ✅ **przetestowany na żywo, wielowątkowo, z prawdziwymi zadaniami** (`runner_loop`/`system_health_monitor` odpalane równolegle wg różnych interwałów) i z celowo zepsutym zadaniem (poprawnie raportuje błąd, nie wywraca schedulera) |
 
 ## Czego celowo brakuje (uczciwie, nie udawane)
 
@@ -116,6 +117,10 @@ Pełna specyfikacja: `../SKALOWANIE.md` sekcja 4, instruktaż krok po kroku: `..
 python bootstrap_init_secrets.py           # tworzy secrets/.env + secrets/mcp/*.json — uzupełnij ręcznie
 python bootstrap_register.py dev
 python bootstrap_smoke_test.py
+
+# Uruchomienie na stałe — jedno zadanie w Harmonogramie zadań Windows:
+#   Program: python   Argumenty: job_scheduler.py   Rozpocznij w: ...\wirtualny-pracownik\app
+python job_scheduler.py --status           # podgląd stanu wszystkich zadań cyklicznych w dowolnej chwili
 ```
 
 ## Następny krok

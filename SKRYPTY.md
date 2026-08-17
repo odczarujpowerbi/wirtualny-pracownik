@@ -8,7 +8,8 @@ Pomysły na skrypty pogrupowane wg domeny. Każdy skrypt ma jasno określony cel
 
 | Skrypt | Cel | Wyzwalacz | Ryzyko |
 |---|---|---|---|
-| `runner_loop.py` | Główna pętla: pobiera zadania, kolejkuje, uruchamia workery, aktualizuje stan | Usługa ciągła / Harmonogram zadań Windows | infra |
+| `job_scheduler.py` | Centralny scheduler WSZYSTKICH skryptów cyklicznych — jeden proces zamiast osobnego wpisu w Harmonogramie na każdy skrypt, `config/schedule.yaml` (interwał/enabled na zadanie), zmiana harmonogramu na żywo bez restartu (`--set-interval`/`--enable`/`--disable`), stan każdego zadania w `runs/scheduler_status.json` (`--status`) — na nim ma się opierać monitoring całości mechanizmu | JEDYNE zadanie w Harmonogramie zadań Windows, instalowane od razu przy starcie | infra |
+| `runner_loop.py` | Główna pętla: pobiera zadania, kolejkuje, uruchamia workery, aktualizuje stan | Wg `config/schedule.yaml` przez `job_scheduler.py` (albo samodzielnie, `--loop`, starsze podejście) | infra |
 | `task_router.py` | Klasyfikuje zadanie z Projectly na typ i wymagany worker (Power BI / CRM / Ads / pliki / mail / dev) | Po pobraniu zadania | infra |
 | `state_store.py` | Trzyma stan zadania (SQLite/JSON) niezależnie od modelu AI — pozwala wznowić po restarcie | Każda zmiana stanu | infra |
 | `heartbeat.py` | Zapisuje `heartbeat.json` co 30-60s | Cyklicznie w tle | infra |
@@ -112,8 +113,8 @@ Pomysły na skrypty pogrupowane wg domeny. Każdy skrypt ma jasno określony cel
 | `cost_tracker.py` | Sumuje koszt AI per zadanie/dzień, alarm po przekroczeniu limitu | Po każdym wywołaniu modelu | infra |
 | `secret_scanner.py` | Skanuje logi/artefakty pod kątem sekretów przed zapisem/synchronizacją | Przed `sharepoint_sync.py` / commitem | infra |
 | `kill_switch.py` | Sprawdza globalny plik/flagę STOP przy starcie każdej pętli runnera; jeśli aktywna, bezpiecznie przerywa (jak PAUSE) i nie podejmuje nowych akcji (PLAN-WDROZENIA.md sekcja 17) | Na starcie każdej iteracji `runner_loop.py` | infra |
-| `system_health_monitor.py` | Patrzy na realny stan maszyny (RAM, czy oczekiwane skrypty faktycznie działają w systemie — nie tylko czy piszą heartbeat), publikuje status, eskaluje przy problemie. Uzupełnia `heartbeat.py`/`watchdog.py` (te widzą tylko czy runner "daje znać", nie widzą samego systemu) | Harmonogram, co 2 min (`--loop --interval 120`), niezależnie od `runner_loop.py` | zielone |
-| `machine_status_reporter.py` | Cogodzinny, czysto informacyjny (bez eskalacji) raport statusu maszyny do Projectly: wersje narzędzi, historia ostatniego bootstrapu, RAM | Harmonogram, co godzinę (`--loop --interval 3600`) | zielone |
+| `system_health_monitor.py` | Patrzy na realny stan maszyny (RAM, czy oczekiwane skrypty faktycznie działają w systemie — nie tylko czy piszą heartbeat), publikuje status, eskaluje przy problemie. Uzupełnia `heartbeat.py`/`watchdog.py` (te widzą tylko czy runner "daje znać", nie widzą samego systemu) | Wg `config/schedule.yaml` przez `job_scheduler.py` (domyślnie co 2 min), albo samodzielnie `--loop --interval 120` | zielone |
+| `machine_status_reporter.py` | Cogodzinny, czysto informacyjny (bez eskalacji) raport statusu maszyny do Projectly: wersje narzędzi, historia ostatniego bootstrapu, RAM | Wg `config/schedule.yaml` przez `job_scheduler.py` (domyślnie co godzinę), albo samodzielnie `--loop --interval 3600` | zielone |
 
 ## L. Asystent zadań ludzkich (proactive assist — patrz PLAN-WDROZENIA.md sekcja 5)
 

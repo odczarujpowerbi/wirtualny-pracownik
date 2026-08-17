@@ -201,35 +201,50 @@ Lista umiejętności, które są już zaplanowane (część gotowa, część cze
 
 ## Krok 8 — Uruchomienie na stałe (żeby działało bez Ciebie)
 
-Żeby program uruchamiał się sam po restarcie komputera i działał w tle:
+Żeby program uruchamiał się sam po restarcie komputera i działał w tle, wystarczy **jedno** zadanie w Harmonogramie — `job_scheduler.py`. To centralny scheduler, który sam odpala w środku wszystkie skrypty cykliczne (dziś: pobieranie zadań z Projectly co 30s, monitor zdrowia maszyny co 2 min, raport statusu co godzinę) i sam pilnuje ich harmonogramów — nie trzeba już zakładać osobnego zadania w Harmonogramie na każdy nowy skrypt, który kiedyś dojdzie.
 
 1. Otwórz **Harmonogram zadań** (wpisz w wyszukiwarce Windows "Harmonogram zadań" / "Task Scheduler").
 2. Kliknij **Utwórz zadanie podstawowe** (Create Basic Task).
-3. Nazwa: np. "Wirtualny Pracownik — Runner".
+3. Nazwa: np. "Wirtualny Pracownik — Scheduler".
 4. Wyzwalacz: **Przy uruchomieniu komputera** (When the computer starts).
 5. Akcja: **Uruchom program** (Start a program).
 6. W polu "Program/skrypt" wpisz: `python`
-7. W polu "Argumenty" wpisz: `runner_loop.py --loop`
+7. W polu "Argumenty" wpisz: `job_scheduler.py`
 8. W polu "Rozpocznij w" wpisz: `C:\AIWorker\wirtualny-pracownik\app`
 9. Zapisz zadanie.
 
-Powtórz te same kroki 2-9 dla **drugiego** zadania — monitora zdrowia maszyny, który patrzy, czy komputerowi niczego nie brakuje (pamięć, czy runner faktycznie działa), i sam zgłasza alert, jeśli coś jest nie tak:
+To wszystko — jedna, samodziałająca pętla zamiast trzech. Nie musisz nic więcej klikać — to jest właśnie ten "dzieje się samo", o który chodziło.
 
-- Nazwa: np. "Wirtualny Pracownik — Monitor zdrowia".
-- W polu "Argumenty" wpisz: `system_health_monitor.py --loop`
-- Reszta identyczna jak wyżej (ten sam folder "Rozpocznij w").
+**Jak sprawdzić, co się dzieje w środku i zmienić harmonogram, bez grzebania w Harmonogramie zadań Windows:**
 
-I trzecie zadanie — cogodzinny raport statusu maszyny (wersje narzędzi, jak poszedł ostatni bootstrap, RAM) do Projectly:
+```
+python job_scheduler.py --status
+```
 
-- Nazwa: np. "Wirtualny Pracownik — Status maszyny".
-- W polu "Argumenty" wpisz: `machine_status_reporter.py --loop`
-- Reszta identyczna jak wyżej.
+Pokaże każde zadanie: interwał, czy włączone, ostatni status, ile trwało, kiedy odpali się następny raz. Żeby zmienić, jak często coś się odpala:
 
-Od tego momentu działają **trzy niezależne, samodzielne pętle** — jedna pobiera i wykonuje zadania z Projectly, druga co 2 minuty sprawdza samą maszynę i eskaluje, jeśli coś wymaga uwagi, trzecia co godzinę wysyła "zdjęcie" stanu maszyny. Nie musisz nic więcej klikać — to jest właśnie ten "dzieje się samo", o który chodziło.
+```
+python job_scheduler.py --set-interval system_health_monitor 60
+```
+
+Działa na żywo — scheduler podchwyci zmianę, bez restartu, bo czyta `config/schedule.yaml` na nowo co kilka sekund. Żeby czasowo wyłączyć jakieś zadanie: `python job_scheduler.py --disable nazwa` (i `--enable`, żeby wrócić).
 
 **Uwaga:** wysyłka do Projectly przez `machine_status_reporter.py` dziś działa w trybie mock (wypisuje status, nie wysyła naprawdę) — czeka na dedykowaną funkcję MCP po stronie Projectly. Gdy powstanie, podłącza się w jednym miejscu (`projectly_client.py`), bez zmiany tego skryptu.
 
-**Po czym poznasz, że się udało:** po restarcie komputera, po kilku minutach, w Projectly pojawiają się wpisy statusu ("status na żywo") dla tego komputera — dla roli bota i etykiety "system-health" na pewno; "machine-status" dopiero po podłączeniu wspomnianej wyżej funkcji MCP.
+**Po czym poznasz, że się udało:** po restarcie komputera, po kilku minutach, `python job_scheduler.py --status` pokazuje świeże "Ostatni status: ok" przy `runner_loop` i `system_health_monitor`, a w Projectly pojawia się wpis statusu ("status na żywo") z etykietą "system-health".
+
+<details>
+<summary>Starsze podejście: trzy osobne zadania w Harmonogramie (rozwiń, jeśli już to skonfigurowałeś albo wolisz to podejście)</summary>
+
+Zamiast jednego `job_scheduler.py` można założyć trzy osobne zadania w Harmonogramie, każde z inną komendą w polu "Argumenty" (reszta pól identyczna jak wyżej):
+
+- `runner_loop.py --loop`
+- `system_health_monitor.py --loop`
+- `machine_status_reporter.py --loop`
+
+Działa tak samo, tylko trzy niezależne procesy zamiast jednego — i każdy nowy skrypt cykliczny w przyszłości wymaga ręcznego założenia kolejnego zadania w Harmonogramie, zamiast jednej linijki w `config/schedule.yaml`.
+
+</details>
 
 ## Krok 9 — Jak sprawdzić, że wszystko działa na żywo
 

@@ -1,0 +1,25 @@
+# Harmonogram wszystkich skryptów cyklicznych — czytany przez job_scheduler.py.
+# Edytuj wprost ALBO przez CLI (python job_scheduler.py --set-interval NAZWA SEKUNDY
+# / --enable NAZWA / --disable NAZWA) — scheduler w trybie ciągłym podchwyci
+# zmianę na najbliższym ticku, BEZ restartu procesu.
+#
+# Dodanie nowego przyszłego skryptu cyklicznego = nowy wpis tutaj (moduł musi
+# mieć bezargumentową funkcję, np. run_once/run_health_check) — bez zmiany
+# kodu job_scheduler.py.
+
+jobs:
+- name: runner_loop
+  module: runner_loop
+  function: run_once
+  interval_seconds: 30
+  enabled: true
+- name: system_health_monitor
+  module: system_health_monitor
+  function: run_health_check
+  interval_seconds: 120
+  enabled: true
+- name: machine_status_reporter
+  module: machine_status_reporter
+  function: run_machine_status_report
+  interval_seconds: 3600
+  enabled: true
