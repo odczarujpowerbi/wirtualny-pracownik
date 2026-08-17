@@ -1,0 +1,22 @@
+# Przykładowy kontrakt struktury danych — "konfiguracja firmy"
+# (SKALOWANIE.md sekcja 2), per klient/proces. Uzgadniany RAZ z właścicielem
+# pliku, potem pilnowany automatycznie przy każdym przepięciu/odświeżeniu.
+
+required_columns:
+  - kod_produktu
+  - nazwa
+  - ilosc
+  - cena_netto
+  - data_transakcji
+
+optional_columns: []
+
+types:
+  ilosc: int
+  cena_netto: float
+  data_transakcji: date
+
+# strict: true -> każda kolumna spoza required+optional to błąd, nie ostrzeżenie.
+# Domyślnie false, bo dodanie nowej kolumny samo w sobie rzadko psuje raport —
+# usunięcie/zmiana typu istniejącej psuje niemal zawsze.
+strict: false

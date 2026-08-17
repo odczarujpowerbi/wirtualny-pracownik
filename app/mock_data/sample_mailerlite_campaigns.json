@@ -1,0 +1,20 @@
+[
+  {
+    "id": "ML-001",
+    "subject": "3 błędy w DAX, które kosztują Cię godziny co tydzień",
+    "html_body": "<html><body><h1>3 błędy w DAX</h1><p>Wielu analityków popełnia te same błędy. W tym mailu pokazuję jak ich unikać, żeby raporty liczyły się szybciej i były łatwiejsze w utrzymaniu. To krótki, konkretny przegląd bez lania wody.</p></body></html>",
+    "plain_body": "3 błędy w DAX. Wielu analityków popełnia te same błędy. W tym mailu pokazuję jak ich unikać, żeby raporty liczyły się szybciej i były łatwiejsze w utrzymaniu.",
+    "sent_count": 2400,
+    "opens": 840,
+    "clicks": 96
+  },
+  {
+    "id": "ML-002",
+    "subject": "Aktualizacja newslettera - lipiec 2026",
+    "html_body": "<html><body><p>W tym miesiącu w Odczaruj Power BI działo się dużo rzeczy które chcielibyśmy Wam po kolei przedstawić w formie bardzo długiego i szczegółowego podsumowania obejmującego wszystkie tematy jakie poruszaliśmy w ciągu ostatnich kilku tygodni w naszej społeczności oraz na kanałach social media, a także zapowiedzi tego co planujemy w najbliższej przyszłości.</p></body></html>",
+    "plain_body": "W tym miesiącu w Odczaruj Power BI działo się dużo rzeczy które chcielibyśmy Wam po kolei przedstawić w formie bardzo długiego i szczegółowego podsumowania obejmującego wszystkie tematy.",
+    "sent_count": 2400,
+    "opens": 480,
+    "clicks": 12
+  }
+]

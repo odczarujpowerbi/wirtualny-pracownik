@@ -1,0 +1,12 @@
+# Pliki źródłowe pilnowane przez source_schema_watcher.py — "konfiguracja
+# firmy" (SKALOWANIE.md sekcja 2), wymieniana per wdrożenie. `path` w
+# realnym wdrożeniu wskazuje na plik na dysku/OneDrive klienta, nie na
+# mock_data — wpis niżej to przykład demonstracyjny/testowy.
+#
+# `owner` to osoba/rola, do której trafi zadanie po wykryciu zmiany
+# struktury (patrz clients_routing.yaml — te same nazwy właścicieli).
+
+sources:
+  - name: indeka_sample
+    path: mock_data/source_sample_v1.csv
+    owner: asia

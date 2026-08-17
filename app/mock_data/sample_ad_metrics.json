@@ -1,0 +1,6 @@
+[
+  {"variant_id": "V1-marek", "platform": "meta", "spend": 45.0, "impressions": 12000, "clicks": 180, "conversions": 3},
+  {"variant_id": "V2-katarzyna", "platform": "meta", "spend": 45.0, "impressions": 11500, "clicks": 95, "conversions": 1},
+  {"variant_id": "V3-marek", "platform": "tiktok", "spend": 30.0, "impressions": 20000, "clicks": 310, "conversions": 5},
+  {"variant_id": "V4-roman", "platform": "tiktok", "spend": 30.0, "impressions": 9000, "clicks": 40, "conversions": 0}
+]

@@ -1,0 +1,17 @@
+# Dopóki bot nie ma ugruntowanej historii sukcesu z realną skrzynką,
+# KAŻDA wysyłka maila (email_client.send_email) trafia do człowieka
+# wewnątrz firmy, nie bezpośrednio do zamierzonego adresata — ten sam
+# fail-closed co czerwone akcje w approval_policy.yaml (PLAN-WDROZENIA.md
+# sekcja 3), tylko zastosowany do maila zamiast eskalacji zadania.
+# Zamierzony adresat zostaje jawnie opisany w temacie i treści, żeby
+# człowiek widział, komu miało pójść, i sam zdecydował o przekazaniu dalej.
+#
+# To NIE dotyczy `save_draft` (draft w skrzynce bota i tak nikt nie widzi,
+# dopóki go nie wyślesz ręcznie) — tylko realnej/symulowanej wysyłki.
+#
+# Zmień/rozszerz listę, kiedy świadomie zdecydujesz się na bezpośrednią
+# wysyłkę do konkretnych adresatów (per klient/proces, nie globalnie).
+
+review_recipients:
+  - pawel@odczarujpowerbi.pl
+  - aldona.wawryniuk@odczarujpowerbi.pl

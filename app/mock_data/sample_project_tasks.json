@@ -1,0 +1,56 @@
+[
+  {
+    "task_id": "PRJ-2001",
+    "project_id": "magnapharm",
+    "title": "Zaktualizować mechanizm odświeżania danych hurtowni",
+    "status": "done",
+    "dueDate": "2026-08-10",
+    "estimatedHours": 4,
+    "assignee": "kacper"
+  },
+  {
+    "task_id": "PRJ-2002",
+    "project_id": "magnapharm",
+    "title": "Przygotować raport dla przedstawicieli",
+    "status": "in_progress",
+    "dueDate": "2026-08-05",
+    "estimatedHours": 6,
+    "assignee": "kacper"
+  },
+  {
+    "task_id": "PRJ-2003",
+    "project_id": "organizacyjne",
+    "title": "Weekly raportowanie sprzedaży",
+    "status": "done",
+    "dueDate": "2026-08-14",
+    "estimatedHours": 1,
+    "assignee": "asia"
+  },
+  {
+    "task_id": "PRJ-2004",
+    "project_id": "sprzedaz",
+    "title": "Follow-up z leadami po konferencji",
+    "status": "todo",
+    "dueDate": "2026-08-01",
+    "estimatedHours": 2,
+    "assignee": "aldona"
+  },
+  {
+    "task_id": "PRJ-2005",
+    "project_id": "diverse",
+    "title": "Sprawdzić przepięcie danych retail po zmianie pliku",
+    "status": "in_progress",
+    "dueDate": "2026-08-20",
+    "estimatedHours": 3,
+    "assignee": "asia"
+  },
+  {
+    "task_id": "PRJ-2006",
+    "project_id": "clickless",
+    "title": "Wysłać podsumowanie wdrożenia do klienta LDIT",
+    "status": "todo",
+    "dueDate": "2026-08-19",
+    "estimatedHours": 1,
+    "assignee": "pawel"
+  }
+]

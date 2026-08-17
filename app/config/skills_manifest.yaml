@@ -1,0 +1,99 @@
+# Rejestr dostępnych skilli/narzędzi z metadanymi (SKRYPTY.md kategoria J).
+# To jest "konfiguracja firmy" w rozumieniu SKALOWANIE.md — wymieniana per
+# wdrożenie, nie zaszyta w kodzie.
+
+skills:
+  - name: pbip_validate
+    version: "0.1.0"
+    risk: green
+    description: Waliduje strukturę projektu PBIP (PBI-01)
+  - name: source_schema_watcher
+    version: "0.1.0"
+    risk: green
+    description: Wykrywa zmiany struktury plików źródłowych CSV (Excel wymaga jeszcze openpyxl), tworzy zadanie dla właściciela
+  - name: data_contract_validator
+    version: "0.1.0"
+    risk: green
+    description: Waliduje plik źródłowy wobec zadeklarowanego kontraktu struktury (config/data_contracts/*.yaml)
+  - name: digest_generator
+    version: "0.1.0"
+    risk: green
+    description: >
+      Cykliczny digest z Projectly (zrobione/przeterminowane/w toku) do skrócenia daily/weekly —
+      bez pola realnej daty wykonania (patrz PROJECTLY-ROZWOJ.md), bazuje na statusie i dueDate
+  - name: stale_time_entry_nudger
+    version: "0.1.0"
+    risk: green
+    description: Skanuje eksport CSV wpisów czasu, znajduje wpisy "otwarte" dłużej niż próg dni, grupuje wg osoby
+  - name: report_builder
+    version: "0.1.0"
+    risk: żółte
+    description: Generyczny silnik raportów (markdown/CSV) z listy rekordów — realne dane (Kadry, Finansowy) wymagają osobnego podłączenia źródła
+  - name: email_draft_generator
+    version: "0.1.0 (tryb mock — realna wysyłka wymaga Microsoft Graph)"
+    risk: żółte
+    description: >
+      Generuje draft LUB wysyłkę maila z szablonu (templates/email/*.md), opcjonalnie
+      dopracowany przez model; KAŻDA wysyłka przekierowana do config/email_safety.yaml
+      (dziś: Paweł/Aldona), nigdy bezpośrednio do zamierzonego adresata
+  - name: task_feedback_requester
+    version: "0.1.0"
+    risk: green
+    description: >
+      Po zamknięciu zadania prosi assignee o feedback — komentarz + osobne zadanie w
+      Projectly + mail (przekierowany jak wyżej); pilnuje lokalnie, komu już zadano pytanie
+  - name: weekly_team_report
+    version: "0.1.0"
+    risk: green
+    description: >
+      Raport tygodniowy zespołu (zrobione/przeterminowane zadania + zaległe wpisy czasu +
+      opcjonalna interpretacja słabych stron przez model), publikowany w Projectly i mailem
+  - name: system_health_monitor
+    version: "0.1.0"
+    risk: green
+    description: >
+      Cyklicznie (co 2 min) sprawdza RAM i czy oczekiwane skrypty faktycznie działają
+      w systemie (config/health_thresholds.yaml), publikuje status, eskaluje przy problemie
+
+  # Poniższe: PLANOWANE, nie autorskie jeszcze — integracja jest zarejestrowana
+  # w integrations.yaml, ale ani skill, ani konektor (SKRYPTY.md) nie istnieją.
+  # status "planned" = do napisania, gdy dana integracja realnie wchodzi w użycie.
+  - name: projectly_operations
+    version: "planned"
+    risk: infra
+    description: >
+      Jak poprawnie korzystać z MCP Projectly — schemat zadania (sekcja 1
+      planu), tworzenie/aktualizacja, komentarze, statusy. Najważniejszy z
+      planowanych, bo to rdzeń komunikacji — do napisania jak tylko będzie
+      dostęp do prawdziwego MCP Projectly.
+  - name: zoho_crm_operations
+    version: "planned"
+    risk: żółte
+    description: Wzorce pracy z Zoho CRM przez MCP (COQL, rekordy, tagi) pod kątem routingu zadań i aktualizacji statusu klienta.
+  - name: google_workspace_operations
+    version: "planned"
+    risk: żółte
+    description: Docs/Sheets/Drive plus Search Console/Analytics — który zakres/scope do czego (raport widoczności, sekcja 18 planu).
+  - name: microsoft_graph_operations
+    version: "planned"
+    risk: żółte
+    description: Mail (odczyt/wysyłka z jednego konta), SharePoint, OneDrive przez Microsoft Graph.
+  - name: mailerlite_operations
+    version: "planned"
+    risk: żółte
+    description: >
+      Kampanie (pełny zapis: draft/harmonogram/wysyłka/statystyki) vs
+      automatyzacje (workflow budowany raz w UI, bot zarządza tylko danymi
+      wjeżdżającymi) — patrz integrations.yaml, wpis mailerlite.
+  - name: ads_platforms_operations
+    version: "planned"
+    risk: żółte/czerwone
+    description: Wspólny wzorzec dla Meta Ads i TikTok Ads — odczyt kampanii, zmiana budżetu w granicach bounded red, raportowanie wydatków.
+  - name: zanfia_courses_operations
+    version: "planned"
+    risk: żółte
+    description: Struktura kursów i danych sprzedażowych na zanfia.com przez MCP — do raportu sprzedażowego (sekcja 18 planu).
+  - name: miro_read_operations
+    version: "planned"
+    risk: zielone
+    description: Jak czytać board Miro przez connector (tylko odczyt) do wyciągania kontekstu/notatek dla Zofii/Stratega.

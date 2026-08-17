@@ -1,0 +1,16 @@
+# Progi dla system_health_monitor.py — "konfiguracja firmy" (SKALOWANIE.md
+# sekcja 2), edytowalna bez zmiany kodu, inna per maszyna (np. słaby VPS
+# testowy vs docelowy komputer 32 GB).
+
+# Poniżej tego % wolnej pamięci RAM -> status "critical" i eskalacja.
+min_available_ram_percent: 10
+
+# Procesy, które POWINNY działać (dopasowanie po nazwie pliku w cmdline).
+# Brak dowolnego z nich na liście uruchomionych procesów -> status "critical".
+# Pusta lista = nie sprawdzaj (przydatne np. na maszynie testowej, gdzie
+# runner nie jest jeszcze uruchomiony w trybie ciągłym).
+expected_scripts:
+  - runner_loop.py
+
+# Komu zgłosić alert (ta sama nazwa co w clients_routing.yaml/skills).
+alert_assignee: pawel

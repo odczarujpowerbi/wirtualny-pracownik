@@ -1,0 +1,8 @@
+table Sales
+	column Amount
+		dataType: double
+
+	column Date
+		dataType: dateTime
+
+	measure 'Total Sales' = SUM(Sales[Amount])

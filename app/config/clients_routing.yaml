@@ -1,0 +1,16 @@
+# Mapowanie klient/projekt -> właściciel (rola bota lub człowiek).
+# Trzymane OSOBNO od kodu (task_router.py), zgodnie z SKALOWANIE.md sekcja 2 —
+# to jest część "konfiguracji firmy", nie rdzenia, wymieniana przy kopiowaniu
+# systemu do innej firmy. Dopasowanie po słowach kluczowych, wielkość liter
+# nieistotna. Brak dopasowania = trafia do "unassigned_pool" (PLAN-WDROZENIA.md
+# sekcja 11: niska pewność nie jest zgadywana).
+
+routes:
+  - keywords: ["indeka", "diverse"]
+    owner: asia
+  - keywords: ["magnapharm", "kajzerka"]
+    owner: kacper
+  - keywords: ["okołosprzedażowe", "kalkulator"]
+    owner: karol
+
+default_owner: unassigned_pool

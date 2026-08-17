@@ -1,0 +1,51 @@
+# Reguły klasyfikacji ryzyka i progów auto-zatwierdzania.
+# PLAN-WDROZENIA.md sekcja 3. Edytowalne bez zmiany kodu.
+#
+# WAŻNE: bounded_red zaczyna PUSTE (sekcja 3, "rekomendacja startowa: pusta lista
+# granic"). Nie dodawaj tu wpisów, dopóki zwykły tryb czerwony (sekcja 4) nie
+# przepracował kilku tygodni na produkcji i nie ma na to danych z KPI (sekcja 8).
+
+# Domyślny poziom ryzyka per typ akcji. Cokolwiek nie jest tu wymienione = red
+# (fail-closed: nieznana akcja nigdy nie jest zielona/żółta z domysłu).
+action_risk:
+  read_file: green
+  read_report: green
+  screenshot: green
+  draft_comment: green
+
+  git_commit_branch: yellow
+  update_crm_record: yellow
+  draft_email: yellow
+  update_task_status: yellow
+  report_build: yellow
+  data_tidy: yellow
+  ad_variant_pause: yellow   # wyłączenie słabego wariantu testowego — ogranicza wydatek, nie zwiększa go (sekcja 20)
+  ad_copy_draft: green       # sam tekst reklamy to draft, dopiero uruchomienie wydaje pieniądze
+
+  publish: red
+  budget_change: red
+  mass_email: red
+  delete_data: red
+  grant_role: red
+  accounting_change: red    # inFakt — celowo bez bounded_red, patrz SKALOWANIE.md / sekcja 18
+  ad_test_launch: red       # uruchomienie NOWEGO zestawu testowego — czerwone, chyba że w granicach bounded_red niżej (sekcja 20)
+
+# Próg walidatorów dla żółtych: ile z N musi się zgodzić, żeby auto-zatwierdzić.
+# `validator_count` startuje na 3 dla nowych/nieprzetestowanych typów zadań;
+# obniżyć do 1 dopiero gdy skill_usage_logger.py pokaże ugruntowaną historię
+# sukcesu dla danego typu (sekcja 3, kalibracja kosztu).
+validator_thresholds:
+  default:
+    validator_count: 3
+    required_agreement: 2
+
+# Czerwone w granicach (bounded autonomy) — PUSTE na start, celowo.
+# Format docelowy (przykład, NIEAKTYWNY dopóki ktoś świadomie tu nie wpisze):
+# bounded_red:
+#   meta_ads_budget_change:
+#     max_percent_change: 15
+#     window: daily
+#   ad_test_launch:                    # sekcja 20 planu — testy kreatyw co 48h
+#     max_daily_budget_per_variant: 50 # PLN, przykład — Ty ustalasz realną kwotę
+#     max_concurrent_variants: 5
+bounded_red: {}
