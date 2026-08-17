@@ -107,14 +107,17 @@ Pełna specyfikacja: `../SKALOWANIE.md` sekcja 4, instruktaż krok po kroku: `..
 
 ```powershell
 # Szybka ścieżka — jedno polecenie zamiast kroków 1-4 niżej (repo domyślne
-# z config/repo.yaml; -RepoUrl tylko gdy używasz forka):
+# z config/repo.yaml; -RepoUrl tylko gdy używasz forka; -WithLocalModel dorzuca
+# lokalny model AI sterujący ekranem):
 .\bootstrap_all.ps1
+.\bootstrap_all.ps1 -WithLocalModel        # jw. + lokalny model wizyjny (Ollama, kilka GB)
 
 # Albo krok po kroku, ten sam efekt:
 .\bootstrap_install_git.ps1                # jeśli świeża maszyna/Windows Server nie ma jeszcze gita
 .\bootstrap_install_python.ps1             # jeśli nie ma jeszcze Pythona 3.11+
 .\bootstrap_install_claude_code.ps1        # narzędzie terminalowe do dalszej pracy nad tym kodem
 .\bootstrap_install.ps1                    # -RepoUrl tylko przy własnym forku
+.\bootstrap_install_local_model.ps1        # opcjonalnie: lokalny model AI sterujący ekranem (computer use)
 python bootstrap_init_secrets.py           # tworzy secrets/.env + secrets/mcp/*.json — uzupełnij ręcznie
 python bootstrap_register.py dev
 python bootstrap_smoke_test.py

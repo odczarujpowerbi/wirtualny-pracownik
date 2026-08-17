@@ -27,6 +27,8 @@
 #
 # Użycie (najprościej — repo domyślne z parametru $RepoUrl):
 #   .\bootstrap_all.ps1
+# z lokalnym modelem AI sterującym ekranem (computer use, kilka GB):
+#   .\bootstrap_all.ps1 -WithLocalModel
 # albo wskazując inne repo/fork:
 #   .\bootstrap_all.ps1 -RepoUrl "https://github.com/<org>/<repo>.git"
 
@@ -40,7 +42,11 @@ param(
 
     [string]$Branch = "main",
 
-    [switch]$SkipClaudeCode
+    [switch]$SkipClaudeCode,
+
+    # Lokalny model AI (Ollama) sterujący ekranem + walidator promptów. Krok
+    # opcjonalny, bo to kilka GB pobierania — patrz bootstrap_install_local_model.ps1.
+    [switch]$WithLocalModel
 )
 
 $ErrorActionPreference = "Stop"
@@ -103,6 +109,13 @@ $steps = @(
 
 if ($SkipClaudeCode) {
     $steps = $steps | Where-Object { $_.Name -ne "Claude Code (CLI)" }
+}
+
+# Opcjonalny lokalny model AI (sterujący ekranem / computer use) — tylko z
+# przełącznikiem -WithLocalModel, bo to kilka GB. Required=$false: awaria tylko
+# ostrzega, nie przerywa całego bootstrapu.
+if ($WithLocalModel) {
+    $steps += @{ Name = "Lokalny model AI (Ollama)"; Required = $false; Run = { Invoke-PowerShellScript (Get-BootstrapScriptPath "bootstrap_install_local_model.ps1") @() } }
 }
 
 $total = $steps.Count
