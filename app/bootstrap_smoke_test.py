@@ -14,13 +14,20 @@ import sys
 import kill_switch
 import runner_loop
 import watchdog
+from projectly_client import MockProjectlyClient
 
 
 def run():
     checks = []
 
-    print("1/3 — pełny cykl zadań przez runner_loop.run_once()...")
-    results = runner_loop.run_once()
+    # Test dymny sprawdza MECHANIZM na danych testowych (mock), więc wymuszamy
+    # MockProjectlyClient — niezależnie od tego, czy maszyna ma już wpisany token
+    # do realnego Projectly. Realny Projectly może mieć akurat 0 zadań todo dla
+    # konta AI tej roli, co NIE znaczy, że runner jest zepsuty.
+    mock_client = MockProjectlyClient()
+
+    print("1/3 — pełny cykl zadań przez runner_loop.run_once() (dane testowe/mock)...")
+    results = runner_loop.run_once(client=mock_client)
     checks.append(("Runner przetworzył zadania z mock_data", len(results) > 0))
 
     print("2/3 — świeżość heartbeat...")
@@ -29,7 +36,7 @@ def run():
 
     print("3/3 — reakcja kill switcha...")
     kill_switch.activate("Test dymny bootstrapu.")
-    blocked_results = runner_loop.run_once()
+    blocked_results = runner_loop.run_once(client=mock_client)
     kill_switch.deactivate()
     checks.append(("Kill switch blokuje wykonanie", blocked_results == []))
 

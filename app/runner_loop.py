@@ -133,14 +133,17 @@ def _validator_failure_reason(validation):
     )
 
 
-def run_once():
+def run_once(client=None):
     if kill_switch.is_active():
         print(f"Kill switch aktywny ({kill_switch.reason()}) — runner nie podejmuje akcji.")
         return []
 
     policy = risk_classifier.load_policy()
     routing = task_router.load_routing()
-    client = get_client()
+    # client wstrzykiwany w testach (bootstrap_smoke_test wymusza mock, żeby test
+    # mechanizmu był deterministyczny niezależnie od tego, czy live Projectly ma
+    # akurat zadania). W produkcji None -> get_client() (mock albo realny wg .env).
+    client = client or get_client()
 
     heartbeat.write_heartbeat(current_task_id=None)
 
