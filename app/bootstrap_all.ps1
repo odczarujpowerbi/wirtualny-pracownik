@@ -196,5 +196,5 @@ if ($stoppedEarly) {
 Write-Host "`nGotowe. Następne kroki:" -ForegroundColor Green
 Write-Host "  1. Uzupełnij secrets\.env i secrets\mcp\*.json"
 Write-Host "  2. python bootstrap_register.py <rola>"
-Write-Host "  3. Zarejestruj JEDNO zadanie w Harmonogramie zadań: python job_scheduler.py (Rozpocznij w: $appPath)"
+Write-Host "  3. Zarejestruj zadanie automatyczne (24/7): .\bootstrap_register_task.ps1"
 Write-Host "  4. python job_scheduler.py --status   # podgląd stanu wszystkich zadań cyklicznych"
