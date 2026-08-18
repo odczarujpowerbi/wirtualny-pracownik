@@ -34,6 +34,18 @@ ROLE_CONFIG_PATH = Path(__file__).parent / "config" / "role.json"
 MOCK_TASKS_PATH = Path(__file__).parent / "mock_data" / "sample_tasks.json"
 MOCK_RUNS_DIR = Path(__file__).parent / "runs"
 
+# Projectly zna tylko trzy statusy (todo|in_progress|done). Pipeline używa
+# szerszego zestawu wewnętrznego (planning, needs_approval, queued...) — tu je
+# mapujemy, żeby update_task nie dostał nieznanego statusu. Domyślnie in_progress.
+_STATUS_TO_PROJECTLY = {
+    "done": "done",
+    "queued": "todo",
+    "todo": "todo",
+    "in_progress": "in_progress",
+    "planning": "in_progress",
+    "needs_approval": "in_progress",
+}
+
 
 def _load_config():
     if not CONFIG_PATH.exists():
@@ -186,8 +198,10 @@ class ProjectlyClient:
         return [c.get("body", "") if isinstance(c, dict) else c for c in comments]
 
     def update_status(self, task_id, status):
-        """MCP: update_task. Zmiana statusu (todo|in_progress|done)."""
-        self._mcp.call_tool("update_task", {"taskId": task_id, "status": status})
+        """MCP: update_task. Mapuje status wewnętrzny (planning/needs_approval/...)
+        na status Projectly (todo|in_progress|done) — Projectly zna tylko te trzy."""
+        projectly_status = _STATUS_TO_PROJECTLY.get(status, "in_progress")
+        self._mcp.call_tool("update_task", {"taskId": task_id, "status": projectly_status})
         return True
 
     def create_task(self, title, description, assigned_to, parent_task_id=None, project_id=None, relation_type="eskalacja"):
