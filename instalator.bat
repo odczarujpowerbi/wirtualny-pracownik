@@ -1,19 +1,36 @@
 @echo off
 chcp 65001 >nul
-setlocal
 title Instalator - Wirtualny Pracownik AI
 
+REM Podnosimy uprawnienia RAZ, na starcie, zeby CALY instalator (lacznie z
+REM krokiem 06 - autostart) dzialal w JEDNYM oknie, bez wyskakujacych okien.
+REM Jesli okno nie jest administratorem, otwieramy je ponownie jako admin i
+REM to nowe okno prowadzi caly proces do konca.
+net session >nul 2>&1
+if %errorlevel% neq 0 (
+  echo Podnosze uprawnienia do administratora - potwierdz pytanie systemu Windows...
+  powershell -NoProfile -Command "try { Start-Process -FilePath '%~f0' -Verb RunAs } catch { exit 1 }"
+  if errorlevel 1 (
+    echo.
+    echo [UWAGA] Nie udalo sie uruchomic jako administrator (odmowa zgody?).
+    echo Kliknij prawym przyciskiem na instalator.bat i wybierz
+    echo "Uruchom jako administrator".
+    echo.
+    pause
+  )
+  exit /b
+)
+
+setlocal
 set "KROKI=%~dp0instalator"
 
 echo ============================================================
 echo   INSTALATOR - Wirtualny Pracownik AI
 echo.
-echo   Przejdzie po kolei przez kroki 01-06.
+echo   Przejdzie po kolei przez kroki 01-06, w tym jednym oknie.
 echo   To, co juz masz zainstalowane, zostanie pominiete.
+echo   Okno zostanie otwarte przez caly czas - nie zamykaj go.
 echo ============================================================
-echo.
-echo   WAZNE: najlepiej uruchom ten instalator jako administrator
-echo   (krok 06 - autostart - tego wymaga; sam o to poprosi, jesli nie).
 echo.
 pause
 echo.

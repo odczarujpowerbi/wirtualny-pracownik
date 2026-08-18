@@ -3,9 +3,13 @@ INSTALATOR - Wirtualny Pracownik AI
 
 NAJPROSCIEJ:
   Wroc do folderu wyzej i uruchom "instalator.bat" (prawy przycisk ->
-  Uruchom jako administrator). Przejdzie po kolei przez kroki 01-06,
-  pomijajac to, co juz masz zainstalowane, i na koncu zaproponuje
+  Uruchom jako administrator). Przejdzie po kolei przez kroki 01-06 w
+  JEDNYM oknie, ktore zostaje otwarte przez caly czas - nie zamyka sie
+  samo. Pomija to, co juz masz zainstalowane, a na koncu zaproponuje
   otwarcie okna podgladu (dashboard).
+
+  Jesli nie uruchomisz go jako administrator, instalator sam otworzy
+  jedno okno administratora i to ono poprowadzi caly proces do konca.
 
 ALBO KROK PO KROKU (te pliki):
   01-programy-podstawowe.bat  - Git, Python, Claude Code (pomija zainstalowane)
