@@ -111,43 +111,56 @@
     <div class="card" data-status="warn">
       <h3><span>1. Claude Code (subskrypcja)</span><span class="tag warn">🟡 częściowe</span></h3>
       <p><b>Metoda domyślna.</b> Wszystko, co da się kodem, przez MCP i na plikach: tworzenie projektów w repo, pełna funkcjonalność, poprawki, praca i walidacja plików, Git.</p>
-      <div class="meta"><b>Dziś:</b> CLI zainstalowane, ale niezalogowane; brak realnego workera projektowego. <b>Bot:</b> Kuba.</div>
+      <div class="meta"><b>Dziś:</b> CLI zainstalowane, ale niezalogowane; brak realnego workera projektowego. <b>Bot:</b> Patrycja.</div>
     </div>
     <div class="card" data-status="err">
       <h3><span>2. Claude Desktop + wtyczka Chrome</span><span class="tag err">⛔ brak</span></h3>
       <p><b>Fallback, gdy kodem się nie da.</b> Klikanie po stronach w przeglądarce (to, czego nie zrobi API ani skrypt).</p>
-      <div class="meta"><b>Dziś:</b> nie zainstalowane, brak integracji. <b>Bot:</b> Damian, sterowany przez Leona.</div>
+      <div class="meta"><b>Dziś:</b> nie zainstalowane, brak integracji. <b>Bot:</b> Aldona, sterowana przez Michała.</div>
     </div>
     <div class="card" data-status="err">
       <h3><span>3. Model lokalny (sterowanie ekranem)</span><span class="tag err">⛔ brak</span></h3>
       <p><b>Warstwa "co kliknąć".</b> Robi zrzuty, wskazuje gdzie kliknąć, prowadzi agenta przeglądarkowego, sterowanie ekranem (computer use), ma własne skrypty, daje drugą opinię.</p>
-      <div class="meta"><b>Dziś:</b> kod już go woła (walidacja, Oskar), ale modele nie zainstalowane. <b>Bot:</b> Leon.</div>
+      <div class="meta"><b>Dziś:</b> kod już go woła (walidacja, Oskar), ale modele nie zainstalowane. <b>Bot:</b> Michał.</div>
     </div>
   </div>
+
+  <h3 style="margin:22px 0 8px;font-size:15.5px">Modele domyślne (czym myśli który bot)</h3>
+  <p class="lead">Dobór modelu do zadania: drogie i trudne na Opus, proste i masowe na Sonnet, sterowanie ekranem lokalnie, a rzeczy, w których Anthropic wypada słabiej (obraz, głos, transkrypcja), przez OpenRouter.</p>
+  <table style="margin-bottom:6px">
+    <thead><tr><th style="width:26%">Do czego</th><th style="width:26%">Model domyślny</th><th>Kiedy i kto</th></tr></thead>
+    <tbody>
+      <tr data-status="warn"><td>Główna praca: projekty, kod, myślenie, decyzje</td><td><b>Claude Opus 4.8</b> (Claude Code, subskrypcja)</td><td>Domyślny mózg. Patrycja i Paweł. Płaski koszt subskrypcji, więc pierwszy wybór.</td></tr>
+      <tr data-status="warn"><td>Proste, masowe, tanie zadania i agenci pomocniczy</td><td><b>Claude Sonnet 4.6</b></td><td>Gdy zadanie nie potrzebuje Opusa. Szybciej i taniej, np. drobne klasyfikacje, krótkie odpowiedzi, pomocnicze kroki.</td></tr>
+      <tr data-status="err"><td>Sterowanie ekranem, druga opinia, ocena zrzutów</td><td><b>Modele lokalne</b> (Ollama: llama3.2-vision, hermes3)</td><td>Michał. Bez kosztu API, na maszynie. Do instalacji.</td></tr>
+      <tr data-status="err"><td>Tam gdzie Anthropic wypada słabiej; obraz, głos, transkrypcja</td><td><b>OpenRouter</b> (API, różne modele)</td><td>Generowanie zdjęć, modele głosowe, transkrypcja, oraz zadania, gdzie inny dostawca jest lepszy. Mamy dostęp API, więc też z terminala.</td></tr>
+    </tbody>
+  </table>
+  <p class="lead" style="margin-top:6px">Zasada doboru: najpierw najtaniej i najprościej (Sonnet albo lokalny), Opus do trudnych rzeczy, OpenRouter do tego, czego Anthropic nie robi dobrze albo w ogóle (obraz/głos). Wybór modelu ma być konfigurowalny bez zmiany kodu.</p>
 
   <!-- 2. Obsada botow -->
   <h2><span class="n">2</span> Obsada botów i co kogo wyzwala</h2>
   <p class="lead">Żaden pojedynczy model nie robi wszystkiego. Roboty wyzwalają się nawzajem (triggery) i odpalają swoje skrypty. Imiona są robocze, można je zmienić.</p>
   <div class="cards">
     <div class="card" data-status="err">
-      <h3><span>Darek — dyspozytor</span><span class="tag err">⛔ brak</span></h3>
+      <h3><span>Paweł — dyspozytor</span><span class="tag err">⛔ brak</span></h3>
       <p>Serce pętli. Co około minutę przechodzi przez wszystkie aktywne zadania, sprawdza status, decyduje czy coś wymaga działania i jaką metodą, po czym wyzwala właściwego wykonawcę.</p>
-      <div class="meta"><b>Wyzwala go:</b> zegar (co ~1 min). <b>Wyzwala:</b> Kubę / Damiana+Leona / Leona.</div>
+      <div class="meta"><b>Wyzwala go:</b> zegar (co ~1 min). <b>Wyzwala:</b> Patrycję / Aldonę+Michała / Michała.</div>
     </div>
     <div class="card" data-status="warn">
-      <h3><span>Kuba — wykonawca kodowy</span><span class="tag warn">🟡 częściowe</span></h3>
-      <p>Domyślny robotnik. Claude Code na subskrypcji: zakłada i prowadzi projekty w repo (zapis na OneDrive), MCP, Git, commit i PR, praca oraz walidacja plików. Bieżąca obsługa istniejących projektów i poprawki.</p>
-      <div class="meta"><b>Wyzwala go:</b> Darek. <b>Wyzwala:</b> bramkę walidacji; przy błędzie Henryka.</div>
+      <h3><span>Patrycja — wykonawczyni kodowa</span><span class="tag warn">🟡 częściowe</span></h3>
+      <p>Domyślna wykonawczyni. Claude Code na subskrypcji: zakłada i prowadzi projekty w repo (zapis na OneDrive), MCP, Git, commit i PR, praca oraz walidacja plików. Bieżąca obsługa istniejących projektów i poprawki.</p>
+      <div class="meta"><b>Wyzwala ją:</b> Paweł. <b>Wyzwala:</b> bramkę walidacji; przy błędzie Kacpra.</div>
     </div>
     <div class="card" data-status="err">
-      <h3><span>Damian — wykonawca przeglądarkowy</span><span class="tag err">⛔ brak</span></h3>
-      <p>Claude Desktop z wtyczką Chrome. Uruchamiany, gdy Kuba nie da rady i trzeba realnie klikać po stronie. Sam z siebie nie wie co klikać, prowadzi go Leon.</p>
-      <div class="meta"><b>Wyzwala go:</b> Darek (gdy potrzeba przeglądarki). <b>Współpracuje z:</b> Leonem.</div>
+      <h3><span>Aldona — wykonawczyni przeglądarkowa</span><span class="tag err">⛔ brak</span></h3>
+      <p>Claude Desktop z wtyczką Chrome. Uruchamiana, gdy Patrycja nie da rady i trzeba realnie klikać po stronie. Sama z siebie nie wie co klikać, prowadzi ją Michał.</p>
+      <div class="meta"><b>Wyzwala ją:</b> Paweł (gdy potrzeba przeglądarki). <b>Współpracuje z:</b> Michałem.</div>
     </div>
     <div class="card" data-status="err">
-      <h3><span>Leon — model lokalny</span><span class="tag err">⛔ brak</span></h3>
-      <p>Orkiestruje działania na ekranie: robi zrzuty, mówi "kliknij tu i tu", steruje Damianem i computer use. Ma własne skrypty. Weryfikuje, czy klik zrobił to, co miał.</p>
-      <div class="meta"><b>Wyzwala go:</b> Darek / Damian. <b>Wyzwala:</b> swoje skrypty; wynik do bramki.</div>
+      <h3><span>Michał — model lokalny</span><span class="tag err">⛔ brak</span></h3>
+      <p>Orkiestruje działania na ekranie: robi zrzuty, mówi "kliknij tu i tu", steruje Aldoną i computer use. Ma własne skrypty. Weryfikuje, czy klik zrobił to, co miał.</p>
+      <div class="meta"><b>Wyzwala go:</b> Paweł / Aldona. <b>Wyzwala:</b> swoje skrypty; wynik do bramki.</div>
     </div>
     <div class="card" data-status="warn">
       <h3><span>Gustaw + Bartek/Franek/Oskar/Bożena — bramka</span><span class="tag warn">🟡 częściowe</span></h3>
@@ -155,32 +168,32 @@
       <div class="meta"><b>Wyzwala go:</b> wykonawca skończył. <b>Wyzwala:</b> zapis (OneDrive+GitHub) albo eskalację.</div>
     </div>
     <div class="card" data-status="err">
-      <h3><span>Henryk — samo-naprawa</span><span class="tag err">⛔ brak</span></h3>
+      <h3><span>Kacper — samo-naprawa</span><span class="tag err">⛔ brak</span></h3>
       <p>Zbiera wszystkie wyjątki, błędy i nietypowe sytuacje z pozostałych botów i zrzuca je do modelu głównego, który poprawia skrypty i skille (branch + PR), żeby maszyna działała bezobsługowo i sama pisała sobie rozwiązania.</p>
       <div class="meta"><b>Wyzwala go:</b> wyjątek/błąd dowolnego bota. <b>Wyzwala:</b> model główny do naprawy.</div>
     </div>
   </div>
 
   <!-- 3. Warunkowanie: drzewo decyzyjne -->
-  <h2><span class="n">3</span> Warunkowanie: jak Darek wybiera metodę</h2>
-  <p class="lead">To jest sedno, którego brakowało. Dla każdego aktywnego zadania Darek schodzi po tym drzewie od góry i wyzwala pierwszą metodę, która wystarcza.</p>
+  <h2><span class="n">3</span> Warunkowanie: jak Paweł wybiera metodę</h2>
+  <p class="lead">To jest sedno, którego brakowało. Dla każdego aktywnego zadania Paweł schodzi po tym drzewie od góry i wyzwala pierwszą metodę, która wystarcza.</p>
   <div class="tree">
     <div class="node">
       <div class="q">Pytanie 1: Da się to zrobić kodem, przez API/MCP albo operacją na plikach?</div>
       <div class="branch yes"><span class="label">TAK →</span>
-        <p class="outcome">Wyzwól <span class="who">Kuba — Claude Code (subskrypcja)</span>. Tworzy/prowadzi projekt w repo na OneDrive, commit, PR, pracuje na plikach, waliduje. To domyślna, najtańsza ścieżka.</p>
+        <p class="outcome">Wyzwól <span class="who">Patrycja — Claude Code (subskrypcja)</span>. Tworzy/prowadzi projekt w repo na OneDrive, commit, PR, pracuje na plikach, waliduje. To domyślna, najtańsza ścieżka.</p>
       </div>
-      <div class="branch no"><span class="label">NIE albo Kuba zawiódł →</span>
+      <div class="branch no"><span class="label">NIE albo Patrycja zawiodła →</span>
         <div class="node" style="margin-top:8px">
           <div class="q">Pytanie 2: Wystarczy przeglądarka (kliknięcia po stronie web)?</div>
           <div class="branch yes"><span class="label">TAK →</span>
-            <p class="outcome">Uruchom <span class="who">Damian — Claude Desktop + Chrome</span>, sterowany przez <span class="who">Leon — model lokalny</span> (co kliknąć, zrzuty). Leon weryfikuje każdy krok.</p>
+            <p class="outcome">Uruchom <span class="who">Aldona — Claude Desktop + Chrome</span>, sterowana przez <span class="who">Michał — model lokalny</span> (co kliknąć, zrzuty). Michał weryfikuje każdy krok.</p>
           </div>
           <div class="branch no"><span class="label">NIE →</span>
             <div class="node" style="margin-top:8px">
               <div class="q">Pytanie 3: Trzeba sterować ekranem poza przeglądarką (zrzut + klik)?</div>
               <div class="branch yes"><span class="label">TAK →</span>
-                <p class="outcome">Wyzwól <span class="who">Leon — model lokalny (computer use)</span>: zrzut, wskazanie kliknięcia, własne skrypty.</p>
+                <p class="outcome">Wyzwól <span class="who">Michał — model lokalny (computer use)</span>: zrzut, wskazanie kliknięcia, własne skrypty.</p>
               </div>
               <div class="branch no"><span class="label">NIE (nie wiadomo jak) →</span>
                 <p class="outcome">Eskalacja do człowieka z jasnym opisem, czego zabrakło (fail-closed, nic na ślepo).</p>
@@ -192,7 +205,7 @@
     </div>
     <div class="node" style="border-left-color:var(--ok)">
       <div class="q" style="color:var(--ok)">Po każdej metodzie: efekt idzie do bramki walidacji.</div>
-      <p class="outcome">Dobrze zrobione → zapis (OneDrive + ślad na GitHub) i status gotowe. Źle → eskalacja albo poprawka. Wyjątek na dowolnym etapie → <span class="who">Henryk (samo-naprawa)</span>.</p>
+      <p class="outcome">Dobrze zrobione → zapis (OneDrive + ślad na GitHub) i status gotowe. Źle → eskalacja albo poprawka. Wyjątek na dowolnym etapie → <span class="who">Kacper (samo-naprawa)</span>.</p>
     </div>
   </div>
 
@@ -200,14 +213,14 @@
   <h2><span class="n">4</span> Pętla ciągła i triggery między botami</h2>
   <p class="lead">Maszyna chodzi non stop. Boty nie działają w oderwaniu: jeden wyzwala drugiego albo odpala skrypty, i tak przez cały łańcuch.</p>
   <div id="loop">
-    <details class="step" data-status="warn"><summary><span class="dot warn"></span><span>Co ~1 min: Darek skanuje aktywne zadania</span><span class="tag warn">🟡 częściowe</span><span class="arrow">▸</span></summary>
-      <div class="body">Dziś runner chodzi co 30s, ale bez warunkowania metody. Docelowo Darek dla każdego aktywnego zadania sprawdza status i pyta: czy coś wymaga działania, i jakiego.</div></details>
+    <details class="step" data-status="warn"><summary><span class="dot warn"></span><span>Co ~1 min: Paweł skanuje aktywne zadania</span><span class="tag warn">🟡 częściowe</span><span class="arrow">▸</span></summary>
+      <div class="body">Dziś runner chodzi co 30s, ale bez warunkowania metody. Docelowo Paweł dla każdego aktywnego zadania sprawdza status i pyta: czy coś wymaga działania, i jakiego.</div></details>
     <div class="conn"></div>
-    <details class="step" data-status="err"><summary><span class="dot err"></span><span>Darek wyzwala właściwego wykonawcę (Kuba / Damian+Leon / Leon)</span><span class="tag err">⛔ brak</span><span class="arrow">▸</span></summary>
-      <div class="body">Warunkowanie z sekcji 3. To jest brakujący router metody. Kuba domyślnie; przeglądarka to Damian prowadzony przez Leona; sterowanie ekranem to Leon.</div></details>
+    <details class="step" data-status="err"><summary><span class="dot err"></span><span>Paweł wyzwala właściwego wykonawcę (Patrycja / Aldona+Michał / Michał)</span><span class="tag err">⛔ brak</span><span class="arrow">▸</span></summary>
+      <div class="body">Warunkowanie z sekcji 3. To jest brakujący router metody. Patrycja domyślnie; przeglądarka to Aldona prowadzona przez Michała; sterowanie ekranem to Michał.</div></details>
     <div class="conn"></div>
     <details class="step" data-status="err"><summary><span class="dot err"></span><span>Wykonawca robi zadanie i odpala swoje skrypty</span><span class="tag err">⛔ brak</span><span class="arrow">▸</span></summary>
-      <div class="body">Kuba: projekt w repo na OneDrive, commit, praca na plikach. Damian: klika w Chrome. Leon: zrzuty, wskazywanie kliknięć, własne skrypty. Jeden bot triggeruje skrypty drugiego.</div></details>
+      <div class="body">Patrycja: projekt w repo na OneDrive, commit, praca na plikach. Aldona: klika w Chrome. Michał: zrzuty, wskazywanie kliknięć, własne skrypty. Jeden bot triggeruje skrypty drugiego.</div></details>
     <div class="conn"></div>
     <details class="step" data-status="warn"><summary><span class="dot warn"></span><span>Bramka walidacji sprawdza, czy zrobione dobrze</span><span class="tag warn">🟡 częściowe</span><span class="arrow">▸</span></summary>
       <div class="body">Gustaw zbiera werdykty Bartka/Franka/Oskara/Bożeny. Logika gotowa; Oskar i Bożena bez modeli lokalnych na razie się degradują.</div></details>
@@ -215,8 +228,8 @@
     <details class="step" data-status="warn"><summary><span class="dot warn"></span><span>Zapis efektu: OneDrive + ślad na GitHub</span><span class="tag warn">🟡 częściowe</span><span class="arrow">▸</span></summary>
       <div class="body">Repo leży już na OneDrive i Git działa. Brakuje automatu: branch + commit + PR + komentarze per zadanie, także dla zadań marketingowych.</div></details>
     <div class="conn"></div>
-    <details class="step" data-status="err"><summary><span class="dot err"></span><span>Wyjątek gdziekolwiek → Henryk → model główny naprawia</span><span class="tag err">⛔ brak</span><span class="arrow">▸</span></summary>
-      <div class="body">Henryk zbiera błędy i anomalie, zrzuca kontekst do modelu głównego, ten poprawia skrypt lub skill i wystawia PR. Cel: maszyna naprawia się sama, bezobsługowo.</div></details>
+    <details class="step" data-status="err"><summary><span class="dot err"></span><span>Wyjątek gdziekolwiek → Kacper → model główny naprawia</span><span class="tag err">⛔ brak</span><span class="arrow">▸</span></summary>
+      <div class="body">Kacper zbiera błędy i anomalie, zrzuca kontekst do modelu głównego, ten poprawia skrypt lub skill i wystawia PR. Cel: maszyna naprawia się sama, bezobsługowo.</div></details>
     <div class="conn"></div>
     <details class="step" data-status="ok"><summary><span class="dot ok"></span><span>Samo-weryfikacja i podgląd (self_check + dashboard)</span><span class="tag ok">✅ działa</span><span class="arrow">▸</span></summary>
       <div class="body">Co godzinę uruchamiane są wszystkie testy dymne; czerwony przebieg w dashboardzie sygnalizuje regresję. To już działa i pilnuje całej reszty.</div></details>
@@ -245,12 +258,12 @@
   <table>
     <thead><tr><th style="width:30%">Obszar</th><th style="width:14%">Status</th><th>Uwaga</th></tr></thead>
     <tbody>
-      <tr data-status="err"><td>Dyspozytor Darek (pętla co minutę, warunkowanie metody)</td><td><span class="tag err">⛔ brak</span></td><td>Serce architektury. Do zbudowania jako pierwszy krok logiki.</td></tr>
-      <tr data-status="err"><td>Logowanie Claude Code (subskrypcja)</td><td><span class="tag err">⛔ brak</span></td><td>Bez tego domyślny wykonawca Kuba nie działa.</td></tr>
-      <tr data-status="err"><td>Modele lokalne (Leon) zainstalowane</td><td><span class="tag err">⛔ brak</span></td><td>Skrypt instalacyjny istnieje, nie jest wpięty w instalator.</td></tr>
-      <tr data-status="err"><td>Claude Desktop + wtyczka Chrome (Damian)</td><td><span class="tag err">⛔ brak</span></td><td>Fallback przeglądarkowy. Do instalacji i integracji.</td></tr>
+      <tr data-status="err"><td>Dyspozytor Paweł (pętla co minutę, warunkowanie metody)</td><td><span class="tag err">⛔ brak</span></td><td>Serce architektury. Do zbudowania jako pierwszy krok logiki.</td></tr>
+      <tr data-status="err"><td>Logowanie Claude Code (subskrypcja)</td><td><span class="tag err">⛔ brak</span></td><td>Bez tego domyślna wykonawczyni Patrycja nie działa.</td></tr>
+      <tr data-status="err"><td>Modele lokalne (Michał) zainstalowane</td><td><span class="tag err">⛔ brak</span></td><td>Skrypt instalacyjny istnieje, nie jest wpięty w instalator.</td></tr>
+      <tr data-status="err"><td>Claude Desktop + wtyczka Chrome (Aldona)</td><td><span class="tag err">⛔ brak</span></td><td>Fallback przeglądarkowy. Do instalacji i integracji.</td></tr>
       <tr data-status="err"><td>Moduł projektów (branch/commit/PR per zadanie, OneDrive)</td><td><span class="tag err">⛔ brak</span></td><td>Ślad każdej pracy w repo.</td></tr>
-      <tr data-status="err"><td>Samo-naprawa (Henryk → model główny)</td><td><span class="tag err">⛔ brak</span></td><td>Docelowo pełna bezobsługowość.</td></tr>
+      <tr data-status="err"><td>Samo-naprawa (Kacper → model główny)</td><td><span class="tag err">⛔ brak</span></td><td>Docelowo pełna bezobsługowość.</td></tr>
       <tr data-status="err"><td>Realne wykonanie zadania (worker)</td><td><span class="tag err">⛔ brak</span></td><td>Dziś execution to zaślepka; router i wykonawcy do zbudowania.</td></tr>
       <tr data-status="warn"><td>Bramka walidacji 5 botów</td><td><span class="tag warn">🟡 częściowe</span></td><td>Logika działa; Oskar i Bożena czekają na modele lokalne.</td></tr>
       <tr data-status="warn"><td>Krok myślenia (task_thinker)</td><td><span class="tag warn">🟡 częściowe</span></td><td>Działa, ale bez zalogowanego Claude Code degraduje się.</td></tr>
@@ -267,20 +280,20 @@
   <ol class="road">
     <li><h4>Logowanie Claude Code + zdrowie modeli <span class="tag err">⛔</span></h4>
       <p>Skrypt <code>zaloguj-claude.bat</code> (Ty logujesz się w sąsiednim terminalu) oraz <code>model_health.py</code>, który cyklicznie sprawdza, czy główny i lokalne modele odpowiadają, i pokazuje to w dashboardzie.</p>
-      <div class="why">Dlaczego najpierw: bez działającego modelu głównego (Kuba) i lokalnego (Leon) żaden wykonawca nie ruszy.</div></li>
+      <div class="why">Dlaczego najpierw: bez działającego modelu głównego (Patrycja) i lokalnego (Michał) żaden wykonawca nie ruszy.</div></li>
     <li><h4>Instalator: modele lokalne + Claude Desktop + wtyczka Chrome + VS Code <span class="tag err">⛔</span></h4>
-      <p>Dołożenie kroków instalatora, żeby świeża VM dostała komplet narzędzi (Leon, Damian, podgląd zmian) bez ręcznego dogrywania.</p>
+      <p>Dołożenie kroków instalatora, żeby świeża VM dostała komplet narzędzi (Michał, Aldona, podgląd zmian) bez ręcznego dogrywania.</p>
       <div class="why">Dlaczego teraz: bez tych narzędzi fallbacki (przeglądarka, sterowanie ekranem) fizycznie nie istnieją na maszynie.</div></li>
-    <li><h4>Dyspozytor Darek: pętla co minutę + warunkowanie metody <span class="tag err">⛔</span></h4>
+    <li><h4>Dyspozytor Paweł: pętla co minutę + warunkowanie metody <span class="tag err">⛔</span></h4>
       <p>Moduł, który przechodzi po aktywnych zadaniach, sprawdza status i wybiera metodę wg drzewa z sekcji 3 (konfiguracja edytowalna bez kodu). Wynik zawsze do bramki.</p>
       <div class="why">Dlaczego teraz: to brakujący środek przepływu, który łączy pozostałe boty.</div></li>
-    <li><h4>Kuba realny: projekty w repo na OneDrive przez Claude Code <span class="tag err">⛔</span></h4>
+    <li><h4>Patrycja realna: projekty w repo na OneDrive przez Claude Code <span class="tag err">⛔</span></h4>
       <p>Wykonawca kodowy zakłada branch, robi commit, PR, pracuje i waliduje pliki, zapis na OneDrive. Zamienia zaślepkę wykonania w prawdziwą pracę dla ścieżki domyślnej.</p>
       <div class="why">Dlaczego teraz: to najczęstszy typ zadań (Git i projekty), więc najwięcej wartości.</div></li>
-    <li><h4>Leon i Damian: klikanie i sterowanie ekranem z weryfikacją <span class="tag err">⛔</span></h4>
-      <p>Model lokalny prowadzi Claude Desktop w Chrome i computer use: zrzuty, wskazywanie kliknięć, własne skrypty, sprawdzanie czy klik zadziałał. Triggery między Darkiem, Damianem i Leonem.</p>
+    <li><h4>Michał i Aldona: klikanie i sterowanie ekranem z weryfikacją <span class="tag err">⛔</span></h4>
+      <p>Model lokalny prowadzi Claude Desktop w Chrome i computer use: zrzuty, wskazywanie kliknięć, własne skrypty, sprawdzanie czy klik zadziałał. Triggery między Pawłem, Aldoną i Michałem.</p>
       <div class="why">Dlaczego teraz: domyka fallbacki dla zadań, których nie da się zrobić kodem.</div></li>
-    <li><h4>Henryk: samo-naprawa i bezobsługowość <span class="tag err">⛔</span></h4>
+    <li><h4>Kacper: samo-naprawa i bezobsługowość <span class="tag err">⛔</span></h4>
       <p>Zbieranie wyjątków i anomalii, zrzut do modelu głównego, automatyczne poprawki skryptów i skilli (branch + PR). Domknięcie: maszyna naprawia się sama.</p>
       <div class="why">Dlaczego na końcu: ma sens dopiero, gdy jest co naprawiać, czyli gdy działają wykonawcy.</div></li>
   </ol>
