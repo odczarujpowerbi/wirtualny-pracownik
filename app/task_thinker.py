@@ -12,16 +12,25 @@ Code nie ma, a jest ANTHROPIC_API_KEY. Brak obu = degradacja bez wywalania
 pętli (zwraca available=False, runner leci dalej na samej klasyfikacji).
 """
 
+import json
 import os
 import shutil
 import subprocess
 import tempfile
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 import env_bootstrap  # noqa: F401  # wczytuje .env / secrets/.env (ANTHROPIC_API_KEY fallback)
 
 THINK_TIMEOUT_SECONDS = 120
 MAX_FIELD_CHARS = 1500
+
+# Lokalny model tekstowy (Ollama) jako ostatni fallback wołania modelu —
+# używany przez ask_model() (np. Bożena, gdy nie ma ani Claude Code, ani klucza).
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+OLLAMA_TEXT_MODEL = os.environ.get("OLLAMA_TEXT_MODEL", "hermes3")
+OLLAMA_TIMEOUT_SECONDS = 20
 
 
 def _find_claude():
@@ -89,6 +98,53 @@ def _think_via_sdk(prompt):
     text = "".join(block.text for block in message.content if getattr(block, "type", None) == "text")
     return {"available": True, "ok": True, "reasoning": text.strip(), "detail": "OK (SDK)",
             "cost_usd": 0.0, "source": "anthropic_sdk"}
+
+
+def _ask_ollama_text(prompt):
+    """Lokalny model tekstowy przez Ollamę. Zwraca tekst albo None, gdy
+    niedostępny — brak lokalnego modelu to nie błąd, tylko brak tej ścieżki."""
+    payload = json.dumps({"model": OLLAMA_TEXT_MODEL, "prompt": prompt, "stream": False}).encode("utf-8")
+    request = urllib.request.Request(
+        f"{OLLAMA_HOST}/api/generate", data=payload, headers={"Content-Type": "application/json"}
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=OLLAMA_TIMEOUT_SECONDS) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+        return None
+    text = (result.get("response") or "").strip()
+    return text or None
+
+
+def ask_model(prompt):
+    """Generyczne wołanie modelu dowolnym promptem (nie tylko analiza zadania).
+    Ta sama hierarchia co think(): Claude Code (claude login) -> SDK anthropic
+    (ANTHROPIC_API_KEY) -> lokalny model tekstowy (Ollama). Nigdy nie rzuca.
+    Zwraca {available, text, source, detail}. Używane przez boty walidujące,
+    które potrzebują oceny modelu (np. Bożena — odbiór biznesowy)."""
+    claude_exe = _find_claude()
+    if claude_exe:
+        try:
+            r = _think_via_claude_code(claude_exe, prompt)
+            if r.get("ok"):
+                return {"available": True, "text": r["reasoning"], "source": "claude_code", "detail": "OK"}
+        except (subprocess.TimeoutExpired, OSError):
+            pass  # spróbujemy kolejnej ścieżki poniżej
+
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        try:
+            r = _think_via_sdk(prompt)
+            if r and r.get("ok"):
+                return {"available": True, "text": r["reasoning"], "source": "anthropic_sdk", "detail": "OK"}
+        except Exception:  # noqa: BLE001 — fallback nie może wywalić wołającego
+            pass
+
+    text = _ask_ollama_text(prompt)
+    if text is not None:
+        return {"available": True, "text": text, "source": "ollama", "detail": "OK (lokalny model)"}
+
+    return {"available": False, "text": None, "source": None,
+            "detail": "Brak modelu (Claude Code / ANTHROPIC_API_KEY / Ollama) — nie mogę ocenić."}
 
 
 def think(task):

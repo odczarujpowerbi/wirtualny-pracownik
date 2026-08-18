@@ -1,0 +1,36 @@
+# Bramka jakości (Gustaw, bot_gustaw_bramka.py) — konfiguracja serii testów,
+# przez które przechodzi KAŻDE zadanie z realnym efektem, zanim wynik trafi do
+# człowieka. Edytowalne bez zmiany kodu.
+#
+# Kolejność = kolejność uruchamiania botów. Każdy bot zwraca werdykt
+# approved/rejected/skipped. Decyzja bramki:
+#   passed = brak blokującego odrzucenia
+#            ORAZ wszystkie boty z listy `mandatory` zatwierdziły
+#            ORAZ liczba zatwierdzeń >= required_approvals
+# Bez passed zadanie idzie do człowieka (eskalacja) z zebranymi zastrzeżeniami.
+
+gate:
+  enabled: true
+  order: [bartek, franek, oskar, bozena]
+  required_approvals: 2
+  # Boty, które MUSZĄ zatwierdzić (weto). Bożena = odbiór biznesowy: bez jej
+  # "tak" nic nie idzie do człowieka jako gotowe. Gdy Bożena nie może ocenić
+  # (brak modelu), zadanie eskaluje — fail-closed, nie cicha zgoda.
+  mandatory: [bozena]
+
+bots:
+  bartek:
+    enabled: true
+    # Rozbieżność między dwoma niezależnymi przebiegami blokuje (niedeterminizm).
+    blocking_on_mismatch: true
+  franek:
+    enabled: true
+    # Błąd wykonania albo nieprzechodzący test funkcjonalny blokuje.
+    blocking_on_error: true
+  oskar:
+    enabled: true
+    # Brak zrzutu ekranu = pominięcie (nie blokuje), ale model oceniający zrzut
+    # negatywnie — blokuje.
+    blocking_on_bad_visual: true
+  bozena:
+    enabled: true

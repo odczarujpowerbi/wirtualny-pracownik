@@ -1,0 +1,44 @@
+# Kontekst biznesowy dla Bożeny (bot odbioru biznesowego, bot_bozena_biznes.py).
+# To jest "wiedza biznesowa użytkownika", przez pryzmat której Bożena ocenia,
+# czy efekt zadania to na pewno TO, czego oczekiwał biurowy użytkownik.
+# Edytowalne bez zmiany kodu (część konfiguracji firmy, SKALOWANIE.md sekcja 2).
+#
+# Bożena składa kontekst z trzech warstw (od ogólnej do szczegółowej):
+#   default  ->  per_typ_zadania[typ]  ->  klienci[klient]
+# Bardziej szczegółowa warstwa dokłada się do ogólnej (nie nadpisuje jej).
+
+default:
+  oczekiwania: >
+    Efekt ma być kompletny, poprawny liczbowo i gotowy do pokazania klientowi
+    bez ręcznych poprawek. Ma odpowiadać dokładnie na to, o co proszono w zadaniu.
+  na_co_uwaga:
+    - liczby zgodne ze źródłem danych, nic nie zmyślone
+    - polskie formatowanie (separator tysięcy, przecinek dziesiętny, daty)
+    - brak placeholderów, "lorem ipsum", pustych sekcji, tekstu roboczego
+    - spójna terminologia i nazewnictwo z resztą raportów klienta
+
+per_typ_zadania:
+  report_build:
+    na_co_uwaga:
+      - zgodność z IBCS przy wariancjach (AC vs PY/PL, kolory wariancji)
+      - osie i nagłówki opisane, jednostki widoczne
+      - brak wizualizacji wychodzących poza obszar strony
+  data_tidy:
+    na_co_uwaga:
+      - liczba wierszy przed i po ma się zgadzać z oczekiwaniem
+      - typy kolumn poprawne (daty jako daty, liczby jako liczby)
+  draft_email:
+    na_co_uwaga:
+      - ton dopasowany do odbiorcy, bez błędów, konkretne wezwanie do działania
+
+# Kontekst per klient (dopasowanie po słowie kluczowym w tytule zadania,
+# tak jak clients_routing.yaml). Na start przykładowo — uzupełniaj realnie.
+klienci:
+  indeka:
+    oczekiwania: Klient zwraca uwagę na dokładność liczb i czytelność dla zarządu.
+    na_co_uwaga:
+      - podsumowania na górze strony, szczegóły niżej
+  magnapharm:
+    oczekiwania: Raporty farmaceutyczne — wrażliwe na poprawność jednostek i okresów.
+    na_co_uwaga:
+      - okresy porównawcze jasno oznaczone

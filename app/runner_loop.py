@@ -23,6 +23,7 @@ from datetime import datetime, timezone
 
 import env_bootstrap  # noqa: F401  # wczytuje .env / secrets/.env (patrz .env.example, bootstrap_init_secrets.py)
 
+import bot_gustaw_bramka
 import cost_tracker
 import heartbeat
 import kill_switch
@@ -35,7 +36,6 @@ import task_thinker
 import validator_prompt
 from escalation import escalate_to_human
 from projectly_client import get_client
-from validator_pool import run_validators
 
 HINT_TO_ACTION = {
     "green": "read_report",
@@ -82,6 +82,9 @@ def process_task(task, policy, routing, client):
     # bez wywalania pętli, gdy model niedostępny (task_thinker.think).
     thinking = task_thinker.think(task)
     state_store.record_event(task_id, "thinking", thinking.get("detail", ""), now_iso())
+    # action_type trafia do zadania, żeby Bożena (odbiór biznesowy) dobrała
+    # właściwą warstwę kontekstu biznesowego per typ zadania.
+    task["action_type"] = action_type
     execution_result = {
         "cost_usd": thinking.get("cost_usd", 0.0),
         "acceptance_notes": thinking.get("reasoning") or "Brak modelu — sama klasyfikacja/routing.",
@@ -89,26 +92,30 @@ def process_task(task, policy, routing, client):
     }
     cost_tracker.record_cost(task_id, execution_result["cost_usd"])
 
-    if risk == "green":
-        status, comment = "done", _comment_green(owner)
-        skill_usage_logger.log_usage(task_id, "risk_classifier", "success", "zielone, auto")
-
-    elif risk == "yellow":
-        requirements = risk_classifier.validator_requirements(action_type, policy)
-        validation = run_validators(task, execution_result, requirements)
-        if validation["auto_approved"]:
-            status, comment = "done", _comment_yellow_approved(owner, validation)
-            skill_usage_logger.log_usage(task_id, "validator_pool", "success", str(validation["agreement"]))
-        else:
-            reason = _validator_failure_reason(validation)
-            escalate_to_human(task, reason, client, assignee=owner)
-            status, comment = "needs_approval", _comment_escalated(owner, reason)
-            skill_usage_logger.log_usage(task_id, "validator_pool", "failure", reason)
-
-    else:  # red
+    if risk == "red":
         reason = "Czerwona akcja — poza zakresem tego szkieletu, brak jeszcze zdefiniowanej bounded_red do sprawdzenia."
         escalate_to_human(task, reason, client, assignee=owner)
         status, comment = "needs_approval", _comment_escalated(owner, reason)
+
+    elif risk == "green" and not _has_effect(execution_result):
+        # Zielone bez realnego efektu (np. sam odczyt) — szybka ścieżka, bez bramki.
+        status, comment = "done", _comment_green(owner)
+        skill_usage_logger.log_usage(task_id, "risk_classifier", "success", "zielone bez efektu, auto")
+
+    else:
+        # Żółte ORAZ zielone z efektem (zrzut/plik/testy) przechodzą pełną bramkę
+        # jakości (Gustaw): Bartek, Franek, Oskar, Bożena — zanim człowiek dostanie
+        # odpowiedź jako gotową.
+        gate = bot_gustaw_bramka.run_gate(task, execution_result)
+        state_store.record_event(task_id, "quality_gate", gate["summary"], now_iso())
+        if gate["passed"]:
+            status, comment = "done", _comment_gate_passed(owner, gate)
+            skill_usage_logger.log_usage(task_id, "quality_gate", "success", gate["summary"])
+        else:
+            reason = _gate_failure_reason(gate)
+            escalate_to_human(task, reason, client, assignee=owner)
+            status, comment = "needs_approval", _comment_escalated(owner, reason)
+            skill_usage_logger.log_usage(task_id, "quality_gate", "failure", reason)
 
     state_store.upsert_task(task_id, payload=task, status=status, assigned_to=owner, risk_level=risk, now=now_iso())
     state_store.record_event(task_id, "status_set", status, now_iso())
@@ -123,14 +130,21 @@ def process_task(task, policy, routing, client):
     return {"task_id": task_id, "risk": risk, "owner": owner, "status": status}
 
 
+def _has_effect(execution_result):
+    """Czy zadanie wytworzyło realny efekt do walidacji (zrzut, plik, testy,
+    powtarzalny przebieg). Zielone bez efektu idą szybką ścieżką, z efektem —
+    przez bramkę (decyzja usera: żółte i wyżej + zielone z efektem)."""
+    return any(execution_result.get(k) for k in ("screenshot_path", "output_file", "functional_checks", "rerun"))
+
+
 def _comment_green(owner):
     return f"✅ done\nCo zrobiono: klasyfikacja i routing (Faza 0-1 — bez realnego workera jeszcze).\nPrzypisano do: {owner}\n"
 
 
-def _comment_yellow_approved(owner, validation):
+def _comment_gate_passed(owner, gate):
     return (
-        f"✅ done (auto-zatwierdzone: {validation['agreement']}/{validation['total']} walidatorów, "
-        f"próg {validation['required']})\nPrzypisano do: {owner}\n"
+        f"✅ done (przeszło bramkę jakości: zgody {gate['approvals']}/{gate['required']})\n"
+        f"{gate['summary']}\nPrzypisano do: {owner}\n"
     )
 
 
@@ -138,11 +152,9 @@ def _comment_escalated(owner, reason):
     return f"⚠️ needs_approval\nWymaga decyzji: tak — {reason}\nUtworzono osobne zadanie dla: {owner}\n"
 
 
-def _validator_failure_reason(validation):
-    failed = [r["detail"] for r in validation["results"] if not r["approved"]]
-    return f"Zgoda {validation['agreement']}/{validation['total']} poniżej progu {validation['required']}. " + "; ".join(
-        failed
-    )
+def _gate_failure_reason(gate):
+    concerns = "; ".join(gate["concerns"]) or "brak szczegółów"
+    return f"Bramka jakości nie przepuściła zadania. {gate['summary']} Zastrzeżenia: {concerns}"
 
 
 def run_once(client=None):
