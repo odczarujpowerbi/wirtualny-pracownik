@@ -145,14 +145,14 @@
       <div class="meta"><b>Kto:</b> Patrycja i zarejestrowane skrypty.</div>
     </div>
     <div class="card" data-status="err">
-      <h3><span>3. Automatyzacja UI (przeglądarka)</span><span class="tag err">brak</span></h3>
-      <p>Sterowanie kontrolkami, gdy brak API. Claude Desktop plus wtyczka Chrome.</p>
-      <div class="meta"><b>Kto:</b> Aldona, prowadzona przez Michała.</div>
+      <h3><span>3. Przeglądarka (Claude Desktop)</span><span class="tag err">brak</span></h3>
+      <p>Zadania webowe. Claude Desktop działa dość samodzielnie w oknie przeglądarki (wtyczka Chrome opcjonalna, nie jest kluczowa).</p>
+      <div class="meta"><b>Kto:</b> Aldona. Michał ją podgląda i robi zrzuty.</div>
     </div>
     <div class="card" data-status="err">
-      <h3><span>4. Computer use (ekran)</span><span class="tag err">brak</span></h3>
-      <p>Zrzuty, sterowanie myszą i klawiaturą, weryfikacja wizualna. Wymaga własnej pętli i nadzoru.</p>
-      <div class="meta"><b>Kto:</b> Michał (model lokalny).</div>
+      <h3><span>4. Computer use (klikanie po ekranie)</span><span class="tag err">brak</span></h3>
+      <p>Gdy trzeba coś kliknąć albo włączyć program poza przeglądarką. Zrzuty, mysz i klawiatura, weryfikacja wizualna.</p>
+      <div class="meta"><b>Kto:</b> Asia klika, Michał weryfikuje i robi zrzuty.</div>
     </div>
   </div>
 
@@ -160,9 +160,10 @@
   <table>
     <thead><tr><th style="width:26%">Do czego</th><th style="width:26%">Model domyślny</th><th>Kiedy i kto</th></tr></thead>
     <tbody>
-      <tr data-status="warn"><td>Główna praca: projekty, kod, myślenie, decyzje</td><td><b>Claude Opus 4.8</b> (Claude Code, subskrypcja)</td><td>Domyślny mózg. Patrycja i Paweł. Płaski koszt subskrypcji, pierwszy wybór.</td></tr>
-      <tr data-status="warn"><td>Proste, masowe, tanie zadania i agenci pomocniczy</td><td><b>Claude Sonnet 4.6</b></td><td>Gdy nie trzeba Opusa. Szybciej i taniej.</td></tr>
-      <tr data-status="err"><td>Sterowanie ekranem, druga opinia, ocena zrzutów</td><td><b>Modele lokalne</b> (Ollama: llama3.2-vision, hermes3)</td><td>Michał. Bez kosztu API, na maszynie.</td></tr>
+      <tr data-status="err"><td>Dyspozytor i mózg: decyzje, planowanie, ocena (Paweł)</td><td><b>Opus 5.0</b> (najmocniejszy model)</td><td>Paweł tylko decyduje, nie wykonuje. Najdroższy, bo od jego decyzji zależy reszta.</td></tr>
+      <tr data-status="warn"><td>Praca kodowa: projekty, pliki, raporty zmian (Patrycja)</td><td><b>Claude Code</b> (Opus 4.8, proste na Sonnet 4.6)</td><td>Subskrypcja, płaski koszt. Auto-akceptacja w granicach skilla; decyzje o plikach idą do Pawła.</td></tr>
+      <tr data-status="warn"><td>Bramka odbioru efektu (Gustaw i spółka)</td><td><b>Lepsze modele</b> (Opus) do oceny</td><td>Dostają porównanie: zadanie u źródła vs efekt, kod, zrzuty.</td></tr>
+      <tr data-status="err"><td>Weryfikacja ekranu, zrzuty, klikanie (Michał, Asia)</td><td><b>Modele lokalne</b> (Ollama: llama3.2-vision, hermes3)</td><td>Bez kosztu API, na maszynie. Michał weryfikuje i robi zrzuty, Asia klika.</td></tr>
       <tr data-status="err"><td>Obraz, głos, transkrypcja; gdzie Anthropic słabszy</td><td><b>OpenRouter</b> (API, różne modele)</td><td>Generowanie zdjęć, modele głosowe, transkrypcja. Mamy dostęp API, też z terminala.</td></tr>
     </tbody>
   </table>
@@ -171,24 +172,38 @@
   <h2><span class="n">3</span> Obsada botów i co kogo wyzwala</h2>
   <p class="lead">Żaden pojedynczy model nie robi wszystkiego. Boty wyzwalają się nawzajem i odpalają swoje skrypty. Imiona robocze.</p>
   <div class="cards">
-    <div class="card" data-status="err"><h3><span>Paweł — dyspozytor</span><span class="tag err">brak</span></h3>
-      <p>Co około minutę przechodzi przez aktywne zadania, sprawdza status i uprawnienia, decyduje o metodzie, wyzwala wykonawcę.</p>
-      <div class="meta"><b>Wyzwala go:</b> zegar (~1 min). <b>Wyzwala:</b> Patrycję / Aldonę+Michała / Michała.</div></div>
+    <div class="card" data-status="err"><h3><span>Paweł — dyspozytor i mózg</span><span class="tag err">brak</span></h3>
+      <p>Siła myśląca na najmocniejszym modelu (Opus 5.0). Sam się wyzwala co ~1 min. <b>Tylko decyduje, nie wykonuje.</b> Wszyscy raportują do niego. Decyduje: metodę, akceptację zmian plików od Patrycji, czy bramka dostaje zrzuty, ponowne zlecenie i poprawki, oraz push na GitHub.</p>
+      <div class="meta"><b>Wyzwala go:</b> zegar + raporty wszystkich. <b>Wyzwala:</b> wykonawców i poprawki.</div></div>
     <div class="card" data-status="warn"><h3><span>Patrycja — wykonawczyni kodowa</span><span class="tag warn">częściowe</span></h3>
-      <p>Domyślna. Claude Code na subskrypcji: projekty w repo (zapis na OneDrive), MCP, Git, commit i PR, praca oraz walidacja plików. Bieżąca obsługa i poprawki.</p>
-      <div class="meta"><b>Wyzwala ją:</b> Paweł. <b>Wyzwala:</b> bramkę; przy błędzie Kacpra.</div></div>
-    <div class="card" data-status="err"><h3><span>Aldona — wykonawczyni przeglądarkowa</span><span class="tag err">brak</span></h3>
-      <p>Claude Desktop z wtyczką Chrome. Uruchamiana, gdy Patrycja nie da rady i trzeba klikać po stronie. Prowadzi ją Michał.</p>
-      <div class="meta"><b>Wyzwala ją:</b> Paweł. <b>Współpracuje z:</b> Michałem.</div></div>
-    <div class="card" data-status="err"><h3><span>Michał — model lokalny</span><span class="tag err">brak</span></h3>
-      <p>Sterowanie ekranem: zrzuty, "kliknij tu i tu", computer use, własne skrypty, druga opinia. Weryfikuje, czy klik zadziałał.</p>
-      <div class="meta"><b>Wyzwala go:</b> Paweł / Aldona. <b>Wyzwala:</b> swoje skrypty; wynik do bramki.</div></div>
+      <p>Claude Code, obecna przy każdym otwartym VS Code i Claude Code. Robi pracę i raporty zmian. Domyślnie działa na automacie (skill akceptujący sporo), ale <b>akceptacja tworzenia lub modyfikacji plików idzie do Pawła</b>.</p>
+      <div class="meta"><b>Wyzwala ją:</b> Paweł. <b>Raportuje do:</b> Pawła. <b>Wyzwala:</b> bramkę po skończeniu.</div></div>
+    <div class="card" data-status="err"><h3><span>Aldona — przeglądarka</span><span class="tag err">brak</span></h3>
+      <p>Claude Desktop, działa dość samodzielnie w oknie przeglądarki (wtyczka Chrome opcjonalna). Zadania webowe, gdy nie da się kodem. Nie potrzebuje częstych podpowiedzi.</p>
+      <div class="meta"><b>Wyzwala ją:</b> Paweł. <b>Raportuje do:</b> Pawła. <b>Podgląda ją:</b> Michał.</div></div>
+    <div class="card" data-status="err"><h3><span>Michał — weryfikator i orkiestrator</span><span class="tag err">brak</span></h3>
+      <p>Model lokalny. Podgląda, co robią Patrycja, Aldona i Asia, <b>robi zrzuty każdego</b>. Włącza i konfiguruje narzędzia (VS Code, repozytoria). Zarządza większością na maszynie, kilka ekranów, dużo zadań.</p>
+      <div class="meta"><b>Raportuje do:</b> Pawła (per zadanie albo zbiorczo). <b>Wyzwala:</b> Asię do klikania; zrzuty do bramki.</div></div>
+    <div class="card" data-status="err"><h3><span>Asia — klikacz</span><span class="tag err">brak</span></h3>
+      <p>Model lokalny (computer use). Wchodzi, gdy trzeba coś kliknąć albo włączyć program na ekranie. Robi zrzuty dla bramki na żądanie.</p>
+      <div class="meta"><b>Kieruje nią:</b> Michał / Paweł. <b>Podgląda ją:</b> Michał.</div></div>
     <div class="card" data-status="warn"><h3><span>Bramka: Gustaw + Bartek/Franek/Oskar/Bożena</span><span class="tag warn">częściowe</span></h3>
-      <p>Sprawdza, czy efekt zrobiony dobrze. Bartek regresja, Franek testy funkcjonalne, Oskar zrzut, Bożena odbiór biznesowy. Logika przetestowana.</p>
-      <div class="meta"><b>Wyzwala go:</b> koniec wykonania. <b>Wyzwala:</b> zapis albo eskalację.</div></div>
-    <div class="card" data-status="err"><h3><span>Kacper — samo-naprawa</span><span class="tag err">brak</span></h3>
-      <p>Zbiera wyjątki i anomalie, zrzuca do modelu głównego, ten poprawia skrypty i skille (branch + PR), żeby działało bezobsługowo.</p>
-      <div class="meta"><b>Wyzwala go:</b> wyjątek dowolnego bota. <b>Wyzwala:</b> model główny do naprawy.</div></div>
+      <p>Na lepszych modelach. Porównuje zadanie u źródła z efektem (kod, zrzuty), sprawdza co jest do poprawy. Może poprosić o zrzuty (robi je Asia). Zwraca werdykt do Pawła.</p>
+      <div class="meta"><b>Wyzwala go:</b> koniec wykonania. <b>Zwraca do:</b> Pawła (dobrze / do poprawy + lista).</div></div>
+    <div class="card" data-status="err"><h3><span>Kacper — monitor i samo-naprawa</span><span class="tag err">brak</span></h3>
+      <p>Własny skrypt, chodzi bardzo często (~30 s). Czyta wspólny dziennik, sprawdza status <b>wszystkich</b> bieżących zadań i nietypowe przebiegi. Buduje bazę wiedzy na bieżąco. Tworzy zadania naprawcze (np. skill źle zrobiony).</p>
+      <div class="meta"><b>Pilne:</b> od razu do Pawła. <b>Niepilne:</b> na listę, co godzinę do Projectly i zbiorczo do Pawła.</div></div>
+  </div>
+
+  <h3 class="sub">Zasady współpracy: wspólny dziennik, raportowanie, równoległość</h3>
+  <div class="cards">
+    <div class="card" data-status="warn"><h3><span>Jeden wspólny dziennik przebiegów</span><span class="tag warn">częściowe</span></h3>
+      <p>Wszyscy agenci zapisują informacje o swoich przebiegach w <b>jedno miejsce</b>. Z niego czytają Kacper (monitoring) i dashboard. Jedno źródło prawdy o tym, co się dzieje.</p>
+      <div class="meta"><b>Dziś:</b> run_history.jsonl i state.db istnieją; do rozszerzenia o wpisy każdego agenta per zadanie.</div></div>
+    <div class="card" data-status="err"><h3><span>Wszyscy raportują do Pawła</span><span class="tag err">do zbudowania</span></h3>
+      <p>Patrycja, Aldona i Asia raportują bezpośrednio. Michał pośrednio: podgląda innych i melduje zbiorczo. Paweł tylko decyduje na podstawie tych raportów.</p></div>
+    <div class="card" data-status="err"><h3><span>Kilka zadań i repozytoriów naraz</span><span class="tag err">do zbudowania</span></h3>
+      <p>Mechanizm zakłada, że kilka zadań jest aktywnych jednocześnie i kilka repozytoriów otwartych. Michał ma do dyspozycji kilka ekranów i steruje równolegle.</p></div>
   </div>
 
   <!-- 4. Warunkowanie -->
@@ -203,12 +218,12 @@
         <div class="node" style="margin-top:8px">
           <div class="q">Pytanie 2: Wystarczy przeglądarka (kliknięcia web)?</div>
           <div class="branch yes"><span class="label">TAK →</span>
-            <p class="outcome">Uruchom <span class="who">Aldona — Claude Desktop + Chrome</span>, sterowana przez <span class="who">Michał — model lokalny</span>. Michał weryfikuje każdy krok.</p></div>
+            <p class="outcome">Uruchom <span class="who">Aldona — Claude Desktop</span> (samodzielnie w oknie przeglądarki). <span class="who">Michał</span> ją podgląda i robi zrzuty.</p></div>
           <div class="branch no"><span class="label">NIE →</span>
             <div class="node" style="margin-top:8px">
               <div class="q">Pytanie 3: Trzeba sterować ekranem poza przeglądarką?</div>
               <div class="branch yes"><span class="label">TAK →</span>
-                <p class="outcome">Wyzwól <span class="who">Michał — computer use</span>: zrzut, wskazanie kliknięcia, własne skrypty.</p></div>
+                <p class="outcome">Wchodzi <span class="who">Asia — klikacz (computer use)</span>: klika i włącza program. <span class="who">Michał</span> weryfikuje i robi zrzuty.</p></div>
               <div class="branch no"><span class="label">NIE (nie wiadomo jak) →</span>
                 <p class="outcome">Eskalacja do człowieka z opisem, czego zabrakło (fail-closed).</p></div>
             </div></div>
@@ -338,17 +353,17 @@ constraints:
     <details class="step" data-status="err"><summary><span class="dot err"></span><span>Paweł sprawdza uprawnienia i wyzwala wykonawcę</span><span class="tag err">brak</span><span class="arrow">▸</span></summary>
       <div class="body">Warunkowanie z sekcji 4 plus kontrakt uprawnień z sekcji 5. To brakujący router metody z bramką uprawnień.</div></details>
     <div class="conn"></div>
-    <details class="step" data-status="err"><summary><span class="dot err"></span><span>Wykonawca robi zadanie w granicach kontraktu</span><span class="tag err">brak</span><span class="arrow">▸</span></summary>
-      <div class="body">Patrycja: projekt w repo na OneDrive. Aldona: klika w Chrome. Michał: zrzuty i sterowanie. Każdy tylko w ramach dozwolonych narzędzi i ścieżek.</div></details>
+    <details class="step" data-status="err"><summary><span class="dot err"></span><span>Wykonawcy robią zadanie, Michał robi zrzuty wszystkich</span><span class="tag err">brak</span><span class="arrow">▸</span></summary>
+      <div class="body">Patrycja: kod i pliki w repo na OneDrive. Aldona: przeglądarka. Asia: klikanie po ekranie. Michał podgląda całość i robi zrzuty każdego. Kilka zadań może iść naraz. Każdy tylko w ramach dozwolonych narzędzi i ścieżek. Wszyscy raportują do Pawła (Michał zbiorczo).</div></details>
     <div class="conn"></div>
-    <details class="step" data-status="warn"><summary><span class="dot warn"></span><span>Walidacja (3 poziomy) i ślad audytowy</span><span class="tag warn">częściowe</span><span class="arrow">▸</span></summary>
-      <div class="body">Bezpieczeństwo przed wykonaniem, bramka odbioru efektu, komplet dowodów w folderze uruchomienia.</div></details>
+    <details class="step" data-status="warn"><summary><span class="dot warn"></span><span>Bramka ocenia efekt i zwraca werdykt do Pawła</span><span class="tag warn">częściowe</span><span class="arrow">▸</span></summary>
+      <div class="body">Bramka porównuje zadanie u źródła z efektem (kod, zrzuty od Asi), może poprosić o dodatkowe zrzuty. Zwraca do Pawła: dobrze albo do poprawy z listą. Jeśli do poprawy, Paweł zleca poprawkę. Wszystko z pełnym śladem audytowym (sekcja 7).</div></details>
     <div class="conn"></div>
-    <details class="step" data-status="warn"><summary><span class="dot warn"></span><span>Zapis efektu: OneDrive + ślad na GitHub</span><span class="tag warn">częściowe</span><span class="arrow">▸</span></summary>
-      <div class="body">Repo na lokalnym klonie, commit i push do GitHub (branch + PR), a do OneDrive statusy, zrzuty, raporty i artefakty. Repo nie leży bezpośrednio w folderze synchronizowanym.</div></details>
+    <details class="step" data-status="warn"><summary><span class="dot warn"></span><span>Zapis: lokalne commity na OneDrive, push na GitHub gdy gotowe</span><span class="tag warn">częściowe</span><span class="arrow">▸</span></summary>
+      <div class="body">Repozytoria leżą na OneDrive, agent robi tam lokalne commity. Gdy projekt jest skończony, leci push na GitHub. <b>Decyzję o pushu podejmuje Paweł.</b></div></details>
     <div class="conn"></div>
-    <details class="step" data-status="err"><summary><span class="dot err"></span><span>Wyjątek → Kacper → model główny naprawia</span><span class="tag err">brak</span><span class="arrow">▸</span></summary>
-      <div class="body">Kacper zbiera błędy, zrzuca do modelu głównego, ten poprawia skrypt lub skill i wystawia PR. Cel: bezobsługowość.</div></details>
+    <details class="step" data-status="err"><summary><span class="dot err"></span><span>Równolegle co ~30 s: Kacper monitoruje wszystkie zadania</span><span class="tag err">brak</span><span class="arrow">▸</span></summary>
+      <div class="body">Kacper czyta wspólny dziennik, sprawdza status wszystkich bieżących zadań i nietypowe przebiegi, buduje bazę wiedzy. Pilne, alarmujące → od razu do Pawła. Reszta → na listę, co godzinę do Projectly i zbiorczo do Pawła. Tworzy zadania naprawcze (np. skill źle zrobiony) i karmi model główny do poprawek.</div></details>
   </div>
 
   <!-- 10. Ryzyko i czlowiek w petli -->
@@ -401,7 +416,7 @@ constraints:
       <p>Rejestr narzędzi z allowed_roots, schematem parametrów, poziomem ryzyka i funkcją walidującą. Model uruchamia tylko zarejestrowane narzędzia, nigdy dowolny shell.</p>
       <div class="why">Dlaczego najpierw: to warunek bezpieczeństwa i wymóg autora, bez tego nie wolno rozszerzać zakresu.</div></li>
     <li><h4>Pełny ślad audytowy per uruchomienie <span class="tag err">⛔</span></h4>
-      <p>Folder TASK-xxxx z task.json, plan.md, events.jsonl, zrzutami przed/po, changes.diff, costs.json i final-report.md. Kryterium odbioru: 100% uruchomień.</p>
+      <p>Folder TASK-xxxx z task.json, plan.md, events.jsonl, zrzutami przed/po, changes.diff, costs.json i final-report.md, plus <b>wspólny dziennik przebiegów</b>, do którego piszą wszyscy agenci (czyta go Kacper i dashboard). Kryterium odbioru: 100% uruchomień.</p>
       <div class="why">Dlaczego teraz: rozliczalność to rdzeń celu biznesowego i warunek przejścia z fazy A.</div></li>
     <li><h4>Logowanie Claude Code + zdrowie modeli <span class="tag err">⛔</span></h4>
       <p>zaloguj-claude.bat i model_health.py, żeby główny i lokalne modele realnie odpowiadały i było to widać w dashboardzie.</p>
@@ -415,12 +430,12 @@ constraints:
     <li><h4>Dyspozytor Paweł + router metody z bramką uprawnień <span class="tag err">⛔</span></h4>
       <p>Pętla co minutę po aktywnych zadaniach, wybór metody wg drzewa, sprawdzenie kontraktu uprawnień przed wykonaniem. Wynik zawsze do bramki i audytu.</p>
       <div class="why">Dlaczego teraz: to środek przepływu łączący boty, uprawnienia i walidację.</div></li>
-    <li><h4>Realni wykonawcy: Patrycja (repo), potem Michał i Aldona (ekran) <span class="tag err">⛔</span></h4>
-      <p>Zamiana zaślepki wykonania w prawdziwą pracę: projekty w repo na OneDrive, potem klikanie i sterowanie ekranem z weryfikacją.</p>
+    <li><h4>Realni wykonawcy: Patrycja (repo), potem Aldona i Asia (przeglądarka, ekran), Michał weryfikuje <span class="tag err">⛔</span></h4>
+      <p>Zamiana zaślepki wykonania w prawdziwą pracę: projekty w repo na OneDrive, potem przeglądarka (Aldona) i klikanie po ekranie (Asia), a Michał podgląda wszystkich i robi zrzuty. Obsługa kilku zadań i repozytoriów naraz.</p>
       <div class="why">Dlaczego na końcu: ma sens dopiero, gdy governance, audyt i wiedza są na miejscu.</div></li>
-    <li><h4>Kacper: samo-naprawa i bezobsługowość <span class="tag err">⛔</span></h4>
-      <p>Zbieranie wyjątków, zrzut do modelu głównego, automatyczne poprawki skryptów i skilli. Domknięcie pełnej bezobsługowości.</p>
-      <div class="why">Dlaczego na końcu: ma co naprawiać dopiero, gdy działają wykonawcy.</div></li>
+    <li><h4>Kacper: monitoring co 30 s, baza wiedzy i samo-naprawa <span class="tag err">⛔</span></h4>
+      <p>Własny skrypt czytający wspólny dziennik: status wszystkich zadań, nietypowe przebiegi, budowanie bazy wiedzy. Pilne od razu do Pawła, reszta co godzinę do Projectly. Tworzy zadania naprawcze i karmi model główny do poprawek skryptów i skilli.</p>
+      <div class="why">Dlaczego na końcu: ma co monitorować i naprawiać dopiero, gdy działają wykonawcy i jest wspólny dziennik.</div></li>
   </ol>
 
   <div class="callout">
