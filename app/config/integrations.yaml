@@ -40,8 +40,21 @@ integrations:
     notes: "Lokalna kopia projektów stron (te same repo co GitHub) i biblioteka skilli (ZESPOL-BOTOW.md sekcja 4)."
 
   miro:
-    mechanism: "connector"
+    mechanism: "OAuth (client id + secret)"
     access: "read-only"
+    notes: "Autoryzacja przez aplikacje OAuth: MIRO_CLIENT_ID + MIRO_CLIENT_SECRET (wczesniej pojedynczy token)."
+
+  meta_ads:
+    mechanism: "Graph API + SDK facebook-business (Python)"
+    access: "budżet/publikacja = czerwone (PLAN-WDROZENIA.md sekcja 6); odczyt statusu/statystyk kampanii = zielone"
+    notes: >
+      Uwierzytelnianie: aplikacja typu Business powiazana z BM, System User z
+      tokenem o uprawnieniu ads_management. Cztery ID w secrets/.env:
+      META_APP_ID, META_APP_SECRET, META_ACCESS_TOKEN (System User),
+      META_AD_ACCOUNT_ID (act_...). Kolejnosc wdrozenia: 1) app Business+BM ->
+      2) System User + assety + token ads_management -> 3) zebrac 4 ID ->
+      4) test flow w Graph API Explorer na kampanii testowej PAUSED ->
+      5) dopiero potem SDK facebook-business i kod na Railway.
 
   tiktok_ads:
     mechanism: "API (do potwierdzenia dokładny mechanizm/uprawnienia konta)"
