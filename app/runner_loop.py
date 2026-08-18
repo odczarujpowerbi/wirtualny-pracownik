@@ -31,6 +31,7 @@ import risk_classifier
 import skill_usage_logger
 import state_store
 import task_router
+import task_thinker
 import validator_prompt
 from escalation import escalate_to_human
 from projectly_client import get_client
@@ -76,9 +77,16 @@ def process_task(task, policy, routing, client):
         task_id, "classified", f"action_type={action_type} risk={risk} owner={owner} confident={confident}", now
     )
 
-    # Zaślepka wykonania — patrz docstring modułu. Koszt=0, bo żaden model
-    # jeszcze nie został wywołany na tym etapie (Faza 0-1).
-    execution_result = {"cost_usd": 0.0, "acceptance_notes": "Faza 0-1: brak realnego workera, tylko klasyfikacja."}
+    # Krok myślenia: model analizuje zadanie (Claude Code headless przez
+    # `claude login`, albo SDK z ANTHROPIC_API_KEY jako fallback). Degraduje się
+    # bez wywalania pętli, gdy model niedostępny (task_thinker.think).
+    thinking = task_thinker.think(task)
+    state_store.record_event(task_id, "thinking", thinking.get("detail", ""), now_iso())
+    execution_result = {
+        "cost_usd": thinking.get("cost_usd", 0.0),
+        "acceptance_notes": thinking.get("reasoning") or "Brak modelu — sama klasyfikacja/routing.",
+        "thinking": thinking,
+    }
     cost_tracker.record_cost(task_id, execution_result["cost_usd"])
 
     if risk == "green":
@@ -104,6 +112,10 @@ def process_task(task, policy, routing, client):
 
     state_store.upsert_task(task_id, payload=task, status=status, assigned_to=owner, risk_level=risk, now=now_iso())
     state_store.record_event(task_id, "status_set", status, now_iso())
+
+    reasoning = execution_result.get("thinking", {}).get("reasoning")
+    if reasoning:
+        comment += "\n\n🧠 Analiza (Claude):\n" + reasoning
 
     client.post_comment(task_id, comment)
     client.update_status(task_id, status)
