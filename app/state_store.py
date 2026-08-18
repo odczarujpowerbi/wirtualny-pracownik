@@ -29,6 +29,27 @@ CREATE TABLE IF NOT EXISTS events (
 );
 """
 
+# Kolumny decyzyjne (M2b) dokładane do tabeli events, żeby każdy wpis mógł nieść
+# odpowiedź na: KTO zdecydował, CO, DLACZEGO, jakim MODELEM, jakim KOSZTEM i jak
+# długo. Wpisy bez tych pól (stare record_event) mają je NULL — wstecznie zgodne.
+# Osobna migracja, bo CREATE TABLE IF NOT EXISTS nie dodaje kolumn do istniejącej
+# tabeli (żywe runs/state.db powstało przed tą zmianą).
+_DECISION_COLUMNS = {
+    "agent": "TEXT",
+    "decision": "TEXT",
+    "reason": "TEXT",
+    "model": "TEXT",
+    "cost_usd": "REAL",
+    "duration_ms": "INTEGER",
+}
+
+
+def _migrate(conn):
+    existing = {row[1] for row in conn.execute("PRAGMA table_info(events)")}
+    for name, coltype in _DECISION_COLUMNS.items():
+        if name not in existing:
+            conn.execute(f"ALTER TABLE events ADD COLUMN {name} {coltype}")
+
 
 def get_connection():
     """Publiczny dostęp do połączenia — do zapytań, których nie pokrywają
@@ -36,6 +57,8 @@ def get_connection():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.executescript(SCHEMA)
+    with conn:
+        _migrate(conn)
     return conn
 
 
@@ -84,15 +107,34 @@ def list_tasks(status=None):
     return [{"task_id": r[0], "status": r[1]} for r in rows]
 
 
-def record_event(task_id, event_type, detail, now):
-    """Dopisuje zdarzenie — tylko dopisywane, nigdy nadpisywane (jak events.jsonl w dokumentacji bazowej)."""
+def record_event(task_id, event_type, detail, now, *, agent=None, decision=None,
+                 reason=None, model=None, cost_usd=None, duration_ms=None):
+    """Dopisuje zdarzenie — tylko dopisywane, nigdy nadpisywane (jak events.jsonl
+    w dokumentacji bazowej). Pola decyzyjne (agent/decision/reason/model/cost/
+    duration) są opcjonalne: podane przez log_decision dla decyzji agentów (M2b),
+    None dla zwykłych zdarzeń technicznych."""
     conn = _connect()
     with conn:
         conn.execute(
-            "INSERT INTO events (task_id, event_type, detail, created_at) VALUES (?, ?, ?, ?)",
-            (task_id, event_type, detail, now),
+            """INSERT INTO events
+               (task_id, event_type, detail, created_at, agent, decision, reason, model, cost_usd, duration_ms)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (task_id, event_type, detail, now, agent, decision, reason, model, cost_usd, duration_ms),
         )
     conn.close()
+
+
+def log_decision(task_id, agent, decision, reason, now, *, event_type="decision",
+                 detail=None, model=None, cost_usd=None, duration_ms=None):
+    """Zapisuje DECYZJĘ agenta do wspólnego dziennika (M2b): kto, co, dlaczego,
+    jakim modelem, jakim kosztem. To źródło zakładki 'Przepływy' w dashboardzie
+    i eksportu do analizy (export_decisions.py). Cienka nakładka na record_event,
+    żeby był jeden strumień zdarzeń, nie dwa równoległe."""
+    record_event(
+        task_id, event_type, detail if detail is not None else reason, now,
+        agent=agent, decision=decision, reason=reason, model=model,
+        cost_usd=cost_usd, duration_ms=duration_ms,
+    )
 
 
 def get_events(task_id):
@@ -103,3 +145,21 @@ def get_events(task_id):
     ).fetchall()
     conn.close()
     return [{"event_type": r[0], "detail": r[1], "created_at": r[2]} for r in rows]
+
+
+_DECISION_FIELDS = ["id", "task_id", "event_type", "created_at", "agent",
+                    "decision", "reason", "model", "cost_usd", "duration_ms"]
+
+
+def get_recent_decisions(limit=200):
+    """Ostatnie decyzje agentów (wpisy z wypełnionym `agent`), najnowsze pierwsze —
+    zasila zakładkę 'Przepływy'. Zwykłe zdarzenia techniczne (agent IS NULL) pomijamy,
+    żeby przepływ był czytelny: kto → co → dlaczego → model → koszt."""
+    conn = _connect()
+    rows = conn.execute(
+        f"""SELECT {', '.join(_DECISION_FIELDS)} FROM events
+            WHERE agent IS NOT NULL ORDER BY id DESC LIMIT ?""",
+        (limit,),
+    ).fetchall()
+    conn.close()
+    return [dict(zip(_DECISION_FIELDS, row)) for row in rows]

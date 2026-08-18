@@ -16,9 +16,21 @@ wcześniejszymi wdrożeniami/testami), potem `secrets/.env` z
 istnieje.
 """
 
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+# Konsola Windows domyślnie NIE jest UTF-8 (tu: cp1250) i wywala się na emoji
+# w komentarzach/statusach (np. ✅ ✅ → UnicodeEncodeError, ubija runner).
+# Ponieważ ten moduł importuje KAŻDY punkt wejścia, wymuszamy tu UTF-8 na
+# stdout/stderr raz dla całego procesu. errors="replace" — nawet nietypowy
+# znak nigdy nie ubije procesu autonomicznego. Ten sam wzorzec co w self_check.py.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass  # strumień przekierowany do StringIO/pliku — już radzi sobie z Unicode
 
 load_dotenv()
 load_dotenv(Path(__file__).parent / "secrets" / ".env", override=True)

@@ -29,6 +29,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import job_scheduler
+import state_store
 
 HOST = "127.0.0.1"
 PORT = 8787
@@ -41,6 +42,12 @@ def build_state():
         "status": job_scheduler._load_state(),
         "history": job_scheduler.load_history(limit=100),
     }
+
+
+def build_flows(limit=200):
+    """Zakładka 'Przepływy' (M2b): ostatnie decyzje agentów z state.db —
+    kto → co → dlaczego → model → koszt. Źródło do podglądu na żywo i analizy."""
+    return {"decisions": state_store.get_recent_decisions(limit=limit)}
 
 
 def _validate_updates(body):
@@ -77,6 +84,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._serve_html()
         elif parsed.path == "/api/state":
             self._send_json(build_state())
+        elif parsed.path == "/api/flows":
+            self._send_json(build_flows())
         elif parsed.path == "/api/run-log":
             self._handle_run_log(parse_qs(parsed.query))
         else:

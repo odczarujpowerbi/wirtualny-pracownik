@@ -38,5 +38,17 @@
     "risk_level_hint": "green",
     "max_ai_cost_usd": 0.1,
     "created_by": "email_intake_triage"
+  },
+  {
+    "task_id": "PRJ-0005",
+    "title": "Waliduj strukturę PBIP raportu Sales",
+    "action": "validate_pbip",
+    "project_path": "mock_data/sample_pbip",
+    "expected_result": "Raport walidacji struktury PBIP: lista błędów i ostrzeżeń",
+    "acceptance_criteria": ["Plik .pbip poprawny JSON", "Foldery .Report i .SemanticModel spójne"],
+    "source_file_link": null,
+    "risk_level_hint": "green",
+    "max_ai_cost_usd": 0.0,
+    "created_by": "pawel"
   }
 ]

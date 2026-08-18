@@ -25,6 +25,7 @@ import env_bootstrap  # noqa: F401  # wczytuje .env / secrets/.env (patrz .env.e
 
 import bot_gustaw_bramka
 import cost_tracker
+import executor
 import heartbeat
 import kill_switch
 import live_status_publisher
@@ -63,6 +64,9 @@ def process_task(task, policy, routing, client):
     if not prompt_check["safe"]:
         owner, _ = task_router.route_task(task["title"], routing)
         escalate_to_human(task, f"Wykryto podejrzaną treść: {prompt_check['detail']}", client, assignee=owner)
+        state_store.log_decision(
+            task_id, agent="pawel", decision="escalate",
+            reason=f"prompt injection: {prompt_check['detail']}", now=now_iso(), event_type="escalation")
         status = "needs_approval"
         state_store.upsert_task(task_id, payload=task, status=status, assigned_to=owner, risk_level="red", now=now_iso())
         client.post_comment(task_id, _comment_escalated(owner, prompt_check["detail"]))
@@ -73,32 +77,66 @@ def process_task(task, policy, routing, client):
     risk = risk_classifier.classify(action_type, policy)
     owner, confident = task_router.route_task(task["title"], routing)
 
-    state_store.record_event(
-        task_id, "classified", f"action_type={action_type} risk={risk} owner={owner} confident={confident}", now
+    state_store.log_decision(
+        task_id, agent="pawel", decision=f"risk={risk}",
+        reason=f"action_type={action_type}, właściciel={owner}, pewność routingu={confident}",
+        now=now, event_type="classified",
     )
 
     # Krok myślenia: model analizuje zadanie (Claude Code headless przez
     # `claude login`, albo SDK z ANTHROPIC_API_KEY jako fallback). Degraduje się
     # bez wywalania pętli, gdy model niedostępny (task_thinker.think).
-    thinking = task_thinker.think(task)
-    state_store.record_event(task_id, "thinking", thinking.get("detail", ""), now_iso())
     # action_type trafia do zadania, żeby Bożena (odbiór biznesowy) dobrała
     # właściwą warstwę kontekstu biznesowego per typ zadania.
     task["action_type"] = action_type
-    execution_result = {
-        "cost_usd": thinking.get("cost_usd", 0.0),
-        "acceptance_notes": thinking.get("reasoning") or "Brak modelu — sama klasyfikacja/routing.",
-        "thinking": thinking,
-    }
+
+    thinking = task_thinker.think(task)
+    state_store.record_event(task_id, "thinking", thinking.get("detail", ""), now_iso())
+
+    # Realny worker, jeśli istnieje dla tego typu zadania (dziś: walidacja PBIP).
+    # Gdy None — zostaje dotychczasowa ścieżka "sama klasyfikacja", nic nie udajemy.
+    real = executor.execute(task)
+    if real is not None:
+        execution_result = {**real, "thinking": thinking,
+                            "cost_usd": real.get("cost_usd", 0.0) + thinking.get("cost_usd", 0.0)}
+        state_store.log_decision(
+            task_id, agent="patrycja", decision=real["tool"],
+            reason=real["acceptance_notes"], now=now_iso(),
+            event_type="execution", cost_usd=real.get("cost_usd", 0.0),
+        )
+    else:
+        execution_result = {
+            "cost_usd": thinking.get("cost_usd", 0.0),
+            "acceptance_notes": thinking.get("reasoning") or "Brak modelu — sama klasyfikacja/routing.",
+            "thinking": thinking,
+        }
     cost_tracker.record_cost(task_id, execution_result["cost_usd"])
+
+    # Worker odmówił wykonania (np. ścieżka poza dozwolonym katalogiem roboczym) —
+    # to zdarzenie bezpieczeństwa, eskalujemy wprost, nie przez bramkę jakości
+    # (nie podajemy podejrzanej ścieżki dalej do botów).
+    if real is not None and real.get("executed") is False:
+        reason = real["acceptance_notes"]
+        escalate_to_human(task, reason, client, assignee=owner)
+        state_store.log_decision(task_id, agent="pawel", decision="escalate", reason=reason,
+                                 now=now_iso(), event_type="escalation")
+        state_store.upsert_task(task_id, payload=task, status="needs_approval",
+                                assigned_to=owner, risk_level=risk, now=now_iso())
+        client.post_comment(task_id, _comment_escalated(owner, reason))
+        client.update_status(task_id, "needs_approval")
+        return {"task_id": task_id, "risk": risk, "owner": owner, "status": "needs_approval"}
 
     if risk == "red":
         reason = "Czerwona akcja — poza zakresem tego szkieletu, brak jeszcze zdefiniowanej bounded_red do sprawdzenia."
         escalate_to_human(task, reason, client, assignee=owner)
+        state_store.log_decision(task_id, agent="pawel", decision="escalate", reason=reason,
+                                 now=now_iso(), event_type="escalation")
         status, comment = "needs_approval", _comment_escalated(owner, reason)
 
     elif risk == "green" and not _has_effect(execution_result):
         # Zielone bez realnego efektu (np. sam odczyt) — szybka ścieżka, bez bramki.
+        state_store.log_decision(task_id, agent="pawel", decision="auto_done",
+                                 reason="zielone bez efektu — auto, bez bramki", now=now_iso())
         status, comment = "done", _comment_green(owner)
         skill_usage_logger.log_usage(task_id, "risk_classifier", "success", "zielone bez efektu, auto")
 
@@ -107,13 +145,18 @@ def process_task(task, policy, routing, client):
         # jakości (Gustaw): Bartek, Franek, Oskar, Bożena — zanim człowiek dostanie
         # odpowiedź jako gotową.
         gate = bot_gustaw_bramka.run_gate(task, execution_result)
-        state_store.record_event(task_id, "quality_gate", gate["summary"], now_iso())
+        state_store.log_decision(
+            task_id, agent="gustaw",
+            decision="gate_passed" if gate["passed"] else "gate_failed",
+            reason=gate["summary"], now=now_iso(), event_type="quality_gate")
         if gate["passed"]:
             status, comment = "done", _comment_gate_passed(owner, gate)
             skill_usage_logger.log_usage(task_id, "quality_gate", "success", gate["summary"])
         else:
             reason = _gate_failure_reason(gate)
             escalate_to_human(task, reason, client, assignee=owner)
+            state_store.log_decision(task_id, agent="pawel", decision="escalate", reason=reason,
+                                     now=now_iso(), event_type="escalation")
             status, comment = "needs_approval", _comment_escalated(owner, reason)
             skill_usage_logger.log_usage(task_id, "quality_gate", "failure", reason)
 

@@ -40,6 +40,7 @@ from pathlib import Path
 
 import yaml
 
+import env_bootstrap  # noqa: F401 — wymusza UTF-8 na stdout/stderr dla procesu schedulera (autostart Windows)
 import kill_switch
 
 # Ile znakow wyjscia (stdout+stderr) zapisujemy na przebieg. Powyzej tego
