@@ -75,3 +75,22 @@ jobs:
   function: run_feedback_requests
   interval_seconds: 86400
   enabled: false
+# Samo-weryfikacja: uruchamia wszystkie testy dymne i zaznacza w dashboardzie
+# czerwony przebieg, gdy cokolwiek sie zepsulo. WLACZONY - to jest mechanizm
+# "sprawdzaj czy wszystko dziala" po kazdym dodaniu skilla/funkcji.
+- name: self_check
+  description: Samo-weryfikacja - uruchamia wszystkie testy dymne (*_smoke_test.py).
+    Czerwony przebieg = cos sie zepsulo; klik w przebieg pokazuje ktory test i dlaczego.
+  module: self_check
+  function: run_self_check
+  interval_seconds: 3600
+  enabled: true
+# Auto-aktualizacja kodu z GitHub. Domyslnie WYLACZONY - wlacz w dashboardzie,
+# gdy chcesz, zeby VM sama pobierala nowy kod (po pull self_check zweryfikuje).
+- name: repo_update
+  description: Pobiera swiezy kod z GitHub (git pull --ff-only). Domyslnie wylaczony
+    - wlacz, gdy VM ma sie aktualizowac sama bez klikania aktualizuj-repo.bat.
+  module: repo_updater
+  function: run_update
+  interval_seconds: 1800
+  enabled: false
