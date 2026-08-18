@@ -29,3 +29,49 @@ jobs:
   function: run_machine_status_report
   interval_seconds: 3600
   enabled: true
+- name: cost_tracker
+  description: Pilnuje dziennego kosztu API. Sumuje wydatki i wyzwala kill switch po
+    przekroczeniu limitu z polityki. Tylko odczyt plus zabezpieczenie, bezpieczny cyklicznie.
+  module: cost_tracker
+  function: check_daily_limit
+  interval_seconds: 3600
+  enabled: true
+# Ponizsze skrypty sa WIDOCZNE w dashboardzie, ale domyslnie WYLACZONE
+# (enabled: false), bo wykonuja akcje na zewnatrz (tworza zadania, wysylaja
+# maile). Uruchom je recznie przyciskiem "Uruchom teraz", zeby zobaczyc co
+# zwracaja, a staly harmonogram wlacz dopiero swiadomie (fail-closed).
+- name: digest_generator
+  description: Digest z Projectly przed daily/weekly (zrobione, przeterminowane, w
+    toku). Domyslnie wylaczony, wlacz gdy chcesz codzienny digest.
+  module: digest_generator
+  function: generate_digest
+  interval_seconds: 86400
+  enabled: false
+- name: source_schema_watcher
+  description: Wykrywa zmiane struktury plikow zrodlowych CSV i tworzy zadanie dla
+    wlasciciela. Domyslnie wylaczony, bo tworzy zadania.
+  module: source_schema_watcher
+  function: check_all_watched_sources
+  interval_seconds: 3600
+  enabled: false
+- name: weekly_team_report
+  description: Raport tygodniowy zespolu (zrobione, przeterminowane, zalegle wpisy
+    czasu). Domyslnie wylaczony, bo moze wysylac kopie mailem.
+  module: weekly_team_report
+  function: run_weekly_team_report
+  interval_seconds: 604800
+  enabled: false
+- name: mailerlite_report_analyzer
+  description: Cotygodniowy raport MailerLite (statystyki, czytelnosc, ocena tonu).
+    Domyslnie wylaczony, wymaga klucza MailerLite.
+  module: mailerlite_report_analyzer
+  function: run_weekly_report
+  interval_seconds: 604800
+  enabled: false
+- name: task_feedback_requester
+  description: Prosi o feedback po zamknieciu zadania (komentarz, zadanie, mail).
+    Domyslnie wylaczony, bo tworzy zadania i wysyla maile.
+  module: task_feedback_requester
+  function: run_feedback_requests
+  interval_seconds: 86400
+  enabled: false

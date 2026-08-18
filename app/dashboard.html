@@ -6,25 +6,38 @@
 <title>Wirtualny pracownik - dashboard skryptów</title>
 <style>
   :root { --bg:#f4f5f7; --card:#fff; --line:#e2e5ea; --ink:#1f2430; --muted:#6b7280;
-          --ok:#18A558; --err:#E84040; --accent:#2b6cb0; }
+          --ok:#18A558; --err:#E84040; --accent:#2b6cb0; --off:#9aa2ad; }
   * { box-sizing: border-box; }
-  body { margin:0; font-family: system-ui, "Segoe UI", Arial, sans-serif;
-         background:var(--bg); color:var(--ink); }
-  header { padding:18px 24px; background:var(--card); border-bottom:1px solid var(--line);
-           display:flex; align-items:baseline; gap:16px; }
+  html, body { margin:0; height:100%; }
+  body { font-family: system-ui, "Segoe UI", Arial, sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:16px 24px; background:var(--card); border-bottom:1px solid var(--line);
+           display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; }
   header h1 { font-size:18px; margin:0; }
   header .sub { color:var(--muted); font-size:13px; }
-  main { padding:24px; max-width:1200px; margin:0 auto; }
-  h2 { font-size:15px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin:28px 0 12px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
-  table { width:100%; border-collapse:collapse; font-size:14px; }
-  th, td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
-  th { font-size:12px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); background:#fafbfc; }
+  /* Pelna szerokosc ekranu - bez sztywnego max-width. */
+  main { padding:20px 24px 60px; width:100%; }
+  h2 { font-size:15px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin:26px 0 10px; }
+  .refreshed { color:var(--muted); font-size:12px; font-weight:400; text-transform:none; letter-spacing:0; }
+
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; }
+  .table-wrap { width:100%; overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:14px; table-layout:fixed; }
+  th, td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--line);
+           vertical-align:top; overflow:hidden; }
+  th { position:relative; font-size:12px; text-transform:uppercase; letter-spacing:.03em;
+       color:var(--muted); background:#fafbfc; white-space:nowrap; }
   tr:last-child td { border-bottom:none; }
+  td.ellipsis { white-space:nowrap; text-overflow:ellipsis; }
+  td.wrap { white-space:normal; word-break:break-word; }
   .job-name { font-weight:600; }
-  textarea { width:100%; min-height:52px; resize:vertical; font:inherit; padding:6px 8px;
+
+  /* Uchwyt do rozsuwania kolumn. */
+  .resizer { position:absolute; top:0; right:0; width:7px; height:100%; cursor:col-resize; user-select:none; }
+  .resizer:hover { background:var(--accent); opacity:.35; }
+
+  textarea { width:100%; min-height:48px; resize:vertical; font:inherit; padding:6px 8px;
              border:1px solid var(--line); border-radius:6px; }
-  input[type=number] { width:88px; font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:6px; }
+  input[type=number] { width:100%; max-width:110px; font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:6px; }
   .hint { color:var(--muted); font-size:12px; margin-top:4px; }
   .badge { display:inline-block; padding:2px 9px; border-radius:999px; font-size:12px; font-weight:600; }
   .badge.ok { background:#e6f6ee; color:var(--ok); }
@@ -32,65 +45,116 @@
   .badge.none { background:#eceef1; color:var(--muted); }
   .badge.manual { background:#eef2fb; color:var(--accent); }
   .badge.schedule { background:#eceef1; color:var(--muted); }
+  .badge.clickable { cursor:pointer; }
+  .badge.clickable:hover { filter:brightness(0.95); text-decoration:underline; }
+  .row-off td { color:var(--off); }
   button { font:inherit; cursor:pointer; border-radius:6px; border:1px solid var(--line);
-           background:#fff; padding:6px 12px; }
+           background:#fff; padding:6px 11px; margin:2px 0; }
   button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
   button:disabled { opacity:.5; cursor:default; }
-  .actions { display:flex; gap:8px; }
+  .actions { display:flex; flex-wrap:wrap; gap:6px; }
   .switch { display:flex; align-items:center; gap:6px; font-size:13px; }
-  .err-cell { color:var(--err); font-size:12px; white-space:pre-wrap; }
+  .clickrow { cursor:pointer; }
+  .clickrow:hover td { background:#f8fafc; }
+  .err-cell { color:var(--err); font-size:12px; }
+
   .toast { position:fixed; right:20px; bottom:20px; background:var(--ink); color:#fff;
            padding:10px 16px; border-radius:8px; font-size:14px; opacity:0; transition:opacity .2s;
-           pointer-events:none; max-width:360px; }
+           pointer-events:none; max-width:360px; z-index:50; }
   .toast.show { opacity:1; }
-  .refreshed { color:var(--muted); font-size:12px; }
+
+  /* Okno szczegolu przebiegu. */
+  .overlay { position:fixed; inset:0; background:rgba(20,24,32,.5); display:none;
+             align-items:center; justify-content:center; z-index:40; padding:24px; }
+  .overlay.show { display:flex; }
+  .modal { background:var(--card); border-radius:12px; width:min(1000px, 96vw); max-height:90vh;
+           display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+  .modal-head { padding:16px 20px; border-bottom:1px solid var(--line); display:flex;
+                align-items:center; gap:12px; }
+  .modal-head h3 { margin:0; font-size:16px; flex:1; }
+  .modal-meta { padding:12px 20px; display:flex; gap:20px; flex-wrap:wrap; font-size:13px;
+                color:var(--muted); border-bottom:1px solid var(--line); }
+  .modal-meta b { color:var(--ink); font-weight:600; }
+  .modal-body { padding:16px 20px; overflow:auto; }
+  .modal-body h4 { margin:0 0 6px; font-size:13px; text-transform:uppercase; color:var(--muted); }
+  pre { background:#0f1420; color:#e6e9ef; padding:14px; border-radius:8px; overflow:auto;
+        font-family: "Cascadia Code", Consolas, monospace; font-size:13px; line-height:1.5;
+        white-space:pre-wrap; word-break:break-word; margin:0 0 16px; }
+  .result-box { background:#f6f8fa; border:1px solid var(--line); border-radius:8px; padding:12px;
+                font-family: Consolas, monospace; font-size:13px; white-space:pre-wrap;
+                word-break:break-word; margin:0 0 16px; }
 </style>
 </head>
 <body>
 <header>
   <h1>Dashboard skryptów</h1>
-  <span class="sub">Każdy przebieg się odkłada. Harmonogram edytujesz tutaj - scheduler podchwyci zmianę bez restartu.</span>
+  <span class="sub">Kliknij w status przebiegu albo w wiersz historii, żeby zobaczyć pełne wyjście skryptu. Kolumny można rozsuwać.</span>
 </header>
 <main>
   <h2>Skrypty i harmonogram</h2>
-  <div class="card"><table id="jobs">
+  <div class="card"><div class="table-wrap"><table id="jobs">
     <thead><tr>
-      <th style="width:22%">Skrypt / opis</th>
-      <th style="width:12%">Co ile</th>
-      <th style="width:8%">Włączony</th>
-      <th style="width:10%">Ostatni</th>
-      <th style="width:18%">Ostatni przebieg</th>
-      <th style="width:18%">Następny start</th>
-      <th style="width:12%">Akcje</th>
+      <th data-w="15%">Skrypt</th>
+      <th data-w="28%">Opis</th>
+      <th data-w="9%">Co ile</th>
+      <th data-w="6%">Wł.</th>
+      <th data-w="9%">Ostatni</th>
+      <th data-w="12%">Ostatni przebieg</th>
+      <th data-w="12%">Następny start</th>
+      <th data-w="9%">Akcje</th>
     </tr></thead>
     <tbody id="jobs-body"></tbody>
-  </table></div>
+  </table></div></div>
 
   <h2>Historia przebiegów <span id="refreshed" class="refreshed"></span></h2>
-  <div class="card"><table id="history">
+  <div class="card"><div class="table-wrap"><table id="history">
     <thead><tr>
-      <th style="width:20%">Kiedy</th>
-      <th style="width:22%">Skrypt</th>
-      <th style="width:10%">Status</th>
-      <th style="width:10%">Trwał</th>
-      <th style="width:12%">Źródło</th>
-      <th style="width:26%">Błąd</th>
+      <th data-w="18%">Kiedy</th>
+      <th data-w="20%">Skrypt</th>
+      <th data-w="10%">Status</th>
+      <th data-w="10%">Trwał</th>
+      <th data-w="12%">Źródło</th>
+      <th data-w="30%">Błąd</th>
     </tr></thead>
     <tbody id="history-body"></tbody>
-  </table></div>
+  </table></div></div>
 </main>
+
+<div id="overlay" class="overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="m-title">Przebieg</h3>
+      <button onclick="closeModal()">Zamknij</button>
+    </div>
+    <div class="modal-meta" id="m-meta"></div>
+    <div class="modal-body">
+      <div id="m-result-wrap" style="display:none">
+        <h4>Zwrócona wartość</h4>
+        <div class="result-box" id="m-result"></div>
+      </div>
+      <div id="m-error-wrap" style="display:none">
+        <h4>Błąd</h4>
+        <div class="result-box" id="m-error" style="color:var(--err)"></div>
+      </div>
+      <h4>Pełne wyjście (stdout + stderr)</h4>
+      <pre id="m-output"></pre>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 
 <script>
 const REFRESH_MS = 10000;
 let statusMap = {};
-let rowRefs = {}; // nazwa zadania -> komórki statusu, żeby auto-odświeżanie nie kasowało edycji
+let rowRefs = {};
 
 function el(tag, props = {}, children = []) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(props)) {
     if (k === "class") node.className = v;
     else if (k === "text") node.textContent = v;
+    else if (k === "html") node.innerHTML = v;
     else node[k] = v;
   }
   for (const c of children) node.appendChild(c);
@@ -104,14 +168,15 @@ function fmt(iso) {
 }
 
 function humanInterval(sec) {
+  if (sec % 86400 === 0) return `= ${sec / 86400} dni`;
   if (sec % 3600 === 0) return `= ${sec / 3600} h`;
   if (sec % 60 === 0) return `= ${sec / 60} min`;
   return `= ${sec} s`;
 }
 
-function badge(status) {
+function badge(status, extraClass = "") {
   const cls = status === "ok" ? "ok" : status === "error" ? "error" : "none";
-  return el("span", { class: `badge ${cls}`, text: status || "—" });
+  return el("span", { class: `badge ${cls} ${extraClass}`.trim(), text: status || "—" });
 }
 
 function toast(msg, isError = false) {
@@ -122,6 +187,34 @@ function toast(msg, isError = false) {
   setTimeout(() => t.classList.remove("show"), 2600);
 }
 
+// ---- Rozsuwanie kolumn (zapamietywane w localStorage) ----
+function makeResizable(table, key) {
+  const ths = [...table.tHead.rows[0].cells];
+  const saved = JSON.parse(localStorage.getItem(key) || "null");
+  ths.forEach((th, i) => {
+    if (saved && saved[i]) th.style.width = saved[i] + "px";
+    else if (th.dataset.w) th.style.width = th.dataset.w;
+    const handle = el("span", { class: "resizer" });
+    handle.addEventListener("pointerdown", (e) => startResize(e, th, ths, key));
+    th.appendChild(handle);
+  });
+}
+
+function startResize(e, th, ths, key) {
+  e.preventDefault();
+  const startX = e.clientX;
+  const startW = th.getBoundingClientRect().width;
+  const move = (ev) => { th.style.width = Math.max(60, startW + (ev.clientX - startX)) + "px"; };
+  const up = () => {
+    document.removeEventListener("pointermove", move);
+    document.removeEventListener("pointerup", up);
+    localStorage.setItem(key, JSON.stringify(ths.map((t) => Math.round(t.getBoundingClientRect().width))));
+  };
+  document.addEventListener("pointermove", move);
+  document.addEventListener("pointerup", up);
+}
+
+// ---- Tabela skryptow ----
 function buildJobRow(job) {
   const s = statusMap[job.name] || {};
   const interval = el("input", { type: "number", min: "1", value: job.interval_seconds });
@@ -139,59 +232,112 @@ function buildJobRow(job) {
   const run = el("button", { text: "Uruchom teraz" });
   run.addEventListener("click", () => runJob(job.name, run));
 
-  const statusTd = el("td", {}, [badge(s.last_status)]);
-  const lastTd = el("td", { text: fmt(s.last_run_at) });
-  const nextTd = el("td", { text: fmt(s.next_run_at) });
+  const statusTd = el("td", {});
+  const lastTd = el("td", { class: "ellipsis", text: fmt(s.last_run_at) });
+  const nextTd = el("td", { class: "ellipsis", text: fmt(s.next_run_at) });
   rowRefs[job.name] = { statusTd, lastTd, nextTd };
+  fillStatusCell(statusTd, s);
 
-  return el("tr", {}, [
-    el("td", {}, [el("div", { class: "job-name", text: job.name }), desc]),
+  const tr = el("tr", {}, [
+    el("td", { class: "ellipsis" }, [el("div", { class: "job-name", text: job.name })]),
+    el("td", {}, [desc]),
     el("td", {}, [interval, hint]),
     el("td", {}, [el("label", { class: "switch" }, [enabled])]),
     statusTd, lastTd, nextTd,
     el("td", {}, [el("div", { class: "actions" }, [save, run])]),
   ]);
+  if (job.enabled === false) tr.className = "row-off";
+  return tr;
+}
+
+function fillStatusCell(td, s) {
+  if (s.last_run_id) {
+    const b = badge(s.last_status, "clickable");
+    b.title = "Kliknij, aby zobaczyć pełne wyjście";
+    b.addEventListener("click", () => openRunDetail(s.last_run_id));
+    td.replaceChildren(b);
+  } else {
+    td.replaceChildren(badge(s.last_status));
+  }
 }
 
 function renderJobs(jobs) {
   rowRefs = {};
-  const body = document.getElementById("jobs-body");
-  body.replaceChildren(...jobs.map(buildJobRow));
+  document.getElementById("jobs-body").replaceChildren(...jobs.map(buildJobRow));
 }
 
-// Auto-odświeżanie: aktualizuje tylko komórki statusu, nie dotyka pól edycji.
-// Jeśli lista zadań się zmieniła (dodano/usunięto), przebudowuje całość.
 function updateJobStatuses(jobs) {
-  const sameSet = jobs.length === Object.keys(rowRefs).length
-    && jobs.every((j) => rowRefs[j.name]);
+  const sameSet = jobs.length === Object.keys(rowRefs).length && jobs.every((j) => rowRefs[j.name]);
   if (!sameSet) { renderJobs(jobs); return; }
   for (const job of jobs) {
     const s = statusMap[job.name] || {};
     const ref = rowRefs[job.name];
-    ref.statusTd.replaceChildren(badge(s.last_status));
+    fillStatusCell(ref.statusTd, s);
     ref.lastTd.textContent = fmt(s.last_run_at);
     ref.nextTd.textContent = fmt(s.next_run_at);
   }
 }
 
+// ---- Historia ----
 function renderHistory(history) {
   const body = document.getElementById("history-body");
   if (!history.length) {
     body.replaceChildren(el("tr", {}, [el("td", { colSpan: 6, class: "hint", text: "Jeszcze żaden skrypt się nie wykonał." })]));
     return;
   }
-  const rows = history.map((h) => el("tr", {}, [
-    el("td", { text: fmt(h.run_at) }),
-    el("td", { text: h.name }),
-    el("td", {}, [badge(h.status)]),
-    el("td", { text: h.duration_seconds != null ? h.duration_seconds + " s" : "—" }),
-    el("td", {}, [el("span", { class: `badge ${h.trigger === "manual" ? "manual" : "schedule"}`,
-                               text: h.trigger === "manual" ? "ręcznie" : "harmonogram" })]),
-    el("td", { class: "err-cell", text: h.error || "" }),
-  ]));
+  const rows = history.map((h) => {
+    const tr = el("tr", { class: "clickrow" }, [
+      el("td", { class: "ellipsis", text: fmt(h.run_at) }),
+      el("td", { class: "ellipsis", text: h.name }),
+      el("td", {}, [badge(h.status)]),
+      el("td", { text: h.duration_seconds != null ? h.duration_seconds + " s" : "—" }),
+      el("td", {}, [el("span", { class: `badge ${h.trigger === "manual" ? "manual" : "schedule"}`,
+                                 text: h.trigger === "manual" ? "ręcznie" : "harmonogram" })]),
+      el("td", { class: "wrap err-cell", text: h.error || "" }),
+    ]);
+    if (h.id) tr.addEventListener("click", () => openRunDetail(h.id));
+    return tr;
+  });
   body.replaceChildren(...rows);
 }
 
+// ---- Szczegol przebiegu (okno) ----
+async function openRunDetail(runId) {
+  if (!runId) return;
+  try {
+    const res = await fetch("/api/run-log?id=" + encodeURIComponent(runId));
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error ? json.error.message : "Brak szczegółów");
+    showModal(json.data);
+  } catch (e) {
+    toast(e.message, true);
+  }
+}
+
+function showModal(rec) {
+  document.getElementById("m-title").textContent = rec.name + "  ·  " + (rec.status || "");
+  const meta = document.getElementById("m-meta");
+  meta.replaceChildren(
+    el("span", { html: `<b>Kiedy:</b> ${fmt(rec.run_at)}` }),
+    el("span", { html: `<b>Trwał:</b> ${rec.duration_seconds != null ? rec.duration_seconds + " s" : "—"}` }),
+    el("span", { html: `<b>Źródło:</b> ${rec.trigger === "manual" ? "ręcznie" : "harmonogram"}` }),
+    el("span", { html: `<b>Status:</b> ${rec.status || "—"}` }),
+  );
+  const resWrap = document.getElementById("m-result-wrap");
+  if (rec.result) { document.getElementById("m-result").textContent = rec.result; resWrap.style.display = ""; }
+  else resWrap.style.display = "none";
+  const errWrap = document.getElementById("m-error-wrap");
+  if (rec.error) { document.getElementById("m-error").textContent = rec.error; errWrap.style.display = ""; }
+  else errWrap.style.display = "none";
+  document.getElementById("m-output").textContent = rec.output && rec.output.trim() ? rec.output : "(skrypt nic nie wypisał)";
+  document.getElementById("overlay").classList.add("show");
+}
+
+function closeModal() { document.getElementById("overlay").classList.remove("show"); }
+document.getElementById("overlay").addEventListener("click", (e) => { if (e.target.id === "overlay") closeModal(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+
+// ---- Zapis / uruchomienie ----
 async function saveJob(name, intervalInput, enabledInput, descInput, button) {
   const interval = parseInt(intervalInput.value, 10);
   if (!(interval > 0)) { toast("Interwał musi być dodatnią liczbą sekund.", true); return; }
@@ -199,18 +345,14 @@ async function saveJob(name, intervalInput, enabledInput, descInput, button) {
   try {
     const res = await fetch("/api/schedule", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, interval_seconds: interval,
-                             enabled: enabledInput.checked, description: descInput.value }),
+      body: JSON.stringify({ name, interval_seconds: interval, enabled: enabledInput.checked, description: descInput.value }),
     });
     const json = await res.json();
     if (!res.ok) throw new Error(json.error ? json.error.message : "Błąd zapisu");
     applyState(json.data);
     toast(`Zapisano '${name}'.`);
-  } catch (e) {
-    toast(e.message, true);
-  } finally {
-    button.disabled = false;
-  }
+  } catch (e) { toast(e.message, true); }
+  finally { button.disabled = false; }
 }
 
 async function runJob(name, button) {
@@ -224,19 +366,15 @@ async function runJob(name, button) {
     if (!res.ok) throw new Error(json.error ? json.error.message : "Błąd uruchomienia");
     toast(`Uruchomiono '${name}'. Odświeżam wynik...`);
     setTimeout(load, 1500);
-  } catch (e) {
-    toast(e.message, true);
-  } finally {
-    button.disabled = false;
-  }
+  } catch (e) { toast(e.message, true); }
+  finally { button.disabled = false; }
 }
 
+// ---- Ladowanie stanu ----
 function stamp() {
-  document.getElementById("refreshed").textContent =
-    "(odświeżono " + new Date().toLocaleTimeString("pl-PL") + ")";
+  document.getElementById("refreshed").textContent = "(odświeżono " + new Date().toLocaleTimeString("pl-PL") + ")";
 }
 
-// Pełne przerysowanie - przy starcie oraz po zapisie/uruchomieniu.
 function applyState(state) {
   statusMap = state.status || {};
   renderJobs(state.jobs || []);
@@ -248,12 +386,9 @@ async function load() {
   try {
     const res = await fetch("/api/state");
     applyState(await res.json());
-  } catch (e) {
-    toast("Nie udało się pobrać stanu: " + e.message, true);
-  }
+  } catch (e) { toast("Nie udało się pobrać stanu: " + e.message, true); }
 }
 
-// Lekkie odświeżanie w tle - nie rusza pól, które właśnie edytujesz.
 async function refresh() {
   try {
     const res = await fetch("/api/state");
@@ -262,11 +397,11 @@ async function refresh() {
     updateJobStatuses(state.jobs || []);
     renderHistory(state.history || []);
     stamp();
-  } catch (e) {
-    // cicho - auto-odświeżanie nie powinno spamować komunikatami
-  }
+  } catch (e) { /* cicho */ }
 }
 
+makeResizable(document.getElementById("jobs"), "cols-jobs-v1");
+makeResizable(document.getElementById("history"), "cols-history-v1");
 load();
 setInterval(refresh, REFRESH_MS);
 </script>

@@ -26,6 +26,7 @@ import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 import job_scheduler
 
@@ -71,12 +72,26 @@ class DashboardHandler(BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
-        if self.path in ("/", "/index.html"):
+        parsed = urlparse(self.path)
+        if parsed.path in ("/", "/index.html"):
             self._serve_html()
-        elif self.path == "/api/state":
+        elif parsed.path == "/api/state":
             self._send_json(build_state())
+        elif parsed.path == "/api/run-log":
+            self._handle_run_log(parse_qs(parsed.query))
         else:
             self._send_error("not_found", "Nieznana ścieżka.", status=404)
+
+    def _handle_run_log(self, query):
+        run_id = (query.get("id") or [""])[0]
+        if not run_id:
+            self._send_error("bad_request", "Brak parametru 'id'.", status=400)
+            return
+        record = job_scheduler.get_run_log(run_id)
+        if record is None:
+            self._send_error("not_found", "Nie ma przebiegu o tym id.", status=404)
+            return
+        self._send_json({"data": record})
 
     def do_POST(self):
         try:

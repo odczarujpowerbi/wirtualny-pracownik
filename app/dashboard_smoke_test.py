@@ -19,13 +19,20 @@ import job_scheduler
 
 def _install_fake_jobs_module():
     """Moduł z bezargumentowymi funkcjami do odpalenia przez scheduler:
-    jedna kończy się sukcesem, druga celowo rzuca błąd."""
+    jedna wypisuje coś i zwraca wartość, druga celowo rzuca błąd."""
     mod = types.ModuleType("dash_test_job")
     mod.calls = []
-    mod.run_ok = lambda: mod.calls.append("ok")
+
+    def _ok():
+        mod.calls.append("ok")
+        print("zrobione: przetworzono 3 rekordy")
+        return {"processed": 3}
+    mod.run_ok = _ok
+
     def _boom():
         raise RuntimeError("celowy błąd zadania")
     mod.run_boom = _boom
+
     sys.modules["dash_test_job"] = mod
     return mod
 
@@ -74,10 +81,10 @@ def run():
             raised = True
         checks.append(("update_job na nieznanym zadaniu rzuca ValueError", raised))
 
-        # 3. Uruchomienie na żądanie zadania OK -> status ok + wpis w historii.
+        # 3. Uruchomienie na żądanie zadania OK -> status ok, id przebiegu, wpis w historii.
         result = job_scheduler.run_job_by_name("ok_job", path=schedule_path)
-        checks.append(("run_job_by_name odpala funkcję i raportuje ok",
-                       "ok" in fake.calls and result["last_status"] == "ok"))
+        checks.append(("run_job_by_name odpala funkcję, raportuje ok i zwraca last_run_id",
+                       "ok" in fake.calls and result["last_status"] == "ok" and result["last_run_id"]))
 
         # 4. Zadanie, które rzuca -> status error, scheduler nie wywala się (error case).
         result_boom = job_scheduler.run_job_by_name("boom_job", path=schedule_path)
@@ -92,18 +99,33 @@ def run():
             raised_run = True
         checks.append(("run_job_by_name na nieznanym zadaniu rzuca ValueError", raised_run))
 
-        # 6. Historia: najnowszy pierwszy, oba przebiegi, źródło 'manual'.
+        # 6. Historia: najnowszy pierwszy, oba przebiegi, źródło 'manual', BEZ output.
         history = job_scheduler.load_history(limit=10)
-        checks.append(("load_history zwraca przebiegi, najnowszy pierwszy, źródło manual",
+        checks.append(("load_history zwraca przebiegi, najnowszy pierwszy, źródło manual, bez output",
                        len(history) == 2 and history[0]["name"] == "boom_job"
-                       and history[0]["trigger"] == "manual"))
+                       and history[0]["trigger"] == "manual" and "output" not in history[0]))
 
-    # 7. Walidacja pól z UI: poprawny zestaw przechodzi.
+        # 7. Szczegół przebiegu OK: przechwycone wyjście (stdout) i zwrócona wartość.
+        ok_log = job_scheduler.get_run_log(result["last_run_id"])
+        checks.append(("get_run_log zwraca przechwycone stdout i zwróconą wartość",
+                       ok_log is not None and "przetworzono 3 rekordy" in ok_log["output"]
+                       and "processed" in (ok_log.get("result") or "")))
+
+        # 8. Szczegół przebiegu z błędem: traceback trafia do output.
+        boom_log = job_scheduler.get_run_log(result_boom["last_run_id"])
+        checks.append(("get_run_log dla błędu ma traceback w output",
+                       boom_log is not None and "RuntimeError" in boom_log["output"]))
+
+        # 9. get_run_log dla nieznanego id -> None (error case).
+        checks.append(("get_run_log dla nieznanego id zwraca None",
+                       job_scheduler.get_run_log("nie-ma-takiego") is None))
+
+    # 10. Walidacja pól z UI: poprawny zestaw przechodzi.
     updates = dashboard._validate_updates({"interval_seconds": 45, "enabled": True, "description": " x "})
     checks.append(("_validate_updates przepuszcza poprawne pola i trimuje opis",
                    updates == {"interval_seconds": 45, "enabled": True, "description": "x"}))
 
-    # 8. Walidacja: nie-dodatni interwał odrzucony (error case).
+    # 11. Walidacja: nie-dodatni interwał odrzucony (error case).
     try:
         dashboard._validate_updates({"interval_seconds": 0})
         rejected = False
@@ -111,7 +133,7 @@ def run():
         rejected = True
     checks.append(("_validate_updates odrzuca interwał <= 0", rejected))
 
-    # 9. build_state ma komplet kluczy i czyta zadeklarowane zadania (read-only).
+    # 12. build_state ma komplet kluczy i czyta zadeklarowane zadania (read-only).
     state = dashboard.build_state()
     checks.append(("build_state zwraca jobs/status/history",
                    set(state) == {"jobs", "status", "history"} and isinstance(state["jobs"], list)))

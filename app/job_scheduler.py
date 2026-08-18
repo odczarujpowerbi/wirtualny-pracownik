@@ -27,16 +27,24 @@ Sprawdza `kill_switch.py` na każdym ticku — aktywny kill switch wstrzymuje
 odpalanie NOWYCH zadań (już trwające dokańczają się same).
 """
 
+import contextlib
 import importlib
+import io
 import json
 import threading
 import time
+import traceback
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import yaml
 
 import kill_switch
+
+# Ile znakow wyjscia (stdout+stderr) zapisujemy na przebieg. Powyzej tego
+# obcinamy, zeby pojedynczy zapyziaczony przebieg nie rozdal pliku historii.
+MAX_OUTPUT_CHARS = 200_000
 
 SCHEDULE_PATH = Path(__file__).parent / "config" / "schedule.yaml"
 STATUS_PATH = Path(__file__).parent / "runs" / "scheduler_status.json"
@@ -136,26 +144,72 @@ def _trim_history(keep=MAX_HISTORY):
         HISTORY_PATH.write_text("\n".join(lines[-keep:]) + "\n", encoding="utf-8")
 
 
-def load_history(limit=100):
-    """Ostatnie `limit` przebiegów, najnowszy pierwszy — do dashboardu."""
+def load_history(limit=100, include_output=False):
+    """Ostatnie `limit` przebiegów, najnowszy pierwszy — do listy w dashboardzie.
+    Domyślnie BEZ pola `output` (pełne wyjście bywa duże) — do szczegółu
+    pojedynczego przebiegu służy `get_run_log(run_id)`."""
     if not HISTORY_PATH.exists():
         return []
     lines = [ln for ln in HISTORY_PATH.read_text(encoding="utf-8").splitlines() if ln.strip()]
-    records = [json.loads(ln) for ln in lines[-limit:]]
-    return list(reversed(records))
+    records = list(reversed([json.loads(ln) for ln in lines[-limit:]]))
+    if not include_output:
+        for record in records:
+            record.pop("output", None)
+    return records
+
+
+def get_run_log(run_id):
+    """Pełny zapis JEDNEGO przebiegu (z wyjściem `output`) po jego id —
+    do widoku szczegółu po kliknięciu w przebieg. None, gdy nie ma."""
+    if not HISTORY_PATH.exists():
+        return None
+    lines = HISTORY_PATH.read_text(encoding="utf-8").splitlines()
+    for line in reversed(lines):
+        if not line.strip():
+            continue
+        record = json.loads(line)
+        if record.get("id") == run_id:
+            return record
+    return None
+
+
+def _summarize_result(returned):
+    """Krótkie, czytelne streszczenie wartości zwróconej przez zadanie —
+    do kolumny/nagłówka szczegółu. Pełne wyjście i tak jest w `output`."""
+    if returned is None:
+        return None
+    try:
+        text = json.dumps(returned, ensure_ascii=False, default=str)
+    except (TypeError, ValueError):
+        text = repr(returned)
+    return text if len(text) <= 2000 else text[:2000] + " …(obcięto)"
 
 
 def _run_job(job, state, trigger="schedule"):
     name = job["name"]
+    run_id = uuid.uuid4().hex[:12]
     started_at = datetime.now(timezone.utc)
     t0 = time.monotonic()
+
+    # Przechwytujemy wszystko, co zadanie wypisze (stdout+stderr) ORAZ wartość,
+    # którą zwróci — to jest dokładnie ten "pełny status", który chcemy móc
+    # obejrzeć klikając w przebieg. Bez tego wyjście skryptów donikąd nie szło.
+    buffer = io.StringIO()
+    result_summary = None
     try:
         func = _resolve_callable(job)
-        func()
+        with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
+            returned = func()
+        result_summary = _summarize_result(returned)
         status, error = "ok", None
     except Exception as exc:  # noqa: BLE001 — jedno zawodne zadanie nie może ubić schedulera
         status, error = "error", str(exc)
+        buffer.write("\n" + traceback.format_exc())
     elapsed = round(time.monotonic() - t0, 1)
+
+    output = buffer.getvalue()
+    if len(output) > MAX_OUTPUT_CHARS:
+        output = output[:MAX_OUTPUT_CHARS] + "\n…(wyjście obcięte)"
 
     with _state_lock:
         state[name] = {
@@ -163,16 +217,20 @@ def _run_job(job, state, trigger="schedule"):
             "last_status": status,
             "last_error": error,
             "last_duration_seconds": elapsed,
+            "last_run_id": run_id,
             "next_run_at": (started_at + timedelta(seconds=job["interval_seconds"])).isoformat(),
         }
         _save_state(state)
         _append_history({
+            "id": run_id,
             "name": name,
             "run_at": started_at.isoformat(),
             "status": status,
             "error": error,
             "duration_seconds": elapsed,
             "trigger": trigger,
+            "result": result_summary,
+            "output": output,
         })
 
     print(f"[{name}] {status} ({elapsed}s)" + (f" — {error}" if error else ""))
