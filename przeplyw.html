@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wirtualny Pracownik AI — przepływ i mapa drogowa</title>
+<style>
+  :root{
+    --bg:#eef1f5; --card:#fff; --line:#dfe3ea; --ink:#1d2330; --muted:#6b7280;
+    --ok:#18A558; --warn:#E8A33D; --err:#E84040; --accent:#2b6cb0;
+    --ok-bg:#e6f6ee; --warn-bg:#fdf3e2; --err-bg:#fde8e8; --accent-bg:#eaf1fb;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{font-family:system-ui,"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55}
+  header{background:linear-gradient(120deg,#1d2330,#2b3550);color:#fff;padding:26px 32px}
+  header h1{margin:0 0 4px;font-size:22px}
+  header p{margin:0;color:#c8cfdd;font-size:14px;max-width:820px}
+  .wrap{max-width:1120px;margin:0 auto;padding:24px 32px 80px}
+
+  .bar{position:sticky;top:0;z-index:5;background:var(--card);border:1px solid var(--line);border-radius:12px;
+       padding:14px 18px;margin:-40px 0 24px;box-shadow:0 8px 24px rgba(20,30,50,.12);display:flex;
+       align-items:center;gap:18px;flex-wrap:wrap}
+  .progress{flex:1;min-width:220px}
+  .progress .track{height:12px;border-radius:99px;background:#eceef2;overflow:hidden;display:flex}
+  .progress .seg-ok{background:var(--ok)} .progress .seg-warn{background:var(--warn)} .progress .seg-err{background:var(--err)}
+  .progress small{color:var(--muted);font-size:12px;display:block;margin-top:5px}
+  .legend{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{font-size:12px;font-weight:600;border-radius:99px;padding:4px 11px;border:1px solid transparent;cursor:pointer;user-select:none}
+  .chip.ok{background:var(--ok-bg);color:var(--ok)} .chip.warn{background:var(--warn-bg);color:#a9701a}
+  .chip.err{background:var(--err-bg);color:var(--err)} .chip.all{background:#e9edf3;color:#333}
+  .chip.dim{opacity:.35}
+
+  h2{font-size:17px;margin:34px 0 6px;display:flex;align-items:center;gap:10px}
+  h2 .n{width:26px;height:26px;border-radius:8px;background:var(--accent);color:#fff;font-size:14px;
+        display:inline-flex;align-items:center;justify-content:center}
+  .lead{color:var(--muted);margin:0 0 14px;font-size:14px}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:14px 16px}
+  .card h3{margin:0 0 6px;font-size:15px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .card p{margin:0;font-size:13.5px;color:#3a4150}
+  .card .who{font-size:12px;color:var(--muted);margin-top:8px}
+  .tag{font-size:11px;font-weight:700;border-radius:6px;padding:2px 8px;white-space:nowrap}
+  .tag.ok{background:var(--ok-bg);color:var(--ok)} .tag.warn{background:var(--warn-bg);color:#a9701a} .tag.err{background:var(--err-bg);color:var(--err)}
+  .hide{display:none!important}
+
+  .flow{display:flex;flex-direction:column;gap:0}
+  .step{background:var(--card);border:1px solid var(--line);border-radius:11px;overflow:hidden}
+  .step summary{list-style:none;cursor:pointer;padding:13px 16px;display:flex;align-items:center;gap:12px;font-weight:600}
+  .step summary::-webkit-details-marker{display:none}
+  .step summary .dot{width:11px;height:11px;border-radius:99px;flex:none}
+  .step summary .arrow{margin-left:auto;color:var(--muted);transition:transform .15s}
+  .step[open] summary .arrow{transform:rotate(90deg)}
+  .step .body{padding:0 16px 15px 39px;font-size:13.5px;color:#3a4150}
+  .step .body b{color:var(--ink)}
+  .connector{height:16px;width:2px;background:var(--line);margin-left:38px}
+  .d-ok{background:var(--ok)} .d-warn{background:var(--warn)} .d-err{background:var(--err)}
+
+  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:11px;overflow:hidden;font-size:13.5px}
+  th,td{text-align:left;padding:10px 13px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#f7f9fc;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+  tr:last-child td{border-bottom:none}
+
+  ol.road{list-style:none;counter-reset:r;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
+  ol.road li{counter-increment:r;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:14px 16px 14px 56px;position:relative}
+  ol.road li::before{content:counter(r);position:absolute;left:14px;top:14px;width:28px;height:28px;border-radius:8px;
+        background:var(--accent);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center}
+  ol.road li h4{margin:0 0 4px;font-size:15px}
+  ol.road li p{margin:0;font-size:13.5px;color:#3a4150}
+  ol.road li .why{font-size:12.5px;color:var(--muted);margin-top:6px}
+  .foot{margin-top:36px;color:var(--muted);font-size:12.5px;text-align:center}
+  .callout{background:var(--accent-bg);border:1px solid #cfe0f6;border-radius:11px;padding:13px 16px;font-size:13.5px;margin:14px 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>Wirtualny Pracownik AI — przepływ i mapa drogowa</h1>
+  <p>Jeden spójny obraz: jak zadanie ma przechodzić przez maszynę od zgłoszenia do decyzji człowieka, co już działa, czego jeszcze brakuje, i w jakiej kolejności to składać. Kliknij etap, żeby rozwinąć szczegół. Statusy możesz filtrować na górze.</p>
+</header>
+
+<div class="wrap">
+  <div class="bar">
+    <div class="progress">
+      <div class="track" id="track"></div>
+      <small id="progress-label"></small>
+    </div>
+    <div class="legend" id="legend">
+      <span class="chip all" data-f="all">Wszystko</span>
+      <span class="chip ok" data-f="ok">✅ Działa</span>
+      <span class="chip warn" data-f="warn">🟡 Częściowe</span>
+      <span class="chip err" data-f="err">⛔ Brak</span>
+    </div>
+  </div>
+
+  <!-- ETAP 1: Przepływ zadania -->
+  <h2><span class="n">1</span> Docelowy przepływ jednego zadania</h2>
+  <p class="lead">Tak ma wyglądać droga każdego zadania. Kolor kropki = stan tego etapu dziś.</p>
+  <div class="flow" id="flow"></div>
+
+  <!-- ETAP 2: Hierarchia metod wykonania -->
+  <h2><span class="n">2</span> Jak bot wykonuje zadanie (hierarchia metod)</h2>
+  <p class="lead">Reguła domenowa: zawsze najtańsza i najbezpieczniejsza metoda, jaka wystarczy. Dopiero gdy nie wystarcza, schodzimy niżej.</p>
+  <div class="cards" data-status-group></div>
+
+  <!-- ETAP 3: Warstwa modeli -->
+  <h2><span class="n">3</span> Warstwa modeli (kiedy który się aktywuje)</h2>
+  <p class="lead">To jest rdzeń tego, o czym piszesz: główny model na subskrypcji plus modele lokalne, które włączają się warunkowo i weryfikują proces.</p>
+  <div class="cards" data-status-group></div>
+
+  <!-- ETAP 4: Bramka walidacji -->
+  <h2><span class="n">4</span> Bramka walidacji (5 botów, zanim człowiek dostanie wynik)</h2>
+  <p class="lead">Seria niezależnych sprawdzeń. Każdy efekt z realnym rezultatem przechodzi tę bramkę, zanim trafi do Ciebie jako gotowy.</p>
+  <div class="cards" data-status-group></div>
+
+  <!-- ETAP 5: Infrastruktura -->
+  <h2><span class="n">5</span> Infrastruktura i logowanie (żeby działało samo)</h2>
+  <p class="lead">Czego maszyna potrzebuje, żeby chodzić 24/7 i sama się aktualizować oraz sprawdzać.</p>
+  <div class="cards" data-status-group></div>
+
+  <div class="callout" id="login-note"></div>
+
+  <!-- Stan: tabela -->
+  <h2><span class="n">6</span> Skrót stanu: co jest, czego brakuje</h2>
+  <table id="state-table">
+    <thead><tr><th style="width:26%">Obszar</th><th style="width:12%">Status</th><th>Uwaga</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <!-- Roadmapa -->
+  <h2><span class="n">7</span> Od czego zacząć (kolejność budowy)</h2>
+  <p class="lead">Uporządkowane tak, żeby każdy krok odblokowywał następny i dało się go od razu zweryfikować.</p>
+  <ol class="road" id="road"></ol>
+
+  <div class="foot" id="foot"></div>
+</div>
+
+<script>
+// ---- DANE (jedno źródło prawdy; łatwo aktualizować w miarę postępu) ----
+const FLOW = [
+  {t:"Zadanie wpada z kolejki (Projectly)", s:"ok",
+   d:"Runner pobiera nowe zadania. Dziś realny konektor Projectly działa przy podanym kluczu, inaczej tryb mock na plikach. <b>runner_loop.py</b>."},
+  {t:"Kontrola bezpieczeństwa treści", s:"ok",
+   d:"Zanim cokolwiek się wydarzy, tekst zadania jest sprawdzany pod kątem prób wstrzyknięcia instrukcji. Wykrycie zawsze eskaluje. <b>validator_prompt.py</b>."},
+  {t:"Klasyfikacja ryzyka + routing", s:"ok",
+   d:"Zielone (auto) / żółte (walidacja) / czerwone (człowiek), plus przypisanie do właściciela po słowach kluczowych. <b>risk_classifier.py, task_router.py</b>."},
+  {t:"Krok myślenia (analiza modelem)", s:"warn",
+   d:"Model analizuje zadanie i dopisuje analizę. Woła Claude Code (subskrypcja) lub SDK, degraduje bez modelu. <b>Działa, ale bez zalogowanego Claude Code korzysta tylko z klasyfikacji.</b> task_thinker.py."},
+  {t:"Wybór metody wykonania (API/CLI/przeglądarka/computer use)", s:"err",
+   d:"Tu ma nastąpić decyzja: da się API/MCP, czy trzeba CLI, czy dopiero przeglądarka lub sterowanie ekranem. <b>Tego routera metody jeszcze nie ma</b>, execution_result to na razie zaślepka."},
+  {t:"Wykonanie: warunkowa aktywacja Claude Code / modelu lokalnego", s:"err",
+   d:"Zadanie wymagające przeglądarki uruchamia Claude Code, a model lokalny nadzoruje i steruje agentem (computer use). <b>Nie zbudowane. Brak realnego workera i brak zainstalowanych modeli lokalnych.</b>"},
+  {t:"Zapis efektu do repo (branch + commit + PR)", s:"err",
+   d:"Każde zadanie, także marketingowe, ma zostawić ślad w repozytorium na GitHub (komentarze, artefakty, historia). <b>Modułu tworzenia i prowadzenia projektów jeszcze nie ma.</b>"},
+  {t:"Bramka walidacji (5 botów)", s:"warn",
+   d:"Bartek, Franek, Oskar, Bożena, orkiestruje Gustaw. Logika działa i jest przetestowana. <b>Oskar (wizja) i Bożena (odbiór) potrzebują modeli, które nie są jeszcze zainstalowane, więc dziś się degradują.</b>"},
+  {t:"Decyzja: gotowe albo eskalacja do człowieka", s:"ok",
+   d:"Przeszło bramkę = status done z komentarzem. Nie przeszło = osobne zadanie dla człowieka z listą zastrzeżeń. <b>escalation.py</b>."},
+  {t:"Samo-weryfikacja całości (self_check)", s:"ok",
+   d:"Co godzinę uruchamiane są wszystkie testy dymne. Czerwony przebieg w dashboardzie = coś się zepsuło. <b>self_check.py</b>."},
+];
+
+const METHODS = [
+  {h:"1. API / MCP", s:"warn", who:"projectly_client, mcp_client, konektor Graph",
+   p:"Bezpośrednie API i serwery MCP. Najtańsze i najbezpieczniejsze. Część konektorów gotowa (Projectly, MailerLite, Graph), reszta to na razie wpisy w integrations.yaml."},
+  {h:"2. CLI / skrypt", s:"ok", who:"skrypty .py, pbip_validate",
+   p:"Gdy nie ma API, ale da się skryptem (walidacja plików, raporty). Ta warstwa jest najbardziej dojrzała."},
+  {h:"3. Automatyzacja UI (przeglądarka)", s:"err", who:"planowane: Claude Code + Playwright",
+   p:"Gdy trzeba kliknąć w interfejsie. Ma to robić Claude Code. Nie zbudowane, brak realnego workera przeglądarkowego."},
+  {h:"4. Computer use (sterowanie ekranem)", s:"err", who:"planowane: model lokalny wizyjny",
+   p:"Ostateczność: model lokalny patrzy na ekran i steruje. Wymaga zainstalowanego modelu wizyjnego, którego nie ma."},
+];
+
+const MODELS = [
+  {h:"Główny model — Claude Code (subskrypcja)", s:"warn", who:"task_thinker.py: claude -p (headless)",
+   p:"Główna pętla ma myśleć przez Claude Code na Twojej subskrypcji, nie przez klucz API. CLI jest instalowane przez instalator, ale NIE jest zalogowane i nie ma skryptu logowania. Bez logowania krok myślenia degraduje się."},
+  {h:"Fallback — SDK Anthropic (klucz API)", s:"warn", who:"ANTHROPIC_API_KEY",
+   p:"Zapasowa ścieżka, gdy nie ma Claude Code. Obsłużona w kodzie, klucz opcjonalny. Płatna per użycie, więc to plan B, nie domyślny."},
+  {h:"Lokalny model tekstowy (Ollama, hermes3)", s:"err", who:"validator_prompt.py, task_thinker.ask_model",
+   p:"Druga opinia i tania ocena bez kosztu API. Kod gotowy i już go woła, ale Ollama i model NIE są zainstalowane. Skrypt instalacyjny istnieje osobno, nie jest wpięty w instalator."},
+  {h:"Lokalny model wizyjny (Ollama, llama3.2-vision)", s:"err", who:"bot_oskar_wizja.py",
+   p:"Ocena zrzutów ekranu i sterowanie ekranem (computer use). Kod gotowy (Oskar), ale model NIE jest zainstalowany. Kilka GB pobierania, wymaga RAM/GPU."},
+];
+
+const BOTS = [
+  {h:"Bartek — regresja", s:"ok", who:"bot_bartek_dubler.py", p:"Powtarza zadanie i porównuje wynik. Łapie niedeterminizm. Logika przetestowana."},
+  {h:"Franek — testy funkcjonalne", s:"ok", who:"bot_franek_funkcjonalny.py", p:"Twarde testy na efekcie: plik istnieje, JSON poprawny, PBIP waliduje, liczby się zgadzają. Przetestowany."},
+  {h:"Oskar — kontrola wizualna", s:"warn", who:"bot_oskar_wizja.py", p:"Ocenia zrzut ekranu modelem (Ollama, fallback Anthropic). Logika gotowa, ale bez zainstalowanego modelu wizyjnego pomija ocenę."},
+  {h:"Bożena — odbiór biznesowy", s:"warn", who:"bot_bozena_biznes.py", p:"Wciela się w biurowego użytkownika i ocenia, czy to na pewno oczekiwany efekt. Obowiązkowa. Bez modelu bramka eskaluje do człowieka."},
+  {h:"Gustaw — orkiestrator bramki", s:"ok", who:"bot_gustaw_bramka.py", p:"Zbiera werdykty, sprawdza budżet, podejmuje decyzję przejścia albo eskalacji. Przetestowany."},
+];
+
+const INFRA = [
+  {h:"Scheduler + autostart", s:"warn", who:"job_scheduler.py, bootstrap_register_task.ps1",
+   p:"Jedno zadanie Windows odpala wszystkie skrypty cyklicznie. Rejestracja jest, ale trigger jest przy logowaniu, więc VM potrzebuje autologowania konta bota (do ustawienia ręcznie)."},
+  {h:"Dashboard", s:"ok", who:"dashboard.py",
+   p:"Okno w przeglądarce: przebiegi, historia, edycja harmonogramu, uruchom teraz, pełne logi po kliknięciu. Działa."},
+  {h:"Aktualizacja kodu z GitHub", s:"ok", who:"aktualizuj-repo.bat, repo_updater.py",
+   p:"Ręcznie dwuklikiem, albo automatycznie (job repo_update, domyślnie wyłączony). Po pobraniu self_check weryfikuje."},
+  {h:"Logowanie Claude Code", s:"err", who:"planowane: zaloguj-claude helper",
+   p:"Potrzebny skrypt, który wypisze instrukcję, a Ty zalogujesz się w sąsiednim terminalu (claude login), po czym skrypt sprawdzi, że model odpowiada. Tego jeszcze nie ma."},
+  {h:"Visual Studio Code", s:"err", who:"planowane: krok instalatora",
+   p:"Do przeglądania zmian, commitów, cofania, analizy. Nie jest instalowany i nie ma go w instalatorze."},
+  {h:"Instalacja modeli lokalnych w instalatorze", s:"err", who:"bootstrap_install_local_model.ps1",
+   p:"Skrypt instaluje Ollamę i pobiera modele, ale nie jest wpięty jako krok instalatora, więc świeża VM ich nie ma."},
+  {h:"Moduł tworzenia i weryfikacji projektów", s:"err", who:"planowane",
+   p:"Zakładanie repo/brancha per zadanie, commit efektu, PR, komentarze na GitHub, także dla zadań marketingowych. Nie istnieje."},
+  {h:"Samo-weryfikacja (self_check)", s:"ok", who:"self_check.py",
+   p:"Cyklicznie uruchamia wszystkie testy dymne i pokazuje czerwony/zielony w dashboardzie. Działa i jest wpięte."},
+];
+
+const ROAD = [
+  {h:"Skrypt logowania Claude Code + weryfikacja modelu", why:"Bez tego główny model nie myśli, a większość zadań ma iść przez Claude Code na subskrypcji.",
+   p:"zaloguj-claude.bat: wypisuje instrukcję, czeka aż zalogujesz się w sąsiednim terminalu (claude login), potem sprawdza, że claude -p odpowiada. Dorzucamy to jako sprawdzenie do self_check (czy główny model żyje)."},
+  {h:"Wpięcie VS Code i modeli lokalnych do instalatora", why:"Świeża VM ma mieć komplet narzędzi bez ręcznego dogrywania.",
+   p:"Nowe kroki instalatora: instalacja VS Code oraz uruchomienie bootstrap_install_local_model.ps1 (Ollama + model wizyjny i tekstowy). Numerujemy jak resztę."},
+  {h:"Weryfikacja modeli lokalnych w self_check", why:"Modele mają weryfikować proces, więc najpierw trzeba wiedzieć, czy w ogóle odpowiadają.",
+   p:"Health check: czy Ollama odpowiada, czy modele są pobrane, czy Claude Code zalogowany. Czerwony w dashboardzie, gdy któregoś brak."},
+  {h:"Router metody wykonania (warunkowa aktywacja)", why:"To jest brakujący środek przepływu: decyzja API/CLI/przeglądarka/computer use.",
+   p:"Moduł, który dla danego zadania wybiera metodę i aktywuje odpowiednie narzędzie (np. przeglądarka to Claude Code, sterowanie ekranem to model lokalny). Wynik zawsze idzie do bramki walidacji."},
+  {h:"Moduł tworzenia i prowadzenia projektów w repo", why:"Każde zadanie ma zostawiać ślad na GitHub, także marketingowe.",
+   p:"Zakładanie brancha per zadanie, commit efektu, PR, komentarze, powiązanie z zadaniem w Projectly. Spójne z regułą branch + PR, nigdy prosto do main."},
+  {h:"Realny worker przeglądarkowy przez Claude Code + nadzór modelu lokalnego", why:"Dopiero to zamienia zaślepkę wykonania w prawdziwą pracę.",
+   p:"Claude Code wykonuje zadanie w przeglądarce, model lokalny nadzoruje i robi zrzuty, całość trafia do Oskara i reszty bramki. Ostatni, najbardziej złożony krok."},
+];
+
+// ---- RENDER ----
+const el=(t,p={},c=[])=>{const n=document.createElement(t);for(const[k,v]of Object.entries(p)){if(k==="class")n.className=v;else if(k==="html")n.innerHTML=v;else n[k]=v;}for(const x of c)n.appendChild(x);return n;};
+const TAG={ok:"✅ działa",warn:"🟡 częściowe",err:"⛔ brak"};
+
+function renderFlow(){
+  const box=document.getElementById("flow");
+  FLOW.forEach((step,i)=>{
+    const det=el("details",{class:"step"});
+    det.dataset.status=step.s;
+    det.appendChild(el("summary",{},[
+      el("span",{class:"dot d-"+step.s}),
+      el("span",{text:step.t}),
+      el("span",{class:"tag "+step.s,text:TAG[step.s]}),
+      el("span",{class:"arrow",text:"▸"}),
+    ]));
+    det.appendChild(el("div",{class:"body",html:step.d}));
+    box.appendChild(det);
+    if(i<FLOW.length-1) box.appendChild(el("div",{class:"connector"}));
+  });
+}
+
+function renderCards(list, groupIndex){
+  const box=document.querySelectorAll("[data-status-group]")[groupIndex];
+  list.forEach(it=>{
+    const card=el("div",{class:"card"});
+    card.dataset.status=it.s;
+    card.appendChild(el("h3",{},[el("span",{text:it.h}),el("span",{class:"tag "+it.s,text:TAG[it.s]})]));
+    card.appendChild(el("p",{html:it.p}));
+    card.appendChild(el("div",{class:"who",text:it.who}));
+    box.appendChild(card);
+  });
+}
+
+function renderTable(){
+  const rows=[...FLOW.map(x=>({o:x.t,s:x.s})),...METHODS.map(x=>({o:x.h,s:x.s})),
+    ...MODELS.map(x=>({o:x.h,s:x.s})),...BOTS.map(x=>({o:x.h,s:x.s})),...INFRA.map(x=>({o:x.h,s:x.s}))];
+  const tb=document.querySelector("#state-table tbody");
+  const order={err:0,warn:1,ok:2};
+  rows.sort((a,b)=>order[a.s]-order[b.s]);
+  rows.forEach(r=>{
+    const tr=el("tr");tr.dataset.status=r.s;
+    tr.appendChild(el("td",{text:r.o}));
+    tr.appendChild(el("td",{},[el("span",{class:"tag "+r.s,text:TAG[r.s]})]));
+    tr.appendChild(el("td",{text:r.s==="ok"?"Działa i jest przetestowane.":r.s==="warn"?"Działa częściowo, wymaga dołożenia brakującej warstwy.":"Do zbudowania."}));
+    tb.appendChild(tr);
+  });
+}
+
+function renderRoad(){
+  const ol=document.getElementById("road");
+  ROAD.forEach(r=>ol.appendChild(el("li",{},[
+    el("h4",{text:r.h}),el("p",{text:r.p}),el("div",{class:"why",text:"Dlaczego teraz: "+r.why}),
+  ])));
+}
+
+function computeProgress(){
+  const all=[...FLOW,...METHODS,...MODELS,...BOTS,...INFRA].map(x=>x.s);
+  const n=all.length, c={ok:0,warn:0,err:0};all.forEach(s=>c[s]++);
+  const pct=s=>(c[s]/n*100).toFixed(1)+"%";
+  const track=document.getElementById("track");
+  track.appendChild(el("div",{class:"seg-ok"})).style.width=pct("ok");
+  track.appendChild(el("div",{class:"seg-warn"})).style.width=pct("warn");
+  track.appendChild(el("div",{class:"seg-err"})).style.width=pct("err");
+  document.getElementById("progress-label").textContent=
+    `Gotowe ${c.ok} • częściowe ${c.warn} • do zrobienia ${c.err}  (z ${n} elementów przepływu)`;
+}
+
+let activeFilter="all";
+function applyFilter(f){
+  activeFilter=f;
+  document.querySelectorAll("#legend .chip").forEach(ch=>ch.classList.toggle("dim",f!=="all"&&ch.dataset.f!==f&&ch.dataset.f!=="all"));
+  document.querySelectorAll("[data-status]").forEach(nd=>{
+    nd.classList.toggle("hide", f!=="all" && nd.dataset.status!==f);
+  });
+}
+document.getElementById("legend").addEventListener("click",e=>{
+  const chip=e.target.closest(".chip");if(chip) applyFilter(chip.dataset.f);
+});
+
+document.getElementById("login-note").innerHTML =
+  "<b>Jak zaplanowane jest logowanie (krok 1 mapy drogowej):</b> uruchamiasz <code>zaloguj-claude.bat</code>, "+
+  "on wypisuje instrukcję i czeka. W sąsiednim oknie terminala wpisujesz <code>claude login</code> i logujesz się na "+
+  "swoją subskrypcję. Skrypt następnie sprawdza, że model realnie odpowiada, i dopisuje to sprawdzenie do samo-weryfikacji. "+
+  "Dane subskrypcji zostają na maszynie, nigdzie ich nie przekazujesz w repo.";
+
+document.getElementById("foot").textContent =
+  "Dokument statyczny, generowany z jednego źródła danych w pliku. Aktualizujemy statusy w miarę postępu prac. Otwierasz go dwuklikiem, nie wymaga serwera.";
+
+renderFlow();
+renderCards(METHODS,0);
+renderCards(MODELS,1);
+renderCards(BOTS,2);
+renderCards(INFRA,3);
+renderTable();
+renderRoad();
+computeProgress();
+</script>
+</body>
+</html>
