@@ -31,6 +31,14 @@ import env_bootstrap  # noqa: F401  # wczytuje .env / secrets/.env przed odczyte
 MOCK_OUTBOX_DIR = Path(__file__).parent / "runs" / "mock_outbox"
 EMAIL_SAFETY_PATH = Path(__file__).parent / "config" / "email_safety.yaml"
 
+# Prawdziwy Microsoft Graph (EmailClient.send_email/save_draft) to jeszcze
+# ZAŚLEPKA (NotImplementedError). Dopóki tak jest, SAMA obecność sekretów
+# MS_GRAPH_* w .env NIE może przełączać na realny klient — inaczej każdy skrypt
+# wysyłający mail (weekly_team_report, task_feedback_requester) wywala się, gdy
+# tylko wpiszesz sekrety. Gdy konektor Graph zostanie realnie napisany
+# (msal + wywołania API), ustaw tę flagę na True i wtedy sekrety go aktywują.
+GRAPH_SEND_IMPLEMENTED = False
+
 
 def load_review_recipients(path=EMAIL_SAFETY_PATH):
     with open(path, encoding="utf-8") as f:
@@ -112,15 +120,26 @@ class MockEmailClient:
 
 
 def get_email_client():
-    """Real klient dopiero, gdy WSZYSTKIE dane dostępowe Graph są ustawione —
-    częściowa konfiguracja nie powinna cicho przełączyć na tryb realny
-    (fail-closed, ten sam wzorzec co projectly_client.get_client)."""
+    """Real klient dopiero, gdy WSZYSTKIE dane dostępowe Graph są ustawione
+    ORAZ konektor Graph jest faktycznie zaimplementowany (GRAPH_SEND_IMPLEMENTED).
+    Częściowa konfiguracja albo brak implementacji nie przełącza cicho na tryb
+    realny (fail-closed) — a przede wszystkim nie wywala skryptów crashem, gdy
+    ktoś wpisze sekrety, zanim konektor powstanie."""
     required = ("MS_GRAPH_CLIENT_ID", "MS_GRAPH_CLIENT_SECRET", "MS_GRAPH_TENANT_ID", "MS_GRAPH_MAILBOX")
-    if all(os.environ.get(k) for k in required):
+    have_creds = all(os.environ.get(k) for k in required)
+
+    if have_creds and GRAPH_SEND_IMPLEMENTED:
         return EmailClient(
             client_id=os.environ["MS_GRAPH_CLIENT_ID"],
             client_secret=os.environ["MS_GRAPH_CLIENT_SECRET"],
             tenant_id=os.environ["MS_GRAPH_TENANT_ID"],
             mailbox=os.environ["MS_GRAPH_MAILBOX"],
+        )
+
+    if have_creds and not GRAPH_SEND_IMPLEMENTED:
+        print(
+            "[email_client] Wykryto sekrety MS_GRAPH_*, ale konektor Microsoft Graph "
+            "nie jest jeszcze zaimplementowany — używam trybu mock (runs/mock_outbox). "
+            "Nic nie wychodzi na zewnątrz. Ustaw GRAPH_SEND_IMPLEMENTED=True po napisaniu konektora."
         )
     return MockEmailClient()
