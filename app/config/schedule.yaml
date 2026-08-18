@@ -36,6 +36,14 @@ jobs:
   function: check_daily_limit
   interval_seconds: 3600
   enabled: true
+- name: notebook_intake
+  description: Dodatkowa lokalna sciezka zadan - czyta inbox/zadania.txt (notatnik)
+    i przetwarza nowe zadania klientem MOCK (nie rusza zywego Projectly). Wynik i
+    decyzje widac w dashboardzie (zakladka Przeplywy). Pusty notatnik = nic nie robi.
+  module: notebook_intake
+  function: run_once
+  interval_seconds: 60
+  enabled: true
 # Ponizsze skrypty sa WIDOCZNE w dashboardzie, ale domyslnie WYLACZONE
 # (enabled: false), bo wykonuja akcje na zewnatrz (tworza zadania, wysylaja
 # maile). Uruchom je recznie przyciskiem "Uruchom teraz", zeby zobaczyc co

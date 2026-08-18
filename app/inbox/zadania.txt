@@ -1,0 +1,21 @@
+# ============================================================
+# NOTATNIK ZADAŃ — dodatkowa, lokalna ścieżka zadań (obok Projectly).
+#
+# Jedna linia = jedno zadanie. Zapisz plik, a mechanizm sam je podchwyci
+# (job "notebook_intake" w schedulerze, klient MOCK = lokalnie, NIE rusza
+# żywego Projectly). Efekt i decyzje zobaczysz w dashboardzie, zakładka
+# "Przepływy agentów" (python dashboard.py).
+#
+# Składnia:
+#   - Domyślnie zadanie jest ZIELONE (odczyt / analiza).
+#   - Dopisz na końcu !yellow albo !red, żeby zmienić poziom ryzyka.
+#   - Dla walidacji PBIP podaj ścieżkę po znaku @, np. @ mock_data/sample_pbip
+#   - Linie zaczynające się od # to komentarze (ignorowane).
+#   - Każde zadanie jest przetwarzane RAZ (dedup wg treści linii). Żeby
+#     powtórzyć, zmień treść linii albo skasuj runs/notebook_processed.json.
+#
+# Przykłady — usuń # z początku linii, żeby je uruchomić:
+# Waliduj strukturę PBIP @ mock_data/sample_pbip
+# Przejrzyj notatki ze spotkania i wypisz zadania !yellow
+# Zwiększ budżet kampanii Meta Ads !red
+# ============================================================
