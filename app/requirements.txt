@@ -2,8 +2,9 @@
 PyYAML>=6.0
 python-dotenv>=1.0
 anthropic>=0.40           # validator_visual.py, ad_copy_generator.py, mailerlite_report_analyzer.py
-requests>=2.31            # mailerlite_client.py — reszta klientów API poniżej też z tego skorzysta
+requests>=2.31            # mailerlite_client.py, microsoft_graph_mail_client.py (REST Graph)
 psutil>=5.9               # system_health_monitor.py — RAM i lista procesów identycznie na Windows/Linux
+msal>=1.26               # microsoft_graph_mail_client.py — token app-only do Microsoft Graph (wysyłka maila)
 
 # Kolejne warstwy (SKRYPTY.md) — NIE instaluj, dopóki nie piszesz danego
 # workera; premature dependency bloat to ten sam problem co premature scope.

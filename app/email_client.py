@@ -31,13 +31,11 @@ import env_bootstrap  # noqa: F401  # wczytuje .env / secrets/.env przed odczyte
 MOCK_OUTBOX_DIR = Path(__file__).parent / "runs" / "mock_outbox"
 EMAIL_SAFETY_PATH = Path(__file__).parent / "config" / "email_safety.yaml"
 
-# Prawdziwy Microsoft Graph (EmailClient.send_email/save_draft) to jeszcze
-# ZAŚLEPKA (NotImplementedError). Dopóki tak jest, SAMA obecność sekretów
-# MS_GRAPH_* w .env NIE może przełączać na realny klient — inaczej każdy skrypt
-# wysyłający mail (weekly_team_report, task_feedback_requester) wywala się, gdy
-# tylko wpiszesz sekrety. Gdy konektor Graph zostanie realnie napisany
-# (msal + wywołania API), ustaw tę flagę na True i wtedy sekrety go aktywują.
-GRAPH_SEND_IMPLEMENTED = False
+# Konektor Microsoft Graph (microsoft_graph_mail_client.py) jest już
+# zaimplementowany. Realny klient włącza się, gdy SĄ wszystkie sekrety MS_GRAPH_*
+# ORAZ zainstalowany jest pakiet `msal` (patrz get_email_client). Ustaw na False,
+# żeby awaryjnie wymusić tryb mock nawet z sekretami.
+GRAPH_SEND_IMPLEMENTED = True
 
 
 def load_review_recipients(path=EMAIL_SAFETY_PATH):
@@ -65,29 +63,33 @@ def resolve_send_recipients(intended_to, subject, body_text, path=EMAIL_SAFETY_P
 
 
 class EmailClient:
-    """Prawdziwa implementacja — DO ZROBIENIA, gdy będzie znany mechanizm
-    dostępu do skrzynki (Microsoft Graph)."""
+    """Realna wysyłka przez Microsoft Graph (microsoft_graph_mail_client.py).
+    Przed każdą wysyłką stosuje przekierowanie odbiorców z email_safety.yaml —
+    mail nie leci do zamierzonego adresata, tylko do ludzi wewnątrz firmy do
+    przeglądu (fail-closed). save_draft nie przekierowuje (szkic w skrzynce bota
+    i tak nikt nie widzi, dopóki ręcznie go nie wyśle)."""
 
     def __init__(self, client_id=None, client_secret=None, tenant_id=None, mailbox=None):
         self.client_id = client_id
         self.client_secret = client_secret
         self.tenant_id = tenant_id
         self.mailbox = mailbox
+        self._mailer = None
+
+    def _get_mailer(self):
+        from microsoft_graph_mail_client import GraphMailer
+        if self._mailer is None:
+            self._mailer = GraphMailer(self.client_id, self.client_secret, self.tenant_id, self.mailbox)
+        return self._mailer
 
     def send_email(self, to, subject, body_text, cc=None):
-        # Przekierowanie do ludzi z email_safety.yaml MUSI zostać zastosowane
-        # tutaj, zanim faktyczna implementacja Graph zostanie dopisana —
-        # to jedna linijka do przeniesienia w dół razem z resztą.
-        resolve_send_recipients(to, subject, body_text)
-        raise NotImplementedError(
-            "Prawdziwy Microsoft Graph nie jest jeszcze podłączony. "
-            "Wymaga: rejestracji aplikacji w Azure AD, pakietu 'msal', "
-            "i danych dostępowych w .env (MS_GRAPH_CLIENT_ID/SECRET/TENANT_ID/MAILBOX). "
-            "Użyj MockEmailClient do testów albo uzupełnij tę metodę."
-        )
+        review_to, redirected_subject, redirected_body = resolve_send_recipients(to, subject, body_text)
+        result = self._get_mailer().send(review_to, redirected_subject, redirected_body, cc)
+        print(f"[Graph Email] wysłano do przeglądu ({review_to}), status {result['status']}")
+        return result
 
     def save_draft(self, to, subject, body_text, cc=None):
-        raise NotImplementedError("Jak wyżej.")
+        return self._get_mailer().draft(to, subject, body_text, cc)
 
 
 class MockEmailClient:
@@ -120,15 +122,16 @@ class MockEmailClient:
 
 
 def get_email_client():
-    """Real klient dopiero, gdy WSZYSTKIE dane dostępowe Graph są ustawione
-    ORAZ konektor Graph jest faktycznie zaimplementowany (GRAPH_SEND_IMPLEMENTED).
-    Częściowa konfiguracja albo brak implementacji nie przełącza cicho na tryb
-    realny (fail-closed) — a przede wszystkim nie wywala skryptów crashem, gdy
-    ktoś wpisze sekrety, zanim konektor powstanie."""
+    """Real klient (Microsoft Graph) tylko, gdy JEDNOCZEŚNIE: są wszystkie
+    sekrety MS_GRAPH_*, konektor jest włączony (GRAPH_SEND_IMPLEMENTED), oraz
+    zainstalowany jest pakiet `msal`. Cokolwiek z tego brakuje -> tryb mock,
+    bez crasha (fail-closed, ten sam wzorzec co projectly_client.get_client)."""
+    from microsoft_graph_mail_client import msal_available
+
     required = ("MS_GRAPH_CLIENT_ID", "MS_GRAPH_CLIENT_SECRET", "MS_GRAPH_TENANT_ID", "MS_GRAPH_MAILBOX")
     have_creds = all(os.environ.get(k) for k in required)
 
-    if have_creds and GRAPH_SEND_IMPLEMENTED:
+    if have_creds and GRAPH_SEND_IMPLEMENTED and msal_available():
         return EmailClient(
             client_id=os.environ["MS_GRAPH_CLIENT_ID"],
             client_secret=os.environ["MS_GRAPH_CLIENT_SECRET"],
@@ -136,10 +139,9 @@ def get_email_client():
             mailbox=os.environ["MS_GRAPH_MAILBOX"],
         )
 
-    if have_creds and not GRAPH_SEND_IMPLEMENTED:
+    if have_creds and GRAPH_SEND_IMPLEMENTED and not msal_available():
         print(
-            "[email_client] Wykryto sekrety MS_GRAPH_*, ale konektor Microsoft Graph "
-            "nie jest jeszcze zaimplementowany — używam trybu mock (runs/mock_outbox). "
-            "Nic nie wychodzi na zewnątrz. Ustaw GRAPH_SEND_IMPLEMENTED=True po napisaniu konektora."
+            "[email_client] Są sekrety MS_GRAPH_*, ale pakiet 'msal' nie jest zainstalowany "
+            "(pip install -r requirements.txt) — używam trybu mock. Nic nie wychodzi na zewnątrz."
         )
     return MockEmailClient()
