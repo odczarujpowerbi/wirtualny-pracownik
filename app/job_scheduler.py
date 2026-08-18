@@ -40,8 +40,16 @@ import kill_switch
 
 SCHEDULE_PATH = Path(__file__).parent / "config" / "schedule.yaml"
 STATUS_PATH = Path(__file__).parent / "runs" / "scheduler_status.json"
+HISTORY_PATH = Path(__file__).parent / "runs" / "run_history.jsonl"
+
+# scheduler_status.json trzyma tylko OSTATNI przebieg każdego zadania.
+# run_history.jsonl to dziennik dopisywany co przebieg (jeden JSON na linię),
+# żeby dashboard mógł pokazać "co się działo", nie tylko "co jest teraz".
+# Plik przycinamy do MAX_HISTORY ostatnich wpisów, żeby nie rósł bez końca.
+MAX_HISTORY = 1000
 
 _state_lock = threading.Lock()
+_history_writes = 0
 
 # PyYAML nie potrafi zachować komentarzy przy zapisie (yaml.safe_dump je
 # gubi) — save_schedule() dopisuje więc ten nagłówek na nowo przy KAŻDYM
@@ -71,29 +79,27 @@ def save_schedule(jobs, path=SCHEDULE_PATH):
         yaml.safe_dump({"jobs": jobs}, f, allow_unicode=True, sort_keys=False)
 
 
-def set_job_interval(name, interval_seconds, path=SCHEDULE_PATH):
-    """Zmienia harmonogram JEDNEGO zadania bez ręcznej edycji YAML —
+def update_job(name, updates, path=SCHEDULE_PATH):
+    """Zmienia wybrane pola JEDNEGO zadania bez ręcznej edycji YAML —
     scheduler w trybie ciągłym podchwyci zmianę na najbliższym ticku, bez
-    restartu procesu."""
+    restartu procesu. `updates` to słownik pól do nadpisania, np.
+    {"interval_seconds": 60, "enabled": False, "description": "..."}."""
     jobs = load_schedule(path)
     if not any(j["name"] == name for j in jobs):
         raise ValueError(f"Brak zadania o nazwie '{name}' w {path}")
     for job in jobs:
         if job["name"] == name:
-            job["interval_seconds"] = interval_seconds
+            job.update(updates)
     save_schedule(jobs, path)
     return jobs
+
+
+def set_job_interval(name, interval_seconds, path=SCHEDULE_PATH):
+    return update_job(name, {"interval_seconds": interval_seconds}, path)
 
 
 def set_job_enabled(name, enabled, path=SCHEDULE_PATH):
-    jobs = load_schedule(path)
-    if not any(j["name"] == name for j in jobs):
-        raise ValueError(f"Brak zadania o nazwie '{name}' w {path}")
-    for job in jobs:
-        if job["name"] == name:
-            job["enabled"] = enabled
-    save_schedule(jobs, path)
-    return jobs
+    return update_job(name, {"enabled": enabled}, path)
 
 
 def _resolve_callable(job):
@@ -112,7 +118,34 @@ def _save_state(state):
     STATUS_PATH.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def _run_job(job, state):
+def _append_history(record):
+    global _history_writes
+    HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(HISTORY_PATH, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    _history_writes += 1
+    if _history_writes % 200 == 0:
+        _trim_history()
+
+
+def _trim_history(keep=MAX_HISTORY):
+    if not HISTORY_PATH.exists():
+        return
+    lines = [ln for ln in HISTORY_PATH.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    if len(lines) > keep:
+        HISTORY_PATH.write_text("\n".join(lines[-keep:]) + "\n", encoding="utf-8")
+
+
+def load_history(limit=100):
+    """Ostatnie `limit` przebiegów, najnowszy pierwszy — do dashboardu."""
+    if not HISTORY_PATH.exists():
+        return []
+    lines = [ln for ln in HISTORY_PATH.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    records = [json.loads(ln) for ln in lines[-limit:]]
+    return list(reversed(records))
+
+
+def _run_job(job, state, trigger="schedule"):
     name = job["name"]
     started_at = datetime.now(timezone.utc)
     t0 = time.monotonic()
@@ -133,8 +166,30 @@ def _run_job(job, state):
             "next_run_at": (started_at + timedelta(seconds=job["interval_seconds"])).isoformat(),
         }
         _save_state(state)
+        _append_history({
+            "name": name,
+            "run_at": started_at.isoformat(),
+            "status": status,
+            "error": error,
+            "duration_seconds": elapsed,
+            "trigger": trigger,
+        })
 
     print(f"[{name}] {status} ({elapsed}s)" + (f" — {error}" if error else ""))
+
+
+def run_job_by_name(name, path=SCHEDULE_PATH):
+    """Odpala JEDNO zadanie natychmiast, poza harmonogramem (przycisk
+    'uruchom teraz' w dashboardzie). Uruchamia tylko zadania zadeklarowane
+    w schedule.yaml — nigdy dowolny kod. Wynik trafia do statusu i historii
+    tak samo jak przebieg z harmonogramu."""
+    jobs = load_schedule(path)
+    job = next((j for j in jobs if j["name"] == name), None)
+    if job is None:
+        raise ValueError(f"Brak zadania o nazwie '{name}' w {path}")
+    state = _load_state()
+    _run_job(job, state, trigger="manual")
+    return state.get(name)
 
 
 def run_scheduler(tick_seconds=5, schedule_path=SCHEDULE_PATH):

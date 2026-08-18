@@ -9,16 +9,22 @@
 
 jobs:
 - name: runner_loop
+  description: Główna pętla agenta - pobiera zadania z kolejki, klasyfikuje ryzyko,
+    routuje do klienta, waliduje lub eskaluje.
   module: runner_loop
   function: run_once
   interval_seconds: 30
   enabled: true
 - name: system_health_monitor
+  description: Kontrola zdrowia maszyny - zużycie RAM i czy oczekiwane skrypty faktycznie
+    działają; eskaluje przy problemie.
   module: system_health_monitor
   function: run_health_check
   interval_seconds: 120
   enabled: true
 - name: machine_status_reporter
+  description: Cogodzinny raport statusu maszyny (wersje narzędzi, historia bootstrapu,
+    RAM) wysyłany do Projectly.
   module: machine_status_reporter
   function: run_machine_status_report
   interval_seconds: 3600
