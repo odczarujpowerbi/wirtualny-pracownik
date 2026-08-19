@@ -1,0 +1,18 @@
+﻿=== STAN SRODOWISKA - Wirtualny Pracownik AI ===
+Maszyna: DESKTOP-LREBMVQ    Uzytkownik: LENOVO
+Data:    2026-08-19 11:30
+
+-- Narzedzia --
+Git:          git version 2.52.0.windows.1
+Python:       Python 3.14.2
+Node.js:      v24.16.0
+Claude Code:  2.1.162 (Claude Code)
+VS Code:      1.133.0
+  Rozszerzenie Claude Code: anthropic.claude-code
+Ollama:       BRAK (modele lokalne - bootstrap_install_local_model.ps1)
+
+-- OneDrive --
+Sync:         OK -> C:\Users\LENOVO\OneDrive - Odczaruj Low Code Paweł Czapiewski (1)
+
+-- Logowania (ostatni potwierdzony checklist) --
+Brak zapisu - uruchom bootstrap_logins.ps1
