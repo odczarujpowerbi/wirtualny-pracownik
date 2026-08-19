@@ -59,9 +59,15 @@ $steps += @{ Name = "OneDrive (sync)";            Required = $false; Run = { Inv
 $steps += @{ Name = "Zaleznosci Pythona";         Required = $false; Run = {
     if (Test-Path (Join-Path $appDir "requirements.txt")) { Invoke-Python @("-m", "pip", "install", "-r", "requirements.txt") } else { 0 }
 } }
+# Finalizacja aplikacji - zeby jeden przebieg dawal GOTOWE narzedzie, nie samo
+# srodowisko. Idempotentne: init_secrets nigdy nie nadpisuje wypelnionych plikow,
+# register zapisuje role, smoke test tylko weryfikuje.
+$steps += @{ Name = "Sekrety (secrets/)";         Required = $false; Run = { Invoke-Python @("bootstrap_init_secrets.py") } }
+$steps += @{ Name = "Rejestracja roli (dev)";     Required = $false; Run = { Invoke-Python @("bootstrap_register.py", "dev") } }
 if (-not $SkipLogins) {
     $steps += @{ Name = "Logowania (checklist)";  Required = $false; Run = { Invoke-Step "bootstrap_logins.ps1" @() } }
 }
+$steps += @{ Name = "Test dymny";                 Required = $false; Run = { Invoke-Python @("bootstrap_smoke_test.py") } }
 $steps += @{ Name = "Raport stanu srodowiska";    Required = $false; Run = { Invoke-Step "bootstrap_env_report.ps1" @() } }
 
 $total = $steps.Count

@@ -1,6 +1,18 @@
 # Przygotowanie środowiska na nowej maszynie
 
-Jeden klik: **`Przygotuj-srodowisko.bat`** (dwuklik). Na zupełnie świeżej maszynie kliknij prawym → *Uruchom jako administrator* (część instalatorów tego wymaga; inaczej działa per-user).
+## Zupełnie pusta maszyna (nic nie ma: ani repo, ani git)
+
+Otwórz **PowerShell jako administrator** i wklej jedną linię — pobierze gita, sklonuje repo i uruchomi cały instalator:
+
+```powershell
+$s="$env:TEMP\postaw.ps1"; irm https://raw.githubusercontent.com/odczarujpowerbi/wirtualny-pracownik/main/instalacja/postaw-od-zera.ps1 -OutFile $s; powershell -ExecutionPolicy Bypass -File $s
+```
+
+Domyślnie klonuje do `%USERPROFILE%\wirtualny-pracownik`. Opcje: `-InstallPath`, `-RepoUrl`, `-Branch`, `-SkipOffice`, `-SkipLocalModel`, `-SkipLogins` (dopisz na końcu polecenia `-File $s`).
+
+## Repo już jest na maszynie
+
+Jeden klik: **`Przygotuj-srodowisko.bat`** (dwuklik). Na świeżej maszynie kliknij prawym → *Uruchom jako administrator* (część instalatorów tego wymaga; inaczej działa per-user).
 
 ## Co robi (kolejno)
 
@@ -12,8 +24,13 @@ Jeden klik: **`Przygotuj-srodowisko.bat`** (dwuklik). Na zupełnie świeżej mas
 6. **Modele lokalne (Ollama)** — tania druga opinia / computer use (kilka GB; pomiń: `-SkipLocalModel`).
 7. **OneDrive** — lokalny sync projektów stron i biblioteki skilli.
 8. **Zależności Pythona** — `pip install -r requirements.txt`.
-9. **Logowania** — interaktywny checklist kont (patrz niżej; pomiń: `-SkipLogins`).
-10. **Raport stanu** — zdjęcie konfiguracji do `STAN-SRODOWISKA.txt`.
+9. **Sekrety** — `bootstrap_init_secrets.py` tworzy `app/secrets/` (klucze uzupełniasz ręcznie).
+10. **Rejestracja roli** — `bootstrap_register.py dev`.
+11. **Logowania** — interaktywny checklist kont (patrz niżej; pomiń: `-SkipLogins`).
+12. **Test dymny** — `bootstrap_smoke_test.py` (weryfikacja pętli).
+13. **Raport stanu** — zdjęcie konfiguracji do `STAN-SRODOWISKA.txt`.
+
+Po zakończeniu: uzupełnij klucze w `app/secrets/.env`, potem `python app/job_scheduler.py` (pętla 24/7) + `python app/dashboard.py`.
 
 ## Checklist logowań (krok 8)
 
