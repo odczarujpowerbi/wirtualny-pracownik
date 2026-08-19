@@ -27,3 +27,6 @@ app/config/schedule.yaml
 Thumbs.db
 .vscode/
 .idea/
+
+# Raport stanu generowany w runtime (env_report) - jak schedule.yaml, poza gitem.
+instalacja/STAN-SRODOWISKA.txt
