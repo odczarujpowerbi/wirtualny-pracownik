@@ -1,0 +1,18 @@
+{
+  "theme": "light",
+  "display": {
+    "lines": [
+      {
+        "segments": {
+          "directory": { "enabled": true },
+          "git": { "enabled": true },
+          "model": { "enabled": true },
+          "block": { "enabled": true, "type": "cost" },
+          "today": { "enabled": true, "type": "cost" },
+          "weekly": { "enabled": true, "type": "cost" },
+          "context": { "enabled": true }
+        }
+      }
+    ]
+  }
+}

@@ -302,12 +302,20 @@ function renderHealth(h) {
   st.className = "ctrl-state " + (h.control || "");
   st.textContent = CTRL_LABEL[h.control] || h.control || "—";
   st.title = h.control === "paused" ? h.pause_reason : (h.control === "stopped" ? h.stop_reason : "");
+  let usageStr = "";
+  const u = h.usage;
+  if (u && u.available) {
+    const est = u.estimated_tasks_remaining != null ? u.estimated_tasks_remaining : "?";
+    usageStr = ` · Claude 5h: <b>$${u.block_5h_usd} / $${u.block_budget_usd}</b> (${u.block_budget_used_pct}%)` +
+               ` · szac. zadań: <b>${est}</b>`;
+  }
   document.getElementById("ctrl-metrics").innerHTML =
     `Maszyna: <b>${h.machine || "—"}</b>` +
     ` · Kolejka: <b>${h.queue_depth ?? "—"}</b>` +
     ` · Do decyzji: <b>${h.needs_approval_count ?? "—"}</b>` +
     ` · Koszt dziś: <b>${money(h.cost_today_usd, h.cost_limit_usd)}</b>` +
-    ` · Zdrowie: <b>${h.health || "—"}</b>`;
+    ` · Zdrowie: <b>${h.health || "—"}</b>` +
+    usageStr;
   document.getElementById("btn-pause").disabled = h.control !== "running";
   document.getElementById("btn-resume").disabled = h.control !== "paused";
   document.getElementById("btn-stop").disabled = h.control === "stopped";

@@ -34,6 +34,7 @@ import kill_switch
 import live_status_publisher
 import notebook_intake
 import state_store
+import usage_monitor
 
 HOST = "127.0.0.1"
 PORT = 8787
@@ -74,6 +75,11 @@ def build_health():
     status["control"] = control.state()
     status["pause_reason"] = control.pause_reason()
     status["stop_reason"] = kill_switch.reason() or ""
+    # Zuzycie Claude (limity okna 5h/dzis) + estymacja ile zadan jeszcze.
+    try:
+        status["usage"] = usage_monitor.summary()
+    except Exception as exc:  # noqa: BLE001 - monitor zuzycia nie moze wywrocic health
+        status["usage"] = {"available": False, "reason": str(exc)}
     return status
 
 

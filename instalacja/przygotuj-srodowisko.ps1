@@ -67,6 +67,7 @@ if (-not $SkipApps) {
 }
 if (-not $SkipTerminal) {
     $steps += @{ Name = "Terminal + konfiguracja pod Claude"; Required = $false; Run = { Invoke-Step "bootstrap_setup_terminal.ps1" @("-AppPath", "$appDir") } }
+    $steps += @{ Name = "Statuslinia Claude (limity)"; Required = $false; Run = { Invoke-Step "bootstrap_setup_statusline.ps1" @() } }
 }
 if (-not $SkipLocalModel) {
     $steps += @{ Name = "Modele lokalne (Ollama)"; Required = $false; Run = { Invoke-Step "bootstrap_install_local_model.ps1" @() } }
