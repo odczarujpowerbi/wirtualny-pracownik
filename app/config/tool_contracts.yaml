@@ -1,0 +1,27 @@
+# Kontrakty narzędzi (M1, fundament governance — przeplyw.html sekcja 5,
+# dokumentacja bazowa Załącznik B). Każde narzędzie, które wolno wykonać,
+# MUSI mieć tu wpis. Narzędzie spoza tej listy = odmowa (fail-closed): model
+# nigdy nie dostaje dowolnego shell, tylko zarejestrowane narzędzia.
+#
+# To jest "konfiguracja firmy" (SKALOWANIE.md sekcja 2) — edytowalna bez zmiany
+# kodu, wymieniana przy kopiowaniu do innej firmy.
+#
+# Pola kontraktu:
+#   risk          — green/yellow/red (spójne z approval_policy.yaml)
+#   allowed_roots — katalogi (względem app/), w których narzędziu wolno operować
+#                   na plikach; ścieżka poza nimi = odmowa. Pomiń, gdy narzędzie
+#                   nie dotyka plików.
+#   params        — schemat parametrów: required (bool) + type (path/string/bool/number)
+#                   Parametr type=path jest sprawdzany wobec allowed_roots.
+
+tools:
+  validate_pbip:
+    risk: green
+    description: Walidacja struktury projektu PBIP (PBI-01), tylko odczyt plików.
+    allowed_roots:
+      - mock_data
+      - workspace
+    params:
+      project_path:
+        required: true
+        type: path

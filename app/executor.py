@@ -5,24 +5,17 @@ worker w pętli (M5 w skrócie). Dziś jedna zdolność: walidacja struktury PBI
 ryzyka. Typy nieobsługiwane zwracają None — runner_loop wraca wtedy do dotychczasowej
 ścieżki "sama klasyfikacja/routing", nic nie udając.
 
-Bezpieczeństwo: walidacja czyta pliki, więc ścieżkę zadania ograniczamy do jawnych
-katalogów roboczych (ALLOWED_ROOTS) — zadanie nie może skierować workera na dowolny
-punkt dysku. To lekki zalążek kontraktu uprawnień (pełny allowed_roots per narzędzie
-to M1), nie jego zamiennik.
+Bezpieczeństwo (M1): KAŻDE wykonanie przechodzi przez tool_registry.check_call —
+narzędzie musi być w rejestrze kontraktów (config/tool_contracts.yaml), a jego
+parametry (w tym ścieżki wobec allowed_roots) muszą pasować do kontraktu. Odmowa
+kontraktu = worker nie wykonuje nic (fail-closed). Executor nie trzyma już własnej
+listy ścieżek — źródłem prawdy jest kontrakt.
 """
 
 from pathlib import Path
 
 import pbip_validate
-
-APP_DIR = Path(__file__).parent
-
-# Katalogi, w których wolno walidować pliki. Ścieżka zadania musi się w nich
-# zawierać po rozwinięciu (.resolve()), inaczej worker odmawia (fail-closed).
-ALLOWED_ROOTS = [
-    (APP_DIR / "mock_data").resolve(),
-    (APP_DIR / "workspace").resolve(),
-]
+import tool_registry
 
 
 def execute(task):
@@ -40,20 +33,14 @@ def _is_pbip_validation(task):
     return "pbip" in title and any(w in title for w in ("waliduj", "walidacj", "sprawdź struktur"))
 
 
-def _path_within_allowed(path):
-    resolved = Path(path).resolve()
-    return any(resolved == root or root in resolved.parents for root in ALLOWED_ROOTS)
-
-
 def _run_pbip_validation(task):
     raw_path = task.get("project_path") or task.get("source_file_link")
-    if not raw_path:
-        return _refused("Zadanie walidacji PBIP nie podało project_path.")
 
-    if not _path_within_allowed(raw_path):
-        return _refused(
-            f"Ścieżka '{raw_path}' jest poza dozwolonymi katalogami roboczymi — worker odmawia (fail-closed)."
-        )
+    # M1: bramka kontraktu PRZED jakimkolwiek dostępem do plików. Rejestr sprawdza
+    # allowlistę narzędzia, wymagane parametry i allowed_roots dla ścieżki.
+    check = tool_registry.check_call("validate_pbip", {"project_path": raw_path})
+    if not check["allowed"]:
+        return _refused(check["reason"])
 
     project_dir = Path(raw_path)
     if not project_dir.exists():
