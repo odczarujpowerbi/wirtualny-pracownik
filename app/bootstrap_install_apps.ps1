@@ -8,7 +8,9 @@
 #   - Microsoft Teams   : komunikacja.
 #   - Outlook (nowy)    : poczta (klasyczny Outlook wchodzi tez z Office 365 Apps).
 #   - Google Chrome     : praca przez przegladarke (logowania Meta/Gmail, automatyzacja).
-#   - Terminal Windows  : terminal.
+#
+# Terminal Windows ma WLASNY krok (bootstrap_setup_terminal.ps1) - instalacja +
+# konfiguracja profili pod Claude, wiec NIE ma go na tej liscie.
 #
 # Plik w ASCII (bez polskich znakow) - patrz app/README.md, uwaga o BOM w PS 5.1.
 #
@@ -21,7 +23,6 @@ $apps = @(
     @{ Name = "Microsoft Teams";   Id = "Microsoft.Teams" }
     @{ Name = "Outlook (nowy)";    Id = "Microsoft.Outlook" }
     @{ Name = "Google Chrome";     Id = "Google.Chrome" }
-    @{ Name = "Terminal Windows";  Id = "Microsoft.WindowsTerminal" }
 )
 
 Write-Host "=== Dodatkowe aplikacje (winget) ==="

@@ -8,7 +8,8 @@
 #   3. Claude Code (CLI)   - naped glownego modelu agenta
 #   4. VS Code + rozszerzenie Claude Code - kodowanie z agentem w edytorze
 #   5. Microsoft Office / 365 Apps - Excel/Word dla MCP i botow czytajacych ekran (kilka GB)
-#   6. Aplikacje (Power BI, Obsidian, Teams, Outlook, Chrome, Terminal)
+#   6. Aplikacje (Power BI, Obsidian, Teams, Outlook, Chrome)
+#   6b. Terminal Windows + konfiguracja profili pod Claude
 #   7. Modele lokalne (Ollama) - tania druga opinia / computer use (kilka GB)
 #   8. OneDrive            - lokalny sync projektow stron i skilli
 #   9. Zaleznosci Pythona  - pip install -r requirements.txt (jesli repo obok)
@@ -20,6 +21,7 @@
 # Przelaczniki:
 #   -SkipOffice       pomija Office
 #   -SkipApps         pomija dodatkowe aplikacje (Power BI, Obsidian, Teams, ...)
+#   -SkipTerminal     pomija Terminal Windows + konfiguracje pod Claude
 #   -SkipLocalModel   pomija modele lokalne (kilka GB)
 #   -SkipAutostart    pomija konfiguracje autostartu 24/7
 #   -SkipLogins       pomija interaktywny checklist logowan
@@ -28,6 +30,7 @@
 param(
     [switch]$SkipOffice,
     [switch]$SkipApps,
+    [switch]$SkipTerminal,
     [switch]$SkipLocalModel,
     [switch]$SkipAutostart,
     [switch]$SkipLogins
@@ -61,6 +64,9 @@ if (-not $SkipOffice) {
 }
 if (-not $SkipApps) {
     $steps += @{ Name = "Aplikacje (Power BI, Obsidian, Teams...)"; Required = $false; Run = { Invoke-Step "bootstrap_install_apps.ps1" @() } }
+}
+if (-not $SkipTerminal) {
+    $steps += @{ Name = "Terminal + konfiguracja pod Claude"; Required = $false; Run = { Invoke-Step "bootstrap_setup_terminal.ps1" @("-AppPath", "$appDir") } }
 }
 if (-not $SkipLocalModel) {
     $steps += @{ Name = "Modele lokalne (Ollama)"; Required = $false; Run = { Invoke-Step "bootstrap_install_local_model.ps1" @() } }

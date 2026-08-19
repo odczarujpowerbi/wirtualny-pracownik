@@ -21,7 +21,8 @@ Jeden klik: **`Przygotuj-srodowisko.bat`** (dwuklik). Na świeżej maszynie klik
 3. **Claude Code (CLI)** — naped głównego modelu agenta.
 4. **VS Code + rozszerzenie Claude Code** — kodowanie z agentem w edytorze (poprawki na stronie w repo).
 5. **Microsoft Office / 365 Apps** — Excel, Word, Outlook (klasyczny), PowerPoint (kilka GB; pomiń: `-SkipOffice`). Używa **dołączonego instalatora** `instalacja/office/OfficeSetup.exe` (fallback: winget). Uruchamiany **w tle** — usługa Click-to-Run dociąga pakiet sama, a instalator **nie czeka** i leci z kolejnymi krokami. Instaluje się **bez logowania**; aktywacja później kontem Business Standard (docelowo może ją przejąć agent computer-use). Boty pracują na Office przez MCP do Excela oraz przez boty czytające ekran. *Uwaga: raport stanu (krok 15) może pokazać Office jako BRAK, jeśli pobieranie w tle jeszcze trwa — to normalne.*
-6. **Aplikacje** — Power BI Desktop, Obsidian, Teams, Outlook (nowy), Google Chrome, Terminal Windows (pomiń: `-SkipApps`).
+6. **Aplikacje** — Power BI Desktop, Obsidian, Teams, Outlook (nowy), Google Chrome (pomiń: `-SkipApps`).
+   - **6b. Terminal Windows + konfiguracja pod Claude** (pomiń: `-SkipTerminal`) — instaluje Terminal i dodaje dwa profile (fragment WT, niedestrukcyjnie): **„Wirtualny Pracownik"** (PowerShell w katalogu projektu) i **„Claude — Wirtualny Pracownik"** (od razu odpala `claude` w projekcie). Widoczne w rozwijanym menu Terminala.
 7. **Modele lokalne (Ollama)** — tania druga opinia / computer use (kilka GB; pomiń: `-SkipLocalModel`).
 8. **OneDrive** — lokalny sync projektów stron i biblioteki skilli.
 9. **Zależności Pythona** — `pip install -r requirements.txt`.

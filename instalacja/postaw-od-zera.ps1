@@ -16,6 +16,7 @@ param(
     [string]$Branch = "main",
     [switch]$SkipOffice,
     [switch]$SkipApps,
+    [switch]$SkipTerminal,
     [switch]$SkipLocalModel,
     [switch]$SkipAutostart,
     [switch]$SkipLogins
@@ -73,6 +74,7 @@ if (-not (Test-Path $orchestrator)) { throw "Brak orkiestratora: $orchestrator (
 $fwd = @()
 if ($SkipOffice)     { $fwd += "-SkipOffice" }
 if ($SkipApps)       { $fwd += "-SkipApps" }
+if ($SkipTerminal)   { $fwd += "-SkipTerminal" }
 if ($SkipLocalModel) { $fwd += "-SkipLocalModel" }
 if ($SkipAutostart)  { $fwd += "-SkipAutostart" }
 if ($SkipLogins)     { $fwd += "-SkipLogins" }
