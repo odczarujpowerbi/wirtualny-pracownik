@@ -16,7 +16,7 @@
 #   powershell -ExecutionPolicy Bypass -File bootstrap_setup_terminal.ps1
 #   ... -AppPath <sciezka app>   ... -FragmentDir <sciezka>   (do testow)
 param(
-    [string]$AppPath = $PSScriptRoot,
+    [string]$AppPath = (Join-Path $PSScriptRoot "..\..\app"),
     [string]$FragmentDir = (Join-Path $env:LOCALAPPDATA "Microsoft\Windows Terminal\Fragments\WirtualnyPracownik")
 )
 $ErrorActionPreference = "Stop"

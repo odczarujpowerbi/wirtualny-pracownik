@@ -14,7 +14,7 @@ Wirtualny pracownik działający niezależnie od laptopów zespołu: cyklicznie 
 
 1. **Pusta maszyna** (Windows Server 2022 / Windows 11), PowerShell jako administrator — jedna linia pobiera git, klonuje repo i uruchamia instalator:
    ```powershell
-   $s="$env:TEMP\postaw.ps1"; irm https://raw.githubusercontent.com/odczarujpowerbi/wirtualny-pracownik/main/instalacja/postaw-od-zera.ps1 -OutFile $s; powershell -ExecutionPolicy Bypass -File $s
+   $s="$env:TEMP\postaw.ps1"; irm https://raw.githubusercontent.com/odczarujpowerbi/wirtualny-pracownik/main/instalacja/skrypty/postaw-od-zera.ps1 -OutFile $s; powershell -ExecutionPolicy Bypass -File $s
    ```
    Repo już jest? Kliknij `instalacja\Przygotuj-srodowisko.bat` (jako administrator). Instalacja jest **bezobsługowa**.
 2. Uzupełnij dostępy w `app\secrets\.env` (i `app\secrets\mcp\*.json`). Szczegóły w instrukcji.

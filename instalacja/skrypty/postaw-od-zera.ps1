@@ -67,7 +67,7 @@ if (Test-Path (Join-Path $InstallPath ".git")) {
 }
 
 # --- 3. Pelny instalator srodowiska (nowy proces, przekazujemy przelaczniki) ---
-$orchestrator = Join-Path $InstallPath "instalacja\przygotuj-srodowisko.ps1"
+$orchestrator = Join-Path $InstallPath "instalacja\skrypty\przygotuj-srodowisko.ps1"
 if (-not (Test-Path $orchestrator)) { throw "Brak orkiestratora: $orchestrator (czy repo sklonowalo sie poprawnie?)" }
 
 $fwd = @()

@@ -60,14 +60,14 @@ Stan zapisywany w `app/runs/logins_status.json`.
 
 ## Uruchomienia pojedynczych kroków
 
-Wszystko działa też osobno (folder `app/`):
+Wszystko działa też osobno (skrypty w `instalacja\skrypty\`):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File app\bootstrap_install_vscode.ps1
-powershell -ExecutionPolicy Bypass -File app\bootstrap_install_office.ps1     # Excel/Word (bez logowania)
-powershell -ExecutionPolicy Bypass -File app\bootstrap_setup_onedrive.ps1
-powershell -ExecutionPolicy Bypass -File app\bootstrap_logins.ps1            # -NonInteractive = tylko lista
-powershell -ExecutionPolicy Bypass -File app\bootstrap_env_report.ps1        # mini-raport stanu maszyny
+powershell -ExecutionPolicy Bypass -File instalacja\skrypty\bootstrap_install_vscode.ps1
+powershell -ExecutionPolicy Bypass -File instalacja\skrypty\bootstrap_install_office.ps1     # Excel/Word (bez logowania)
+powershell -ExecutionPolicy Bypass -File instalacja\skrypty\bootstrap_setup_onedrive.ps1
+powershell -ExecutionPolicy Bypass -File instalacja\skrypty\bootstrap_logins.ps1            # -NonInteractive = tylko lista
+powershell -ExecutionPolicy Bypass -File instalacja\skrypty\bootstrap_env_report.ps1        # mini-raport stanu maszyny
 ```
 
 ## Mini-info: jak jest skonfigurowana ta maszyna

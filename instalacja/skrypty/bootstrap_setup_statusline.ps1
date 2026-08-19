@@ -42,7 +42,7 @@ Write-Host "Ustawiono statusLine w: $settingsPath"
 # 2. Config claude-powerline.json (segmenty limitow) - z dolaczonego szablonu,
 #    tylko jesli jeszcze nie ma (nie nadpisujemy recznych zmian uzytkownika).
 $plPath = Join-Path $ClaudeDir "claude-powerline.json"
-$template = Join-Path $PSScriptRoot "..\instalacja\claude\claude-powerline.json"
+$template = Join-Path $PSScriptRoot "..\claude\claude-powerline.json"
 if (Test-Path $plPath) {
     Write-Host "claude-powerline.json juz istnieje - zostawiam bez zmian."
 } elseif (Test-Path $template) {

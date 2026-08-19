@@ -13,7 +13,7 @@ echo.
 echo === Przygotowanie srodowiska - Wirtualny Pracownik AI ===
 echo To potrwa (instalacje + pobieranie modeli lokalnych). Postepuj wg krokow.
 echo.
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0przygotuj-srodowisko.ps1" %*
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0skrypty\przygotuj-srodowisko.ps1" %*
 echo.
 echo === Zakonczono. Okno mozna zamknac. ===
 pause

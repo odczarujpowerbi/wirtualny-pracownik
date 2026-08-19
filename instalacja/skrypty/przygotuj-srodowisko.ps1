@@ -37,10 +37,12 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$appDir = Resolve-Path (Join-Path $PSScriptRoot "..\app")
+# Ten skrypt lezy w instalacja/skrypty/. app/ jest DWA poziomy wyzej.
+$appDir = Resolve-Path (Join-Path $PSScriptRoot "..\..\app")
 
 function Invoke-Step($scriptName, $stepArgs) {
-    $path = Join-Path $appDir $scriptName
+    # Skrypty bootstrap_*.ps1 leza OBOK tego pliku (instalacja/skrypty/), nie w app/.
+    $path = Join-Path $PSScriptRoot $scriptName
     if (-not (Test-Path $path)) { throw "Brak skryptu: $path" }
     $psExe = (Get-Process -Id $PID).Path
     & $psExe -NoProfile -ExecutionPolicy Bypass -File $path @stepArgs | Out-Host

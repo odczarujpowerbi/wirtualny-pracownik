@@ -9,7 +9,7 @@
 #
 # Uzycie:  powershell -ExecutionPolicy Bypass -File bootstrap_autostart.ps1 [-AppPath ...]
 param(
-    [string]$AppPath = $PSScriptRoot,   # domyslnie folder app/ (ten, w ktorym lezy ten skrypt)
+    [string]$AppPath = (Join-Path $PSScriptRoot "..\..\app"),   # domyslnie folder app/ (ten, w ktorym lezy ten skrypt)
     [string]$TaskName = "WirtualnyPracownikAI"
 )
 $ErrorActionPreference = "Stop"

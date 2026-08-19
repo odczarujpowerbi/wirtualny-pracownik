@@ -12,6 +12,6 @@ echo === Logowania na konta - Wirtualny Pracownik AI ===
 echo Przejdziemy po kolei. Dla kazdego konta otworze aplikacje/strone i zapytam,
 echo czy zalogowane.
 echo.
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0..\app\bootstrap_logins.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0skrypty\bootstrap_logins.ps1"
 echo.
 pause

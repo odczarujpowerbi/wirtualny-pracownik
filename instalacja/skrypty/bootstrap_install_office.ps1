@@ -53,7 +53,7 @@ Write-Host "Office nie wykryty. Instaluje Microsoft 365 Apps (pobieranie kilku G
 # NIE blokujemy reszty instalacji - pobieranie kilku GB toczy sie samo w tle,
 # a orkiestrator leci dalej z kolejnymi aplikacjami. Aktywacja licencji (konto
 # Business Standard) to i tak osobny, pozniejszy krok.
-$bundled = Join-Path $PSScriptRoot "..\instalacja\office\OfficeSetup.exe"
+$bundled = Join-Path $PSScriptRoot "..\office\OfficeSetup.exe"
 if (Test-Path $bundled) {
     Write-Host "Uruchamiam dolaczony instalator W TLE: $bundled"
     Start-Process -FilePath $bundled
