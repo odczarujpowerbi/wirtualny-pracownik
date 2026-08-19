@@ -47,6 +47,36 @@
   .badge.schedule { background:#eceef1; color:var(--muted); }
   .badge.agent { background:#eef2fb; color:var(--accent); }
   .badge.decision { background:#f3ecfb; color:#6b46c1; }
+  .badge.warn { background:#fdf3e2; color:#a9701a; }
+  .badge.done { background:#e6f6ee; color:var(--ok); }
+  .badge.needs_approval { background:#fdf3e2; color:#a9701a; }
+  .badge.failed { background:#fde8e8; color:var(--err); }
+  .badge.planning, .badge.queued, .badge.validating { background:#eceef1; color:var(--muted); }
+
+  /* Formularz dodawania zadania. */
+  .addtask { padding:14px 16px; }
+  .addtask-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .addtask-row #t-title { flex:2 1 320px; }
+  .addtask-row #t-path { flex:1 1 220px; }
+  .addtask input[type=text], .addtask select { font:inherit; padding:7px 9px; border:1px solid var(--line); border-radius:6px; }
+
+  /* Karty zadan (grupowanie po zadaniu z osia czasu). */
+  .task { background:var(--card); border:1px solid var(--line); border-radius:10px; margin-bottom:8px; overflow:hidden; }
+  .task-head { display:flex; align-items:center; gap:10px; padding:11px 14px; cursor:pointer; }
+  .task-head:hover { background:#f8fafc; }
+  .task-head .arrow { color:var(--muted); transition:transform .15s; flex:none; }
+  .task.open .task-head .arrow { transform:rotate(90deg); }
+  .task-title { font-weight:600; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .task-id { color:var(--muted); font-size:12px; font-family:Consolas,monospace; flex:none; }
+  .task-when { color:var(--muted); font-size:12px; flex:none; }
+  .pill { font-size:11px; font-weight:700; border-radius:6px; padding:2px 8px; flex:none; }
+  .pill.green { background:#e6f6ee; color:var(--ok); } .pill.yellow { background:#fdf3e2; color:#a9701a; } .pill.red { background:#fde8e8; color:var(--err); }
+  .task-body { display:none; border-top:1px solid var(--line); padding:4px 0 2px; }
+  .task.open .task-body { display:block; }
+  .tl { width:100%; border-collapse:collapse; font-size:13px; table-layout:fixed; }
+  .tl th { text-align:left; padding:6px 14px; font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); background:#fafbfc; }
+  .tl td { padding:6px 14px; border-top:1px solid #f0f2f5; vertical-align:top; word-break:break-word; }
+  .tl td.mono { font-size:12px; color:var(--muted); white-space:nowrap; }
   .badge.clickable { cursor:pointer; }
   .badge.clickable:hover { filter:brightness(0.95); text-decoration:underline; }
   .row-off td { color:var(--off); }
@@ -93,19 +123,23 @@
   <span class="sub">Kliknij w status przebiegu albo w wiersz historii, żeby zobaczyć pełne wyjście skryptu. Kolumny można rozsuwać.</span>
 </header>
 <main>
-  <h2>Przepływy agentów — decyzje na żywo <span id="flows-refreshed" class="refreshed"></span></h2>
-  <div class="card"><div class="table-wrap"><table id="flows">
-    <thead><tr>
-      <th data-w="14%">Kiedy</th>
-      <th data-w="9%">Zadanie</th>
-      <th data-w="9%">Agent</th>
-      <th data-w="14%">Decyzja</th>
-      <th data-w="35%">Dlaczego</th>
-      <th data-w="10%">Model</th>
-      <th data-w="9%">Koszt</th>
-    </tr></thead>
-    <tbody id="flows-body"></tbody>
-  </table></div></div>
+  <h2>Dodaj zadanie</h2>
+  <div class="card addtask">
+    <div class="addtask-row">
+      <input id="t-title" type="text" placeholder="Treść zadania, np. Przejrzyj raport sprzedaży Q3" />
+      <select id="t-risk" title="Poziom ryzyka">
+        <option value="green">zielone (odczyt / analiza)</option>
+        <option value="yellow">żółte (zmiana)</option>
+        <option value="red">czerwone (publikacja / budżet)</option>
+      </select>
+      <input id="t-path" type="text" placeholder="(opcjonalnie) ścieżka PBIP, np. mock_data/sample_pbip" />
+      <button class="primary" id="t-add">Dodaj</button>
+    </div>
+    <div class="hint">Zadanie trafia do notatnika (<code>inbox/zadania.txt</code>) i jest od razu przetwarzane lokalnie klientem mock (nie rusza żywego Projectly). Identyczna treść jest pomijana (dedup).</div>
+  </div>
+
+  <h2>Zadania — kroki, decyzje i statusy agentów <span id="tasks-refreshed" class="refreshed"></span></h2>
+  <div id="tasks"></div>
 
   <h2>Skrypty i harmonogram</h2>
   <div class="card"><div class="table-wrap"><table id="jobs">
@@ -230,34 +264,113 @@ function startResize(e, th, ths, key) {
   document.addEventListener("pointerup", up);
 }
 
-// ---- Przeplywy agentow (decyzje na zywo) ----
-function renderFlows(decisions) {
-  const body = document.getElementById("flows-body");
-  if (!decisions || !decisions.length) {
-    body.replaceChildren(el("tr", {}, [el("td", { colSpan: 7, class: "hint",
-      text: "Jeszcze żadnej decyzji agenta. Uruchom runner_loop (harmonogram albo 'Uruchom teraz')." })]));
-    return;
-  }
-  const rows = decisions.map((d) => el("tr", {}, [
-    el("td", { class: "ellipsis", text: fmt(d.created_at) }),
-    el("td", { class: "ellipsis", text: d.task_id || "—" }),
-    el("td", {}, [el("span", { class: "badge agent", text: d.agent || "—" })]),
-    el("td", {}, [el("span", { class: "badge decision", text: d.decision || d.event_type || "—" })]),
-    el("td", { class: "wrap", text: d.reason || "" }),
-    el("td", { class: "ellipsis", text: d.model || "—" }),
-    el("td", { text: d.cost_usd != null ? Number(d.cost_usd).toFixed(4) + " $" : "—" }),
-  ]));
-  body.replaceChildren(...rows);
+// ---- Zadania: grupowanie po zadaniu z osia czasu krokow/decyzji/statusow ----
+const EVENT_LABELS = {
+  task_received: "przyjęto zadanie",
+  prompt_safety_check: "kontrola treści",
+  classified: "klasyfikacja ryzyka",
+  thinking: "analiza (model)",
+  execution: "wykonanie",
+  quality_gate: "bramka jakości",
+  status_set: "status",
+  escalation: "eskalacja",
+  decision: "decyzja",
+};
+const openTasks = new Set();  // task_id rozwinietych kart - przezywa odswiezanie
+
+function fmtTime(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return isNaN(d) ? iso : d.toLocaleTimeString("pl-PL");
 }
 
-async function loadFlows() {
+function statusBadge(status) {
+  return el("span", { class: `badge ${status || "none"}`, text: status || "—" });
+}
+
+function riskPill(risk) {
+  return risk ? el("span", { class: `pill ${risk}`, text: risk }) : el("span", {});
+}
+
+function buildTimeline(events) {
+  const head = el("thead", {}, [el("tr", {}, [
+    el("th", { text: "Czas", style: "width:13%" }),
+    el("th", { text: "Agent", style: "width:12%" }),
+    el("th", { text: "Krok", style: "width:17%" }),
+    el("th", { text: "Decyzja / status", style: "width:20%" }),
+    el("th", { text: "Dlaczego" }),
+  ])]);
+  const rows = (events || []).map((ev) => el("tr", {}, [
+    el("td", { class: "mono", text: fmtTime(ev.created_at) }),
+    el("td", { text: ev.agent || "—" }),
+    el("td", { text: EVENT_LABELS[ev.event_type] || ev.event_type }),
+    el("td", { text: ev.decision || "—" }),
+    el("td", { text: ev.reason || ev.detail || "" }),
+  ]));
+  const body = el("tbody", {}, rows.length ? rows
+    : [el("tr", {}, [el("td", { colSpan: 5, class: "hint", text: "Brak zdarzeń." })])]);
+  return el("table", { class: "tl" }, [head, body]);
+}
+
+function buildTaskCard(t) {
+  const head = el("div", { class: "task-head" }, [
+    statusBadge(t.status),
+    el("span", { class: "task-title", text: t.title || t.task_id }),
+    riskPill(t.risk),
+    el("span", { class: "task-id", text: t.task_id }),
+    el("span", { class: "task-when", text: fmt(t.updated_at) }),
+    el("span", { class: "arrow", text: "▸" }),
+  ]);
+  const body = el("div", { class: "task-body" }, [buildTimeline(t.events)]);
+  const card = el("div", { class: "task" + (openTasks.has(t.task_id) ? " open" : "") }, [head, body]);
+  head.addEventListener("click", () => {
+    if (openTasks.has(t.task_id)) openTasks.delete(t.task_id); else openTasks.add(t.task_id);
+    card.classList.toggle("open");
+  });
+  return card;
+}
+
+function renderTasks(tasks) {
+  const box = document.getElementById("tasks");
+  if (!tasks || !tasks.length) {
+    box.replaceChildren(el("div", { class: "card", style: "padding:14px 16px" },
+      [el("span", { class: "hint", text: "Brak zadań. Dodaj zadanie wyżej albo uruchom runner." })]));
+    return;
+  }
+  box.replaceChildren(...tasks.map(buildTaskCard));
+}
+
+async function loadTasks() {
   try {
-    const res = await fetch("/api/flows");
+    const res = await fetch("/api/tasks");
     const json = await res.json();
-    renderFlows(json.decisions || []);
-    document.getElementById("flows-refreshed").textContent =
+    renderTasks(json.tasks || []);
+    document.getElementById("tasks-refreshed").textContent =
       "(odświeżono " + new Date().toLocaleTimeString("pl-PL") + ")";
   } catch (e) { /* cicho — dashboard nie może paść przez chwilowy błąd sieci */ }
+}
+
+async function submitTask() {
+  const titleEl = document.getElementById("t-title");
+  const title = titleEl.value.trim();
+  if (!title) { toast("Wpisz treść zadania.", true); return; }
+  const risk = document.getElementById("t-risk").value;
+  const pathEl = document.getElementById("t-path");
+  const btn = document.getElementById("t-add");
+  btn.disabled = true;
+  try {
+    const res = await fetch("/api/add-task", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, risk, project_path: pathEl.value.trim() }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error ? json.error.message : "Błąd dodawania");
+    toast(json.data.message || "Dodano zadanie.");
+    titleEl.value = ""; pathEl.value = "";
+    setTimeout(loadTasks, 1200);
+    setTimeout(loadTasks, 4500);
+  } catch (e) { toast(e.message, true); }
+  finally { btn.disabled = false; }
 }
 
 // ---- Tabela skryptow ----
@@ -433,7 +546,7 @@ async function load() {
     const res = await fetch("/api/state");
     applyState(await res.json());
   } catch (e) { toast("Nie udało się pobrać stanu: " + e.message, true); }
-  loadFlows();
+  loadTasks();
 }
 
 async function refresh() {
@@ -445,18 +558,21 @@ async function refresh() {
     renderHistory(state.history || []);
     stamp();
   } catch (e) { /* cicho */ }
-  loadFlows();
+  loadTasks();
 }
 
-// Przeplywy odswiezamy czesciej niz reszte — to widok "na zywo".
-const FLOWS_REFRESH_MS = 4000;
+// Zadania to widok "na zywo" — odswiezamy czesciej niz reszte.
+const TASKS_REFRESH_MS = 4000;
 
-makeResizable(document.getElementById("flows"), "cols-flows-v1");
+document.getElementById("t-add").addEventListener("click", submitTask);
+document.getElementById("t-title").addEventListener("keydown", (e) => { if (e.key === "Enter") submitTask(); });
+document.getElementById("t-path").addEventListener("keydown", (e) => { if (e.key === "Enter") submitTask(); });
+
 makeResizable(document.getElementById("jobs"), "cols-jobs-v1");
 makeResizable(document.getElementById("history"), "cols-history-v1");
 load();
 setInterval(refresh, REFRESH_MS);
-setInterval(loadFlows, FLOWS_REFRESH_MS);
+setInterval(loadTasks, TASKS_REFRESH_MS);
 </script>
 </body>
 </html>

@@ -75,6 +75,25 @@ def _parse_line(raw):
     return task
 
 
+def append_task(title, risk="green", project_path=None, inbox_path=INBOX_PATH):
+    """Dopisuje jedno zadanie do notatnika w formacie, który rozumie parser
+    (używane przez formularz 'Dodaj zadanie' w dashboardzie). Zwraca dopisaną linię."""
+    title = (title or "").strip()
+    if not title:
+        raise ValueError("Zadanie musi mieć treść.")
+    line = title
+    if project_path and project_path.strip():
+        line += f" @ {project_path.strip()}"
+    if risk in ("yellow", "red"):
+        line += f" !{risk}"
+
+    inbox_path = Path(inbox_path)
+    inbox_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(inbox_path, "a", encoding="utf-8") as f:
+        f.write(line + "\n")
+    return line
+
+
 def _load_processed(path):
     if Path(path).exists():
         return set(json.loads(Path(path).read_text(encoding="utf-8")))

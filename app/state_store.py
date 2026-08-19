@@ -163,3 +163,37 @@ def get_recent_decisions(limit=200):
     ).fetchall()
     conn.close()
     return [dict(zip(_DECISION_FIELDS, row)) for row in rows]
+
+
+_TIMELINE_FIELDS = ["created_at", "event_type", "agent", "decision", "reason", "detail"]
+
+
+def get_tasks_with_timeline(limit=40):
+    """Zadania pogrupowane z pełną osią czasu (kroki, decyzje, statusy poszczególnych
+    agentów) — zasila główny widok dashboardu 'Zadania'. Najnowsze zadania pierwsze;
+    dla każdego wszystkie zdarzenia w kolejności chronologicznej."""
+    conn = _connect()
+    task_rows = conn.execute(
+        """SELECT task_id, status, payload, assigned_to, risk_level, updated_at
+           FROM tasks ORDER BY updated_at DESC LIMIT ?""",
+        (limit,),
+    ).fetchall()
+
+    tasks = []
+    for task_id, status, payload, owner, risk, updated_at in task_rows:
+        try:
+            title = json.loads(payload).get("title", task_id)
+        except (ValueError, TypeError):
+            title = task_id
+        ev_rows = conn.execute(
+            f"""SELECT {', '.join(_TIMELINE_FIELDS)} FROM events
+                WHERE task_id = ? ORDER BY id""",
+            (task_id,),
+        ).fetchall()
+        events = [dict(zip(_TIMELINE_FIELDS, row)) for row in ev_rows]
+        tasks.append({
+            "task_id": task_id, "title": title, "status": status,
+            "owner": owner, "risk": risk, "updated_at": updated_at, "events": events,
+        })
+    conn.close()
+    return tasks

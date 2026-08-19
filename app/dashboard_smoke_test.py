@@ -138,6 +138,34 @@ def run():
     checks.append(("build_state zwraca jobs/status/history",
                    set(state) == {"jobs", "status", "history"} and isinstance(state["jobs"], list)))
 
+    # 13. build_tasks zwraca strukturę zadań (grupowanie po zadaniu, read-only).
+    tasks = dashboard.build_tasks()
+    checks.append(("build_tasks zwraca listę zadań", isinstance(tasks.get("tasks"), list)))
+
+    # 14. append_task (formularz "Dodaj zadanie") buduje linię w formacie parsera.
+    import notebook_intake
+    with tempfile.TemporaryDirectory() as tmp2:
+        inbox = Path(tmp2) / "zadania.txt"
+        line = notebook_intake.append_task("Test zadania", risk="red",
+                                           project_path="mock_data/sample_pbip", inbox_path=inbox)
+        checks.append(("append_task buduje linię z @ ścieżką i !red",
+                       line == "Test zadania @ mock_data/sample_pbip !red"
+                       and inbox.read_text(encoding="utf-8").strip() == line))
+
+        # 15. Round-trip: dopisana linia parsuje się z powrotem na poprawne zadanie.
+        parsed = notebook_intake.parse_notebook(line)[0]
+        checks.append(("append_task -> parse_notebook round-trip (red + validate_pbip)",
+                       parsed["risk_level_hint"] == "red" and parsed["action"] == "validate_pbip"
+                       and parsed["project_path"] == "mock_data/sample_pbip"))
+
+        # 16. Pusta treść zadania odrzucona (error case).
+        try:
+            notebook_intake.append_task("   ", inbox_path=inbox)
+            empty_rejected = False
+        except ValueError:
+            empty_rejected = True
+        checks.append(("append_task odrzuca pustą treść", empty_rejected))
+
     print("\n--- Wynik testu dymnego dashboardu ---")
     all_passed = True
     for name, passed in checks:

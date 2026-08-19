@@ -29,6 +29,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import job_scheduler
+import notebook_intake
 import state_store
 
 HOST = "127.0.0.1"
@@ -48,6 +49,19 @@ def build_flows(limit=200):
     """Zakładka 'Przepływy' (M2b): ostatnie decyzje agentów z state.db —
     kto → co → dlaczego → model → koszt. Źródło do podglądu na żywo i analizy."""
     return {"decisions": state_store.get_recent_decisions(limit=limit)}
+
+
+def build_tasks(limit=40):
+    """Główny widok 'Zadania': zadania pogrupowane z osią czasu kroków, decyzji
+    i statusów poszczególnych agentów."""
+    return {"tasks": state_store.get_tasks_with_timeline(limit=limit)}
+
+
+def _process_notebook_safely():
+    try:
+        notebook_intake.run_once()
+    except Exception as exc:  # noqa: BLE001 — wątek w tle: błąd logujemy, nie wywracamy serwera
+        print(f"[dashboard] błąd przetwarzania notatnika: {exc}")
 
 
 def _validate_updates(body):
@@ -86,6 +100,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._send_json(build_state())
         elif parsed.path == "/api/flows":
             self._send_json(build_flows())
+        elif parsed.path == "/api/tasks":
+            self._send_json(build_tasks())
         elif parsed.path == "/api/run-log":
             self._handle_run_log(parse_qs(parsed.query))
         else:
@@ -108,6 +124,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._handle_schedule()
             elif self.path == "/api/run":
                 self._handle_run()
+            elif self.path == "/api/add-task":
+                self._handle_add_task()
             else:
                 self._send_error("not_found", "Nieznana ścieżka.", status=404)
         except ValueError as exc:
@@ -130,6 +148,22 @@ class DashboardHandler(BaseHTTPRequestHandler):
             raise ValueError(f"Brak zadania '{name}' w harmonogramie.")
         threading.Thread(target=_run_safely, args=(name,), daemon=True).start()
         self._send_json({"data": {"message": f"Uruchomiono '{name}' w tle."}}, status=202)
+
+    def _handle_add_task(self):
+        """Dopisuje zadanie do notatnika (inbox/zadania.txt) i od razu je przetwarza
+        w tle klientem mock — nie czekając na 60-sekundowy tick schedulera."""
+        body = self._read_json_body()
+        title = (body.get("title") or "").strip()
+        risk = body.get("risk", "green")
+        project_path = (body.get("project_path") or "").strip() or None
+        if not title:
+            raise ValueError("Brak treści zadania.")
+        if risk not in ("green", "yellow", "red"):
+            raise ValueError("Nieznany poziom ryzyka (dozwolone: green/yellow/red).")
+
+        line = notebook_intake.append_task(title, risk=risk, project_path=project_path)
+        threading.Thread(target=_process_notebook_safely, daemon=True).start()
+        self._send_json({"data": {"message": f"Dodano i przetwarzam: {line}"}}, status=202)
 
     def _serve_html(self):
         body = HTML_PATH.read_bytes()
