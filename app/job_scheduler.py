@@ -49,6 +49,10 @@ import kill_switch
 MAX_OUTPUT_CHARS = 200_000
 
 SCHEDULE_PATH = Path(__file__).parent / "config" / "schedule.yaml"
+# Szablon SLEDZONY w gicie. schedule.yaml (LIVE) jest poza gitem (.gitignore),
+# bo aplikacja go zapisuje w runtime (dashboard/CLI) - gdyby byl sledzony,
+# kazdy git pull konfliktowalby. Rozdzial: SZABLON w repo, LIVE lokalnie.
+DEFAULT_SCHEDULE_PATH = Path(__file__).parent / "config" / "schedule.default.yaml"
 STATUS_PATH = Path(__file__).parent / "runs" / "scheduler_status.json"
 HISTORY_PATH = Path(__file__).parent / "runs" / "run_history.jsonl"
 
@@ -77,9 +81,36 @@ SCHEDULE_HEADER = (
 )
 
 
-def load_schedule(path=SCHEDULE_PATH):
+def _read_jobs(path):
+    """Surowy odczyt listy jobow z pliku YAML (bez seedowania) — unika rekurencji."""
     with open(path, encoding="utf-8") as f:
-        return yaml.safe_load(f).get("jobs", [])
+        return (yaml.safe_load(f) or {}).get("jobs", [])
+
+
+def _ensure_live_schedule():
+    """Utrzymuje LIVE schedule.yaml zsynchronizowany z SZABLONEM, bez kasowania
+    lokalnych przelacznikow: (1) brak live -> kopiuj z szablonu; (2) live istnieje
+    -> domeruj joby z szablonu, ktorych nie ma lokalnie (po nazwie). Lokalne
+    zmiany enabled/interval istniejacych jobow zostaja nietkniete."""
+    if not DEFAULT_SCHEDULE_PATH.exists():
+        return  # brak szablonu (np. bardzo stary checkout) — nic nie robimy
+    if not SCHEDULE_PATH.exists():
+        save_schedule(_read_jobs(DEFAULT_SCHEDULE_PATH), SCHEDULE_PATH)
+        return
+    live = _read_jobs(SCHEDULE_PATH)
+    live_names = {j["name"] for j in live}
+    new_jobs = [j for j in _read_jobs(DEFAULT_SCHEDULE_PATH) if j["name"] not in live_names]
+    if new_jobs:
+        live.extend(new_jobs)
+        save_schedule(live, SCHEDULE_PATH)
+
+
+def load_schedule(path=SCHEDULE_PATH):
+    # Tylko dla realnej sciezki LIVE seedujemy/domergowujemy z szablonu. Dla
+    # jawnie podanej innej sciezki (testy z plikiem tymczasowym) — czysty odczyt.
+    if Path(path) == SCHEDULE_PATH:
+        _ensure_live_schedule()
+    return _read_jobs(path)
 
 
 def save_schedule(jobs, path=SCHEDULE_PATH):

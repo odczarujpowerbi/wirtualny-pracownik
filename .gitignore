@@ -18,6 +18,10 @@ runs/
 **/runs/
 *.log
 
+# Harmonogram LIVE - zapisywany przez aplikacje (dashboard/CLI), wiec poza gitem.
+# Szablon sledzony to config/schedule.default.yaml; job_scheduler seeduje/domerguje.
+app/config/schedule.yaml
+
 # OS / edytory
 .DS_Store
 Thumbs.db

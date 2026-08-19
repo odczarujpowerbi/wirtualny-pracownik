@@ -1,11 +1,15 @@
-# Harmonogram wszystkich skryptów cyklicznych — czytany przez job_scheduler.py.
-# Edytuj wprost ALBO przez CLI (python job_scheduler.py --set-interval NAZWA SEKUNDY
-# / --enable NAZWA / --disable NAZWA) — scheduler w trybie ciągłym podchwyci
-# zmianę na najbliższym ticku, BEZ restartu procesu.
+# SZABLON harmonogramu (SLEDZONY w gicie). NIE jest czytany bezposrednio w runtime.
+# job_scheduler.py przy pierwszym uruchomieniu kopiuje go do config/schedule.yaml
+# (plik LOKALNY, poza gitem), a przy kolejnych uruchomieniach DOMERGOWUJE stad
+# nowe joby (po nazwie) do lokalnego pliku - bez kasowania lokalnych przelacznikow
+# (enabled/interval zmienianych z dashboardu/CLI).
 #
-# Dodanie nowego przyszłego skryptu cyklicznego = nowy wpis tutaj (moduł musi
-# mieć bezargumentową funkcję, np. run_once/run_health_check) — bez zmiany
-# kodu job_scheduler.py.
+# DLACZEGO tak: schedule.yaml jest zapisywany w runtime (dashboard "Zapisz",
+# --enable/--disable/--set-interval). Gdyby byl sledzony w gicie, kazdy `git pull`
+# konfliktowalby z lokalna zmiana. Rozdzial: SZABLON w gicie, LIVE lokalnie.
+#
+# Chcesz dodac nowy cykliczny skrypt do dystrybucji? Dopisz go TUTAJ (i zrob commit)
+# - trafi na wszystkie maszyny przy najblizszym uruchomieniu, bez konfliktow.
 
 jobs:
 - name: runner_loop
