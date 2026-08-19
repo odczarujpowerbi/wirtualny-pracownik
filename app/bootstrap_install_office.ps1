@@ -6,10 +6,14 @@
 # (computer use) dla rzeczy, ktorych nie da sie zrobic przez API. Bez lokalnego
 # Office ani jedno, ani drugie nie ma na czym pracowac.
 #
-# JAK/LOGOWANIE: instalator Click-to-Run POBIERA I INSTALUJE pakiet BEZ konta.
-# Logowanie (konto Microsoft 365 Business Standard) jest potrzebne dopiero do
-# AKTYWACJI licencji - robi je czlowiek pozniej (krok w bootstrap_logins.ps1).
-# Po aktywacji boty korzystaja z zainstalowanych aplikacji.
+# JAK: preferujemy DOLACZONY instalator w repo (instalacja/office/OfficeSetup.exe),
+# a dopiero gdy go brak - winget, a na koncu instrukcja reczna. Dolaczony to
+# oficjalny stub Click-to-Run (~7 MB) - i tak dociaga pakiet z serwerow MS, ale
+# nie wymaga winget na kazdej maszynie.
+#
+# LOGOWANIE: instalator POBIERA I INSTALUJE pakiet BEZ konta. Logowanie (konto
+# Microsoft 365 Business Standard) potrzebne dopiero do AKTYWACJI licencji -
+# krok w bootstrap_logins.ps1 (docelowo aktywacje moze przejac agent computer-use).
 #
 # Plik w ASCII (bez polskich znakow) - patrz app/README.md, uwaga o BOM w PS 5.1.
 #
@@ -39,9 +43,27 @@ if (Test-OfficeInstalled) {
 }
 
 Write-Host "Office nie wykryty. Instaluje Microsoft 365 Apps (pobieranie kilku GB)..."
+
+# Priorytet 1: DOLACZONY instalator w repo (instalacja/office/OfficeSetup.exe).
+# To oficjalny stub Click-to-Run - pobiera i instaluje BEZ logowania; aktywacja
+# licencji pozniej kontem Business Standard. Wrzucony do repo, zeby nie polegac
+# na winget na kazdej maszynie.
+$bundled = Join-Path $PSScriptRoot "..\instalacja\office\OfficeSetup.exe"
+if (Test-Path $bundled) {
+    Write-Host "Uruchamiam dolaczony instalator: $bundled"
+    Start-Process -FilePath $bundled -Wait
+    if (Test-OfficeInstalled) {
+        Write-Host "Office zainstalowany (z dolaczonego instalatora)."
+        Write-Host "NASTEPNY KROK (recznie): zaloguj sie kontem Business Standard w Excelu/Wordzie, zeby aktywowac licencje."
+        exit 0
+    }
+    Write-Host "UWAGA: instalator sie zakonczyl, ale nie wykrywam Office - sprawdz recznie."
+    exit 1
+}
+
+# Priorytet 2: winget (Microsoft.Office = Microsoft 365 Apps).
 if (Get-Command winget -ErrorAction SilentlyContinue) {
-    # Microsoft.Office w winget = Microsoft 365 Apps (Click-to-Run). Pobiera bez
-    # logowania; aktywacja pozniej przez konto Business Standard.
+    Write-Host "Brak dolaczonego instalatora - uzywam winget."
     winget install -e --id Microsoft.Office --accept-source-agreements --accept-package-agreements
     if (Test-OfficeInstalled) {
         Write-Host "Office zainstalowany. NASTEPNY KROK (recznie): zaloguj sie kontem Business Standard, zeby aktywowac licencje."
@@ -49,9 +71,10 @@ if (Get-Command winget -ErrorAction SilentlyContinue) {
     }
     Write-Host "UWAGA: winget zakonczyl sie, ale nie wykrywam Office - sprawdz recznie."
     exit 1
-} else {
-    Write-Host "UWAGA: winget niedostepny. Zainstaluj Office recznie na jeden ze sposobow:"
-    Write-Host "  - portal: https://portal.office.com -> zaloguj Business Standard -> Zainstaluj aplikacje, ALBO"
-    Write-Host "  - Office Deployment Tool: https://aka.ms/ODT (konfiguracja XML + setup.exe /download /configure)"
-    exit 1
 }
+
+# Priorytet 3: instrukcja reczna.
+Write-Host "UWAGA: brak dolaczonego instalatora i winget. Zainstaluj Office recznie:"
+Write-Host "  - portal: https://portal.office.com -> zaloguj Business Standard -> Zainstaluj aplikacje, ALBO"
+Write-Host "  - Office Deployment Tool: https://aka.ms/ODT (konfiguracja XML + setup.exe /download /configure)"
+exit 1
