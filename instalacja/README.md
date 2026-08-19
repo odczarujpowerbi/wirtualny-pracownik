@@ -20,7 +20,7 @@ Jeden klik: **`Przygotuj-srodowisko.bat`** (dwuklik). Na świeżej maszynie klik
 2. **Python 3.11+** — wymagane.
 3. **Claude Code (CLI)** — naped głównego modelu agenta.
 4. **VS Code + rozszerzenie Claude Code** — kodowanie z agentem w edytorze (poprawki na stronie w repo).
-5. **Microsoft Office / 365 Apps** — Excel, Word, Outlook (klasyczny), PowerPoint (kilka GB; pomiń: `-SkipOffice`). Używa **dołączonego instalatora** `instalacja/office/OfficeSetup.exe` (fallback: winget). Instaluje się **bez logowania**; aktywacja później kontem Business Standard (docelowo może ją przejąć agent computer-use). Boty pracują na Office przez MCP do Excela oraz przez boty czytające ekran.
+5. **Microsoft Office / 365 Apps** — Excel, Word, Outlook (klasyczny), PowerPoint (kilka GB; pomiń: `-SkipOffice`). Używa **dołączonego instalatora** `instalacja/office/OfficeSetup.exe` (fallback: winget). Uruchamiany **w tle** — usługa Click-to-Run dociąga pakiet sama, a instalator **nie czeka** i leci z kolejnymi krokami. Instaluje się **bez logowania**; aktywacja później kontem Business Standard (docelowo może ją przejąć agent computer-use). Boty pracują na Office przez MCP do Excela oraz przez boty czytające ekran. *Uwaga: raport stanu (krok 15) może pokazać Office jako BRAK, jeśli pobieranie w tle jeszcze trwa — to normalne.*
 6. **Aplikacje** — Power BI Desktop, Obsidian, Teams, Outlook (nowy), Google Chrome, Terminal Windows (pomiń: `-SkipApps`).
 7. **Modele lokalne (Ollama)** — tania druga opinia / computer use (kilka GB; pomiń: `-SkipLocalModel`).
 8. **OneDrive** — lokalny sync projektów stron i biblioteki skilli.

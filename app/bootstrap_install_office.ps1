@@ -48,29 +48,30 @@ Write-Host "Office nie wykryty. Instaluje Microsoft 365 Apps (pobieranie kilku G
 # To oficjalny stub Click-to-Run - pobiera i instaluje BEZ logowania; aktywacja
 # licencji pozniej kontem Business Standard. Wrzucony do repo, zeby nie polegac
 # na winget na kazdej maszynie.
+# WAZNE: Office (Click-to-Run) instaluje sie WLASNA usluga w tle
+# (OfficeClickToRun.exe). Uruchamiamy instalator ASYNCHRONICZNIE (bez -Wait) i
+# NIE blokujemy reszty instalacji - pobieranie kilku GB toczy sie samo w tle,
+# a orkiestrator leci dalej z kolejnymi aplikacjami. Aktywacja licencji (konto
+# Business Standard) to i tak osobny, pozniejszy krok.
 $bundled = Join-Path $PSScriptRoot "..\instalacja\office\OfficeSetup.exe"
 if (Test-Path $bundled) {
-    Write-Host "Uruchamiam dolaczony instalator: $bundled"
-    Start-Process -FilePath $bundled -Wait
-    if (Test-OfficeInstalled) {
-        Write-Host "Office zainstalowany (z dolaczonego instalatora)."
-        Write-Host "NASTEPNY KROK (recznie): zaloguj sie kontem Business Standard w Excelu/Wordzie, zeby aktywowac licencje."
-        exit 0
-    }
-    Write-Host "UWAGA: instalator sie zakonczyl, ale nie wykrywam Office - sprawdz recznie."
-    exit 1
+    Write-Host "Uruchamiam dolaczony instalator W TLE: $bundled"
+    Start-Process -FilePath $bundled
+    Write-Host "Office instaluje sie w tle (usluga Click-to-Run). Kontynuuje reszte instalacji."
+    Write-Host "PO ZAKONCZENIU (w tle): zaloguj sie kontem Business Standard w Excelu/Wordzie, zeby aktywowac licencje."
+    exit 0
 }
 
-# Priorytet 2: winget (Microsoft.Office = Microsoft 365 Apps).
+# Priorytet 2: winget (Microsoft.Office = Microsoft 365 Apps), tez asynchronicznie.
 if (Get-Command winget -ErrorAction SilentlyContinue) {
-    Write-Host "Brak dolaczonego instalatora - uzywam winget."
-    winget install -e --id Microsoft.Office --accept-source-agreements --accept-package-agreements
-    if (Test-OfficeInstalled) {
-        Write-Host "Office zainstalowany. NASTEPNY KROK (recznie): zaloguj sie kontem Business Standard, zeby aktywowac licencje."
-        exit 0
-    }
-    Write-Host "UWAGA: winget zakonczyl sie, ale nie wykrywam Office - sprawdz recznie."
-    exit 1
+    Write-Host "Brak dolaczonego instalatora - uruchamiam winget W TLE."
+    Start-Process -FilePath "winget" -ArgumentList @(
+        "install", "-e", "--id", "Microsoft.Office",
+        "--accept-source-agreements", "--accept-package-agreements"
+    )
+    Write-Host "Office instaluje sie w tle przez winget. Kontynuuje reszte instalacji."
+    Write-Host "PO ZAKONCZENIU: zaloguj sie kontem Business Standard, zeby aktywowac licencje."
+    exit 0
 }
 
 # Priorytet 3: instrukcja reczna.
