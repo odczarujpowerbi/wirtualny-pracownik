@@ -1,6 +1,6 @@
 ﻿=== STAN SRODOWISKA - Wirtualny Pracownik AI ===
 Maszyna: DESKTOP-LREBMVQ    Uzytkownik: LENOVO
-Data:    2026-08-19 11:42
+Data:    2026-08-19 17:58
 
 -- Narzedzia --
 Git:          git version 2.52.0.windows.1
@@ -11,6 +11,14 @@ VS Code:      1.133.0
   Rozszerzenie Claude Code: anthropic.claude-code
 Office:       obecny (Click-to-Run, 16.0.20228.20190)
 Ollama:       BRAK (modele lokalne - bootstrap_install_local_model.ps1)
+
+-- Aplikacje --
+Power BI Desktop:  obecny
+Obsidian:          obecny
+Microsoft Teams:   obecny
+Outlook:           obecny
+Google Chrome:     obecny
+Terminal Windows:  obecny
 
 -- OneDrive --
 Sync:         OK -> C:\Users\LENOVO\OneDrive - Odczaruj Low Code Paweł Czapiewski (1)

@@ -20,15 +20,16 @@ Jeden klik: **`Przygotuj-srodowisko.bat`** (dwuklik). Na świeżej maszynie klik
 2. **Python 3.11+** — wymagane.
 3. **Claude Code (CLI)** — naped głównego modelu agenta.
 4. **VS Code + rozszerzenie Claude Code** — kodowanie z agentem w edytorze (poprawki na stronie w repo).
-5. **Microsoft Office / 365 Apps** — Excel, Word (kilka GB; pomiń: `-SkipOffice`). Instaluje się **bez logowania**; aktywacja później kontem Business Standard. Boty pracują na Office przez MCP do Excela oraz przez boty czytające ekran.
-6. **Modele lokalne (Ollama)** — tania druga opinia / computer use (kilka GB; pomiń: `-SkipLocalModel`).
-7. **OneDrive** — lokalny sync projektów stron i biblioteki skilli.
-8. **Zależności Pythona** — `pip install -r requirements.txt`.
-9. **Sekrety** — `bootstrap_init_secrets.py` tworzy `app/secrets/` (klucze uzupełniasz ręcznie).
-10. **Rejestracja roli** — `bootstrap_register.py dev`.
-11. **Logowania** — interaktywny checklist kont (patrz niżej; pomiń: `-SkipLogins`).
-12. **Test dymny** — `bootstrap_smoke_test.py` (weryfikacja pętli).
-13. **Raport stanu** — zdjęcie konfiguracji do `STAN-SRODOWISKA.txt`.
+5. **Microsoft Office / 365 Apps** — Excel, Word, Outlook (klasyczny), PowerPoint (kilka GB; pomiń: `-SkipOffice`). Instaluje się **bez logowania**; aktywacja później kontem Business Standard. Boty pracują na Office przez MCP do Excela oraz przez boty czytające ekran.
+6. **Aplikacje** — Power BI Desktop, Obsidian, Teams, Outlook (nowy), Google Chrome, Terminal Windows (pomiń: `-SkipApps`).
+7. **Modele lokalne (Ollama)** — tania druga opinia / computer use (kilka GB; pomiń: `-SkipLocalModel`).
+8. **OneDrive** — lokalny sync projektów stron i biblioteki skilli.
+9. **Zależności Pythona** — `pip install -r requirements.txt`.
+10. **Sekrety** — `bootstrap_init_secrets.py` tworzy `app/secrets/` (klucze uzupełniasz ręcznie).
+11. **Rejestracja roli** — `bootstrap_register.py dev`.
+12. **Logowania** — interaktywny checklist kont (patrz niżej; pomiń: `-SkipLogins`).
+13. **Test dymny** — `bootstrap_smoke_test.py` (weryfikacja pętli).
+14. **Raport stanu** — zdjęcie konfiguracji do `STAN-SRODOWISKA.txt`.
 
 Po zakończeniu: uzupełnij klucze w `app/secrets/.env`, potem `python app/job_scheduler.py` (pętla 24/7) + `python app/dashboard.py`.
 

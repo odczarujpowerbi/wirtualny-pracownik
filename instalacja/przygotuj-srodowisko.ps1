@@ -8,20 +8,24 @@
 #   3. Claude Code (CLI)   - naped glownego modelu agenta
 #   4. VS Code + rozszerzenie Claude Code - kodowanie z agentem w edytorze
 #   5. Microsoft Office / 365 Apps - Excel/Word dla MCP i botow czytajacych ekran (kilka GB)
-#   6. Modele lokalne (Ollama) - tania druga opinia / computer use (kilka GB)
-#   7. OneDrive            - lokalny sync projektow stron i skilli
-#   8. Zaleznosci Pythona  - pip install -r requirements.txt (jesli repo obok)
-#   9. Logowania           - interaktywny checklist kont (chmura, personalne, Meta, Gmail...)
-#  10. Raport stanu        - zdjecie konfiguracji do instalacja/STAN-SRODOWISKA.txt
+#   6. Aplikacje (Power BI, Obsidian, Teams, Outlook, Chrome, Terminal)
+#   7. Modele lokalne (Ollama) - tania druga opinia / computer use (kilka GB)
+#   8. OneDrive            - lokalny sync projektow stron i skilli
+#   9. Zaleznosci Pythona  - pip install -r requirements.txt (jesli repo obok)
+#  10. Sekrety + rejestracja roli + test dymny (finalizacja aplikacji)
+#  11. Logowania           - interaktywny checklist kont (chmura, personalne, Meta, Gmail...)
+#  12. Raport stanu        - zdjecie konfiguracji do instalacja/STAN-SRODOWISKA.txt
 #
 # Przelaczniki:
-#   -SkipOffice       pomija krok 5 (gdy nie chcesz pobierac Office)
-#   -SkipLocalModel   pomija krok 6 (gdy nie chcesz pobierac kilku GB)
-#   -SkipLogins       pomija krok 9 (interaktywny)
+#   -SkipOffice       pomija Office
+#   -SkipApps         pomija dodatkowe aplikacje (Power BI, Obsidian, Teams, ...)
+#   -SkipLocalModel   pomija modele lokalne (kilka GB)
+#   -SkipLogins       pomija interaktywny checklist logowan
 #
 # Plik w ASCII (bez polskich znakow) - patrz app/README.md, uwaga o BOM w PS 5.1.
 param(
     [switch]$SkipOffice,
+    [switch]$SkipApps,
     [switch]$SkipLocalModel,
     [switch]$SkipLogins
 )
@@ -51,6 +55,9 @@ $steps = @(
 )
 if (-not $SkipOffice) {
     $steps += @{ Name = "Microsoft Office / 365 Apps"; Required = $false; Run = { Invoke-Step "bootstrap_install_office.ps1" @() } }
+}
+if (-not $SkipApps) {
+    $steps += @{ Name = "Aplikacje (Power BI, Obsidian, Teams...)"; Required = $false; Run = { Invoke-Step "bootstrap_install_apps.ps1" @() } }
 }
 if (-not $SkipLocalModel) {
     $steps += @{ Name = "Modele lokalne (Ollama)"; Required = $false; Run = { Invoke-Step "bootstrap_install_local_model.ps1" @() } }

@@ -61,6 +61,27 @@ if (Get-Command ollama -ErrorAction SilentlyContinue) {
 }
 
 $lines += ""
+$lines += "-- Aplikacje --"
+# Jeden odczyt winget list, potem dopasowanie po slowie kluczowym (odporne na
+# wariant Store vs winget, ktore maja rozne ID).
+$wingetList = ""
+if (Get-Command winget -ErrorAction SilentlyContinue) {
+    try { $wingetList = (winget list --disable-interactivity 2>$null | Out-String) } catch {}
+}
+$appChecks = @(
+    @{ Name = "Power BI Desktop"; Key = "Power BI Desktop" }
+    @{ Name = "Obsidian";         Key = "Obsidian" }
+    @{ Name = "Microsoft Teams";  Key = "Microsoft Teams" }
+    @{ Name = "Outlook";          Key = "Outlook for Windows" }
+    @{ Name = "Google Chrome";    Key = "Google Chrome" }
+    @{ Name = "Terminal Windows"; Key = "WindowsTerminal" }
+)
+foreach ($a in $appChecks) {
+    $present = $wingetList -and ($wingetList -match [regex]::Escape($a.Key))
+    $lines += ("{0,-18} {1}" -f ($a.Name + ":"), $(if ($present) { "obecny" } else { "BRAK (bootstrap_install_apps.ps1)" }))
+}
+
+$lines += ""
 $lines += "-- OneDrive --"
 if ($env:OneDrive -and (Test-Path $env:OneDrive)) {
     $lines += "Sync:         OK -> $env:OneDrive"
