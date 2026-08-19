@@ -63,10 +63,11 @@ $steps = @(
 if (-not $SkipOffice) {
     $steps += @{ Name = "Microsoft Office / 365 Apps"; Required = $false; Run = { Invoke-Step "bootstrap_install_office.ps1" @() } }
 }
-# winget potrzebny do Aplikacji i Terminala; na Windows Server bywa nieobecny.
-if ((-not $SkipApps) -or (-not $SkipTerminal)) {
-    $steps += @{ Name = "winget (App Installer)"; Required = $false; Run = { Invoke-Step "bootstrap_ensure_winget.ps1" @() } }
-}
+# winget-ensure USUNIETY z przeplywu: na Windows Server 2022 doinstalowanie winget
+# pada (brak frameworka WindowsAppRuntime, HRESULT 0x80073CF3) i marnuje ~14 min.
+# Aplikacje instalujemy teraz BEZPOSREDNIMI instalatorami (bootstrap_install_apps.ps1),
+# wiec winget nie jest potrzebny. Skrypt bootstrap_ensure_winget.ps1 zostaje do
+# recznego uzycia, ale nie jest wpiety.
 if (-not $SkipApps) {
     $steps += @{ Name = "Aplikacje (Power BI, Obsidian, Teams...)"; Required = $false; Run = { Invoke-Step "bootstrap_install_apps.ps1" @() } }
 }
