@@ -7,18 +7,21 @@
 #   2. Python 3.11+        (wymagane)
 #   3. Claude Code (CLI)   - naped glownego modelu agenta
 #   4. VS Code + rozszerzenie Claude Code - kodowanie z agentem w edytorze
-#   5. Modele lokalne (Ollama) - tania druga opinia / computer use (kilka GB)
-#   6. OneDrive            - lokalny sync projektow stron i skilli
-#   7. Zaleznosci Pythona  - pip install -r requirements.txt (jesli repo obok)
-#   8. Logowania           - interaktywny checklist kont (chmura, personalne, Meta, Gmail...)
-#   9. Raport stanu        - zdjecie konfiguracji do instalacja/STAN-SRODOWISKA.txt
+#   5. Microsoft Office / 365 Apps - Excel/Word dla MCP i botow czytajacych ekran (kilka GB)
+#   6. Modele lokalne (Ollama) - tania druga opinia / computer use (kilka GB)
+#   7. OneDrive            - lokalny sync projektow stron i skilli
+#   8. Zaleznosci Pythona  - pip install -r requirements.txt (jesli repo obok)
+#   9. Logowania           - interaktywny checklist kont (chmura, personalne, Meta, Gmail...)
+#  10. Raport stanu        - zdjecie konfiguracji do instalacja/STAN-SRODOWISKA.txt
 #
 # Przelaczniki:
-#   -SkipLocalModel   pomija krok 5 (gdy nie chcesz pobierac kilku GB)
-#   -SkipLogins       pomija krok 8 (interaktywny)
+#   -SkipOffice       pomija krok 5 (gdy nie chcesz pobierac Office)
+#   -SkipLocalModel   pomija krok 6 (gdy nie chcesz pobierac kilku GB)
+#   -SkipLogins       pomija krok 9 (interaktywny)
 #
 # Plik w ASCII (bez polskich znakow) - patrz app/README.md, uwaga o BOM w PS 5.1.
 param(
+    [switch]$SkipOffice,
     [switch]$SkipLocalModel,
     [switch]$SkipLogins
 )
@@ -46,6 +49,9 @@ $steps = @(
     @{ Name = "Claude Code (CLI)";                Required = $false; Run = { Invoke-Step "bootstrap_install_claude_code.ps1" @() } }
     @{ Name = "VS Code + rozszerzenie";           Required = $false; Run = { Invoke-Step "bootstrap_install_vscode.ps1" @() } }
 )
+if (-not $SkipOffice) {
+    $steps += @{ Name = "Microsoft Office / 365 Apps"; Required = $false; Run = { Invoke-Step "bootstrap_install_office.ps1" @() } }
+}
 if (-not $SkipLocalModel) {
     $steps += @{ Name = "Modele lokalne (Ollama)"; Required = $false; Run = { Invoke-Step "bootstrap_install_local_model.ps1" @() } }
 }

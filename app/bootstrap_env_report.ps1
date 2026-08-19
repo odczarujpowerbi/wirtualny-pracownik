@@ -41,6 +41,17 @@ if (Get-Command code -ErrorAction SilentlyContinue) {
     $lines += "  Rozszerzenie Claude Code: $(if ($hasClaude) { $hasClaude } else { 'BRAK - dodaj: code --install-extension anthropic.claude-code' })"
 }
 
+# Microsoft Office / 365 Apps (Excel, Word).
+$officeVer = $null
+if (Test-Path "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration") {
+    try { $officeVer = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration").VersionToReport } catch {}
+    $lines += "Office:       obecny (Click-to-Run$(if ($officeVer) { ", $officeVer" }))"
+} elseif ((Test-Path "$env:ProgramFiles\Microsoft Office\root\Office16\EXCEL.EXE") -or (Test-Path "${env:ProgramFiles(x86)}\Microsoft Office\root\Office16\EXCEL.EXE")) {
+    $lines += "Office:       obecny (Excel/Word wykryte)"
+} else {
+    $lines += "Office:       BRAK (Excel/Word - bootstrap_install_office.ps1)"
+}
+
 # Ollama (modele lokalne).
 if (Get-Command ollama -ErrorAction SilentlyContinue) {
     $models = (ollama list 2>&1 | Select-Object -Skip 1 | ForEach-Object { ($_ -split '\s+')[0] }) -join ", "

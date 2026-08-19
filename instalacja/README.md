@@ -8,11 +8,12 @@ Jeden klik: **`Przygotuj-srodowisko.bat`** (dwuklik). Na zupełnie świeżej mas
 2. **Python 3.11+** — wymagane.
 3. **Claude Code (CLI)** — naped głównego modelu agenta.
 4. **VS Code + rozszerzenie Claude Code** — kodowanie z agentem w edytorze (poprawki na stronie w repo).
-5. **Modele lokalne (Ollama)** — tania druga opinia / computer use (kilka GB; pomiń: `-SkipLocalModel`).
-6. **OneDrive** — lokalny sync projektów stron i biblioteki skilli.
-7. **Zależności Pythona** — `pip install -r requirements.txt`.
-8. **Logowania** — interaktywny checklist kont (patrz niżej; pomiń: `-SkipLogins`).
-9. **Raport stanu** — zdjęcie konfiguracji do `STAN-SRODOWISKA.txt`.
+5. **Microsoft Office / 365 Apps** — Excel, Word (kilka GB; pomiń: `-SkipOffice`). Instaluje się **bez logowania**; aktywacja później kontem Business Standard. Boty pracują na Office przez MCP do Excela oraz przez boty czytające ekran.
+6. **Modele lokalne (Ollama)** — tania druga opinia / computer use (kilka GB; pomiń: `-SkipLocalModel`).
+7. **OneDrive** — lokalny sync projektów stron i biblioteki skilli.
+8. **Zależności Pythona** — `pip install -r requirements.txt`.
+9. **Logowania** — interaktywny checklist kont (patrz niżej; pomiń: `-SkipLogins`).
+10. **Raport stanu** — zdjęcie konfiguracji do `STAN-SRODOWISKA.txt`.
 
 ## Checklist logowań (krok 8)
 
@@ -24,6 +25,7 @@ Dwa profile: **konto CHMUROWE (firmowe)** i **konto PERSONALNE**. Nie wszystko r
 | VS Code — chmurowe | główny profil pracy | VS Code → Accounts → Sign in (Microsoft 365) |
 | VS Code — personalne | Settings Sync / GitHub | drugie konto w Accounts |
 | Microsoft 365 | mail, SharePoint, OneDrive | office.com |
+| Office (Excel/Word) — aktywacja | licencja pakietu (Business Standard) | otwórz Excel/Word → zaloguj |
 | Gmail / Google | praca przez interfejs, nie tylko API | accounts.google.com |
 | Meta Business | kampanie i zmiany przez interfejs | business.facebook.com |
 | GitHub | repozytoria stron | github.com + VS Code |
@@ -36,6 +38,7 @@ Wszystko działa też osobno (folder `app/`):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File app\bootstrap_install_vscode.ps1
+powershell -ExecutionPolicy Bypass -File app\bootstrap_install_office.ps1     # Excel/Word (bez logowania)
 powershell -ExecutionPolicy Bypass -File app\bootstrap_setup_onedrive.ps1
 powershell -ExecutionPolicy Bypass -File app\bootstrap_logins.ps1            # -NonInteractive = tylko lista
 powershell -ExecutionPolicy Bypass -File app\bootstrap_env_report.ps1        # mini-raport stanu maszyny

@@ -31,6 +31,9 @@ $logins = @(
     @{ Key = "microsoft365";  Name = "Microsoft 365 (chmura) w przegladarce";
        Info = "Zaloguj konto firmowe - mail, SharePoint, OneDrive. Czesc pracy idzie przez interfejs, nie tylko API.";
        Url = "https://www.office.com/" }
+    @{ Key = "office_activate"; Name = "Office (Excel/Word) - AKTYWACJA licencji";
+       Info = "Otworz Excela lub Worda, zaloguj sie kontem Microsoft 365 Business Standard - to aktywuje pakiet. Instalacja dziala bez logowania, ale bez aktywacji Office chodzi w trybie ograniczonym.";
+       App = "excel" }
     @{ Key = "gmail";         Name = "Gmail / Google (przegladarka)";
        Info = "Zaloguj konto Google. Potrzebne, bo nie wszystko robimy przez API - czasem trzeba przez interfejs.";
        Url = "https://accounts.google.com/" }
