@@ -13,10 +13,12 @@
 #   7. Modele lokalne (Ollama) - tania druga opinia / computer use (kilka GB)
 #   8. OneDrive            - lokalny sync projektow stron i skilli
 #   9. Zaleznosci Pythona  - pip install -r requirements.txt (jesli repo obok)
-#  10. Sekrety + rejestracja roli + test dymny (finalizacja aplikacji)
+#  10. Sekrety + rejestracja roli (finalizacja aplikacji)
 #  11. Autostart 24/7     - job_scheduler.py przy logowaniu (Harmonogram -> fallback Startup)
-#  12. Logowania           - interaktywny checklist kont (chmura, personalne, Meta, Gmail...)
-#  13. Raport stanu        - zdjecie konfiguracji do instalacja/STAN-SRODOWISKA.txt
+#  12. Test dymny + raport stanu
+#
+# CALY instalator jest BEZOBSLUGOWY - mozna go wyzwolic i wrocic nastepnego dnia.
+# LOGOWANIA to OSOBNY krok (instalacja/Zaloguj.bat), uruchamiany raz, na koncu.
 #
 # Przelaczniki:
 #   -SkipOffice       pomija Office
@@ -24,7 +26,6 @@
 #   -SkipTerminal     pomija Terminal Windows + konfiguracje pod Claude
 #   -SkipLocalModel   pomija modele lokalne (kilka GB)
 #   -SkipAutostart    pomija konfiguracje autostartu 24/7
-#   -SkipLogins       pomija interaktywny checklist logowan
 #
 # Plik w ASCII (bez polskich znakow) - patrz app/README.md, uwaga o BOM w PS 5.1.
 param(
@@ -32,8 +33,7 @@ param(
     [switch]$SkipApps,
     [switch]$SkipTerminal,
     [switch]$SkipLocalModel,
-    [switch]$SkipAutostart,
-    [switch]$SkipLogins
+    [switch]$SkipAutostart
 )
 
 $ErrorActionPreference = "Stop"
@@ -84,9 +84,9 @@ $steps += @{ Name = "Rejestracja roli (dev)";     Required = $false; Run = { Inv
 if (-not $SkipAutostart) {
     $steps += @{ Name = "Autostart 24/7";         Required = $false; Run = { Invoke-Step "bootstrap_autostart.ps1" @("-AppPath", "$appDir") } }
 }
-if (-not $SkipLogins) {
-    $steps += @{ Name = "Logowania (checklist)";  Required = $false; Run = { Invoke-Step "bootstrap_logins.ps1" @() } }
-}
+# LOGOWANIA celowo NIE sa tutaj - caly instalator ma byc BEZOBSLUGOWY (mozna
+# wyzwolic i wrocic nastepnego dnia). Logowania to osobny, interaktywny krok:
+# instalacja/Zaloguj.bat -> bootstrap_logins.ps1 (uruchamiany raz, na koncu, recznie).
 $steps += @{ Name = "Test dymny";                 Required = $false; Run = { Invoke-Python @("bootstrap_smoke_test.py") } }
 $steps += @{ Name = "Raport stanu srodowiska";    Required = $false; Run = { Invoke-Step "bootstrap_env_report.ps1" @() } }
 

@@ -18,8 +18,7 @@ param(
     [switch]$SkipApps,
     [switch]$SkipTerminal,
     [switch]$SkipLocalModel,
-    [switch]$SkipAutostart,
-    [switch]$SkipLogins
+    [switch]$SkipAutostart
 )
 $ErrorActionPreference = "Stop"
 
@@ -77,7 +76,6 @@ if ($SkipApps)       { $fwd += "-SkipApps" }
 if ($SkipTerminal)   { $fwd += "-SkipTerminal" }
 if ($SkipLocalModel) { $fwd += "-SkipLocalModel" }
 if ($SkipAutostart)  { $fwd += "-SkipAutostart" }
-if ($SkipLogins)     { $fwd += "-SkipLogins" }
 
 Write-Host "`n[3/3] Uruchamiam pelny instalator srodowiska..." -ForegroundColor Cyan
 $psExe = (Get-Process -Id $PID).Path

@@ -30,13 +30,18 @@ Jeden klik: **`Przygotuj-srodowisko.bat`** (dwuklik). Na świeżej maszynie klik
 10. **Sekrety** — `bootstrap_init_secrets.py` tworzy `app/secrets/` (klucze uzupełniasz ręcznie).
 11. **Rejestracja roli** — `bootstrap_register.py dev`.
 12. **Autostart 24/7** — `job_scheduler.py` przy logowaniu; Harmonogram zadań, a przy „Odmowa dostępu" fallback na folder Startup (pomiń: `-SkipAutostart`).
-13. **Logowania** — interaktywny checklist kont (patrz niżej; pomiń: `-SkipLogins`).
-14. **Test dymny** — `bootstrap_smoke_test.py` (weryfikacja pętli).
-15. **Raport stanu** — zdjęcie konfiguracji do `STAN-SRODOWISKA.txt`.
+13. **Test dymny** — `bootstrap_smoke_test.py` (weryfikacja pętli).
+14. **Raport stanu** — zdjęcie konfiguracji do `STAN-SRODOWISKA.txt`.
 
-Po zakończeniu: uzupełnij klucze w `app/secrets/.env`. Agent startuje sam przy następnym logowaniu (krok 12); od ręki: `python app/job_scheduler.py`. Podgląd: `python app/dashboard.py`.
+**Instalacja jest bezobsługowa** — wyzwól i możesz wrócić następnego dnia. Nie zatrzymuje się na logowaniach.
 
-## Checklist logowań (krok 8)
+## Krok 2 (osobno, po instalacji): Logowania — `Zaloguj.bat`
+
+Gdy środowisko jest już zainstalowane, uruchom **`Zaloguj.bat`** (dwuklik). Szybki, interaktywny przewodnik: dla każdego konta otwiera aplikację/stronę i pyta, czy zalogowane. Robisz to raz.
+
+Po zakończeniu: uzupełnij klucze w `app/secrets/.env`. Agent startuje sam przy następnym logowaniu (krok 12 instalacji); od ręki: `python app/job_scheduler.py`. Podgląd: `python app/dashboard.py`.
+
+## Checklist logowań (co obejmuje `Zaloguj.bat`)
 
 Dwa profile: **konto CHMUROWE (firmowe)** i **konto PERSONALNE**. Nie wszystko robi się przez API — część pracy idzie przez interfejs, dlatego potrzebne są też logowania w przeglądarce.
 
