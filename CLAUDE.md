@@ -24,6 +24,7 @@
 - Klasyfikacja ryzyka: zielone (auto) / żółte (auto w granicach polityki, 3 walidatory) / czerwone (zawsze człowiek).
 - Sekrety nigdy w repo/logach/screenshotach.
 - Zmiany w kodzie/PBIP: branch + PR, nigdy bezpośrednio do main.
+- **Pliki zapisywane w runtime (stan, flagi, raporty, cache) MUSZĄ trafiać do `app/runs/` albo `app/secrets/` (oba w .gitignore), NIGDY do ścieżki śledzonej przez git.** Inaczej `git pull` na maszynie konfliktuje z lokalną zmianą. Jeśli plik śledzony musi mieć wartości domyślne (np. harmonogram), trzymaj SZABLON w repo (`*.default.*`) i seeduj/domerguj lokalną kopię przy starcie (wzór: `schedule.default.yaml` → `schedule.yaml`). Naprawione tak: `schedule.yaml`, `role.json`, `STAN-SRODOWISKA.txt`.
 
 ## Bezpieczeństwo
 - reviewer i explorer: tylko Read/Grep/Glob.
