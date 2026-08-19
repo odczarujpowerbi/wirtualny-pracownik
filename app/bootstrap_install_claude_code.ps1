@@ -21,17 +21,33 @@
 
 $ErrorActionPreference = "Stop"
 
+# Typowa lokalizacja natywnej instalacji Claude Code, ktora czesto NIE jest w PATH
+# (realnie napotkane na VM: "C:\Users\...\.local\bin is not in your PATH"). Bez
+# uwzglednienia jej, detekcja zawodzila i skrypt RE-INSTALOWAL Claude Code przy
+# kazdym przebiegu (~115s) - dokladnie to "dlugo sie kreci".
+$LocalBin = Join-Path $env:USERPROFILE ".local\bin"
+
 function Test-ClaudeCodeWorks {
+    # 1) claude w PATH?
     try {
         $output = & claude --version 2>&1
-        return ($LASTEXITCODE -eq 0) -and ($output -match "Claude Code")
-    } catch {
-        return $false
+        if (($LASTEXITCODE -eq 0) -and ($output -match "Claude Code")) { return $true }
+    } catch { }
+    # 2) claude.exe w .local\bin (natywna instalacja poza PATH)? Jesli tak -
+    #    dokladamy do PATH biezacej sesji i uznajemy za zainstalowany.
+    $exe = Join-Path $LocalBin "claude.exe"
+    if (Test-Path $exe) {
+        if ($env:Path -notlike "*$LocalBin*") { $env:Path = "$LocalBin;$env:Path" }
+        try {
+            $output = & $exe --version 2>&1
+            if ($output -match "Claude Code") { return $true }
+        } catch { }
     }
+    return $false
 }
 
 if (Test-ClaudeCodeWorks) {
-    Write-Host "Claude Code już jest zainstalowany: $(claude --version)" -ForegroundColor Green
+    Write-Host "Claude Code juz jest zainstalowany - pomijam (szybko)." -ForegroundColor Green
     exit 0
 }
 

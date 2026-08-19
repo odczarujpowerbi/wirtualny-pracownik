@@ -62,6 +62,10 @@ $steps = @(
 if (-not $SkipOffice) {
     $steps += @{ Name = "Microsoft Office / 365 Apps"; Required = $false; Run = { Invoke-Step "bootstrap_install_office.ps1" @() } }
 }
+# winget potrzebny do Aplikacji i Terminala; na Windows Server bywa nieobecny.
+if ((-not $SkipApps) -or (-not $SkipTerminal)) {
+    $steps += @{ Name = "winget (App Installer)"; Required = $false; Run = { Invoke-Step "bootstrap_ensure_winget.ps1" @() } }
+}
 if (-not $SkipApps) {
     $steps += @{ Name = "Aplikacje (Power BI, Obsidian, Teams...)"; Required = $false; Run = { Invoke-Step "bootstrap_install_apps.ps1" @() } }
 }

@@ -33,13 +33,21 @@ if (Test-Command "code") {
 
 # Rozszerzenie Claude Code do VS Code (kodowanie z agentem w edytorze).
 if (Test-Command "code") {
-    Write-Host "Instaluje/aktualizuje rozszerzenie Claude Code..."
-    try {
-        code --install-extension anthropic.claude-code --force
-        Write-Host "Rozszerzenie Claude Code gotowe."
-    } catch {
-        Write-Host "UWAGA: nie udalo sie zainstalowac rozszerzenia automatycznie ($($_.Exception.Message))."
-        Write-Host "Zainstaluj recznie w VS Code: Extensions -> szukaj 'Claude Code'."
+    # Najpierw SPRAWDZ, czy juz jest - inaczej --install-extension mieli ~18s przy
+    # kazdym przebiegu (uzytkownik: "dlugo sie kreci"). Lista jest szybka.
+    $hasExt = $false
+    try { $hasExt = ((code --list-extensions 2>&1) -match "anthropic.claude-code").Count -gt 0 } catch { }
+    if ($hasExt) {
+        Write-Host "Rozszerzenie Claude Code juz jest - pomijam."
+    } else {
+        Write-Host "Instaluje rozszerzenie Claude Code..."
+        try {
+            code --install-extension anthropic.claude-code
+            Write-Host "Rozszerzenie Claude Code gotowe."
+        } catch {
+            Write-Host "UWAGA: nie udalo sie zainstalowac rozszerzenia automatycznie ($($_.Exception.Message))."
+            Write-Host "Zainstaluj recznie w VS Code: Extensions -> szukaj 'Claude Code'."
+        }
     }
 } else {
     Write-Host "UWAGA: 'code' jeszcze nie w PATH - zainstaluj rozszerzenie po restarcie terminala:"
