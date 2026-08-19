@@ -30,7 +30,8 @@
 - Operacje na bazie tylko SELECT, chyba że jawnie zlecone inaczej.
 
 ## Dokumentacja
-- Koncepcja i architektura: README.md, PLAN-WDROZENIA.md, ZESPOL-BOTOW.md, SKRYPTY.md, SKALOWANIE.md
+- Koncepcja i architektura: README.md (root) + folder docs/ (PLAN-WDROZENIA.md, ZESPOL-BOTOW.md, SKRYPTY.md, SKALOWANIE.md, przeplyw.html, INSTRUKCJA-WDROZENIA.md, ...)
+- Instalacja i konfiguracja maszyny: folder instalacja/ (Przygotuj-srodowisko.bat, Zaloguj.bat)
 - Stan kodu (co działa / czego brak): app/README.md
 
 > Standardy kodu, git, testy i bezpieczeństwo załadowane globalnie z ~/.claude/rules/

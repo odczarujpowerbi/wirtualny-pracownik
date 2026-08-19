@@ -6,9 +6,9 @@ Wirtualny pracownik działający niezależnie od laptopów zespołu: cyklicznie 
 >
 > Pełna dokumentacja koncepcyjna (biznesowa i techniczna, v1.0, 6 sierpnia 2026): `Wirtualny_Pracownik_AI_Dokumentacja_Biznesowa_i_Techniczna.pdf` (przekazana przez właściciela projektu, nie dołączona do repo).
 >
-> Rozwinięcie o konkretne narzędzia (Projectly, CRM, Meta Ads, Google/SharePoint, e-mail przez MCP, skille) — patrz **[PLAN-WDROZENIA.md](./PLAN-WDROZENIA.md)** (architektura, silnik auto-zatwierdzania, komunikacja) i **[SKRYPTY.md](./SKRYPTY.md)** (katalog skryptów do zaimplementowania).
+> Rozwinięcie o konkretne narzędzia (Projectly, CRM, Meta Ads, Google/SharePoint, e-mail przez MCP, skille) — patrz **[PLAN-WDROZENIA.md](./docs/PLAN-WDROZENIA.md)** (architektura, silnik auto-zatwierdzania, komunikacja) i **[SKRYPTY.md](./docs/SKRYPTY.md)** (katalog skryptów do zaimplementowania).
 >
-> Docelowo to nie jeden bot, tylko **zespół botów-ról** (Waldek-marketing, Krzysztof-developer, Zofia-asystentka, Zenek-administracja, Strateg) na osobnych komputerach — patrz **[ZESPOL-BOTOW.md](./ZESPOL-BOTOW.md)**. To faza E z mapy rozwoju, budowana dopiero po ustabilizowaniu jednego pracownika.
+> Docelowo to nie jeden bot, tylko **zespół botów-ról** (Waldek-marketing, Krzysztof-developer, Zofia-asystentka, Zenek-administracja, Strateg) na osobnych komputerach — patrz **[ZESPOL-BOTOW.md](./docs/ZESPOL-BOTOW.md)**. To faza E z mapy rozwoju, budowana dopiero po ustabilizowaniu jednego pracownika.
 >
 > **[app/](./app/)** — działający, przetestowany szkielet kodu Fazy 0-1 (nie dokumentacja): runner, klasyfikacja ryzyka, routing zadań, stan, heartbeat, kill switch. Uruchamialny lokalnie bez żadnych kluczy API (tryb mock). Zobacz `app/README.md` co działa, a czego celowo brakuje (prawdziwe Projectly, walidatory, workery).
 
@@ -21,7 +21,7 @@ Rozpocząć od 2–4 tygodniowego pilotażu na jednym, używanym komputerze z Wi
 - **System:** Windows 11 Pro, stały dostęp do zasilania i internetu, dedykowany komputer (nie do codziennej pracy).
 - **Runner / AI:** Python + Harmonogram zadań Windows; Anthropic API jako główna pętla agenta (limit pilotażowy 20 USD), OpenRouter jako fallback modeli.
 - **Wykonanie zadań:** PowerShell 7, Git, Power BI Desktop (PBIP/PBIR/TMDL) + Desktop Bridge, Playwright + automatyzacja Windows UI.
-- **Kolejka zadań i komunikacja:** **Projectly** (własna apka do zadań, API + MCP) — jedyne źródło prawdy o statusie i historii pracy bota; zastępuje generyczną kolejkę folderową z pierwotnej koncepcji. Szczegóły w [PLAN-WDROZENIA.md](./PLAN-WDROZENIA.md).
+- **Kolejka zadań i komunikacja:** **Projectly** (własna apka do zadań, API + MCP) — jedyne źródło prawdy o statusie i historii pracy bota; zastępuje generyczną kolejkę folderową z pierwotnej koncepcji. Szczegóły w [PLAN-WDROZENIA.md](./docs/PLAN-WDROZENIA.md).
 - **Audyt:** `status.json`, `events.jsonl`, screenshoty, logi stdout/stderr, `costs.json`, raport końcowy — osobny folder per zadanie (`TASK-000142\...`), dodatkowo komentarz-podsumowanie w Projectly.
 - **Zdalny dostęp:** Tailscale + Pulpit zdalny (bez publikowania RDP do internetu).
 - **Integracje docelowe:** CRM (MCP), Meta Ads (API + Playwright fallback), Google Workspace, SharePoint (Graph API), e-mail przez dedykowanego agenta (MCP), Power BI (jak niżej), narzędzia developerskie, system transakcyjny (sprzedaż), inFakt (księgowość — dedykowane konto bota), Google Search Console/Analytics + social media (widoczność w sieci).
@@ -32,7 +32,7 @@ Rozpocząć od 2–4 tygodniowego pilotażu na jednym, używanym komputerze z Wi
 - AI planuje, interpretuje i ocenia rezultat; skrypty i dedykowane narzędzia wykonują powtarzalne czynności. Klikanie po ekranie dopiero, gdy brak stabilnego API/CLI.
 - Hierarchia metod wykonania: **1. API/MCP → 2. pliki/CLI/skrypt → 3. automatyzacja UI → 4. computer use (screenshoty)**.
 - Zasada fail closed: przy niepewności co do aplikacji/konta/rezultatu agent nie wykonuje działania nieodwracalnego — zapisuje stan i prosi o decyzję.
-- Klasyfikacja działań: **zielone** (odczyt, automatycznie) / **żółte** (zmiana, automatycznie w granicach polityki — auto-zatwierdzane przez pulę niezależnych walidatorów, patrz [PLAN-WDROZENIA.md](./PLAN-WDROZENIA.md) sekcja 3) / **czerwone** (publikacja, budżet, dane — zawsze trafia do człowieka jako zadanie, niezależnie od walidatorów).
+- Klasyfikacja działań: **zielone** (odczyt, automatycznie) / **żółte** (zmiana, automatycznie w granicach polityki — auto-zatwierdzane przez pulę niezależnych walidatorów, patrz [PLAN-WDROZENIA.md](./docs/PLAN-WDROZENIA.md) sekcja 3) / **czerwone** (publikacja, budżet, dane — zawsze trafia do człowieka jako zadanie, niezależnie od walidatorów).
 - Sekrety nigdy w repo/logach/screenshotach; maskowanie pól password/token/api_key/authorization/cookie.
 - Bot sam ocenia własny rezultat względem kryteriów zadania (self-review) i dopisuje komentarz w Projectly, zanim (jeśli trzeba) utworzy zadanie dla człowieka.
 - Domyślnie agent radzi sobie sam. Eskalacja do człowieka to wyjątek: pełny obieg zadanie → komentarz człowieka → weryfikacja odpowiedzi → kontynuacja agenta (sekcja 4 planu), plus bot cyklicznie zagląda w zadania ludzi i wykonuje ich automatyzowalną część lub przygotowuje im opracowanie (sekcja 5 planu).
@@ -57,7 +57,7 @@ Rozpocząć od 2–4 tygodniowego pilotażu na jednym, używanym komputerze z Wi
 - [ ] Ustalić repo GitHub i workspace Power BI jako sandbox pilotażu
 - [ ] Skonfigurować Anthropic API (limit pilotażowy) + OpenRouter jako fallback
 - [ ] Zaimplementować runner + pętlę Projectly (poller → wykonanie → komentarz-raport)
-- [ ] Zbudować silnik walidacji i auto-zatwierdzania żółtych akcji (`validator_pool.py`, `approval_policy.yaml`) — priorytet #1, patrz [PLAN-WDROZENIA.md](./PLAN-WDROZENIA.md)
+- [ ] Zbudować silnik walidacji i auto-zatwierdzania żółtych akcji (`validator_pool.py`, `approval_policy.yaml`) — priorytet #1, patrz [PLAN-WDROZENIA.md](./docs/PLAN-WDROZENIA.md)
 - [ ] Zbudować skille raportowe/porządkujące dane (`source_schema_watcher.py`, `data_contract_validator.py`, `newsletter_drafter.py`, `digest_generator.py`) — priorytet #2, oparty na realnej analizie raportu godzin (~175h firefightingu danych), patrz PLAN-WDROZENIA.md sekcja 10
 - [ ] Przetestować PAUSE/RESUME i wznowienie po restarcie
 - [ ] Podłączyć integracje wg kolejności z planu wdrożenia: CRM → Meta Ads → Google/SharePoint → e-mail (MCP)
@@ -68,11 +68,11 @@ Rozpocząć od 2–4 tygodniowego pilotażu na jednym, używanym komputerze z Wi
 
 ## Dalsza dokumentacja
 
-- **[PLAN-WDROZENIA.md](./PLAN-WDROZENIA.md)** — architektura komunikacji przez Projectly, silnik auto-zatwierdzania, fazy wdrożenia, integracje.
-- **[SKRYPTY.md](./SKRYPTY.md)** — pełny katalog skryptów Python do zaimplementowania, z celem, wyzwalaczem i poziomem ryzyka.
-- **[ZESPOL-BOTOW.md](./ZESPOL-BOTOW.md)** — docelowa architektura wieloosobowa: role-boty na osobnych komputerach, agent strategiczny, komunikacja bot-bot, dystrybucja skilli.
-- **[PRZED-PILOTAZEM.md](./PRZED-PILOTAZEM.md)** — checklist otwartych decyzji do zamknięcia przed startem (rejestr D-01..D-07, RODO, zespół, backup, dostępy) i przypomnienie realnego zakresu pilotażu.
-- **[SKALOWANIE.md](./SKALOWANIE.md)** — jak kopiować system na inne komputery i inne firmy: rozdział rdzenia od konfiguracji, izolacja per firma, bootstrap nowego komputera, klucze per wdrożenie.
-- **[INSTRUKCJA-WDROZENIA.md](./INSTRUKCJA-WDROZENIA.md)** — instruktaż krok po kroku dla osoby mało technicznej: co zainstalować, gdzie wpisać dostępy, jak uruchomić i sprawdzić, że działa. Praktyczny runbook, w odróżnieniu od dokumentów architektonicznych powyżej.
-- **[WDROZENIE-VPS-TESTOWE.md](./WDROZENIE-VPS-TESTOWE.md)** — szybka ścieżka testowania na tanim VPS-ie z Linuksem, zanim dojedzie docelowy komputer; ten sam kod, testowany w tej sesji na Linuksie, bez kroków wymagających Power BI Desktop.
-- **[PROJECTLY-ROZWOJ.md](./PROJECTLY-ROZWOJ.md)** — feedback i plan wdrożenia dla zespołu rozwijającego samą aplikację Projectly: czego dziś brakuje w API/UI (potwierdzone realnym sprawdzeniem integracji), żeby agent mógł być pełnoprawnym użytkownikiem — komentarze, data wykonania, feedback po zadaniu, relacje między zadaniami, retrospektywa.
+- **[PLAN-WDROZENIA.md](./docs/PLAN-WDROZENIA.md)** — architektura komunikacji przez Projectly, silnik auto-zatwierdzania, fazy wdrożenia, integracje.
+- **[SKRYPTY.md](./docs/SKRYPTY.md)** — pełny katalog skryptów Python do zaimplementowania, z celem, wyzwalaczem i poziomem ryzyka.
+- **[ZESPOL-BOTOW.md](./docs/ZESPOL-BOTOW.md)** — docelowa architektura wieloosobowa: role-boty na osobnych komputerach, agent strategiczny, komunikacja bot-bot, dystrybucja skilli.
+- **[PRZED-PILOTAZEM.md](./docs/PRZED-PILOTAZEM.md)** — checklist otwartych decyzji do zamknięcia przed startem (rejestr D-01..D-07, RODO, zespół, backup, dostępy) i przypomnienie realnego zakresu pilotażu.
+- **[SKALOWANIE.md](./docs/SKALOWANIE.md)** — jak kopiować system na inne komputery i inne firmy: rozdział rdzenia od konfiguracji, izolacja per firma, bootstrap nowego komputera, klucze per wdrożenie.
+- **[INSTRUKCJA-WDROZENIA.md](./docs/INSTRUKCJA-WDROZENIA.md)** — instruktaż krok po kroku dla osoby mało technicznej: co zainstalować, gdzie wpisać dostępy, jak uruchomić i sprawdzić, że działa. Praktyczny runbook, w odróżnieniu od dokumentów architektonicznych powyżej.
+- **[WDROZENIE-VPS-TESTOWE.md](./docs/WDROZENIE-VPS-TESTOWE.md)** — szybka ścieżka testowania na tanim VPS-ie z Linuksem, zanim dojedzie docelowy komputer; ten sam kod, testowany w tej sesji na Linuksie, bez kroków wymagających Power BI Desktop.
+- **[PROJECTLY-ROZWOJ.md](./docs/PROJECTLY-ROZWOJ.md)** — feedback i plan wdrożenia dla zespołu rozwijającego samą aplikację Projectly: czego dziś brakuje w API/UI (potwierdzone realnym sprawdzeniem integracji), żeby agent mógł być pełnoprawnym użytkownikiem — komentarze, data wykonania, feedback po zadaniu, relacje między zadaniami, retrospektywa.
