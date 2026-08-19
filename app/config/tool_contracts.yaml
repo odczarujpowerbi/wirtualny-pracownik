@@ -25,3 +25,24 @@ tools:
       project_path:
         required: true
         type: path
+
+  capture_screenshot:
+    risk: green
+    description: Zrzut ekranu lub okna do runs/screenshots (tylko zapis PNG w runs).
+    allowed_roots:
+      - runs
+    params:
+      out_dir:
+        required: false
+        type: path
+
+  open_pbip_capture:
+    risk: yellow
+    description: Otwiera PBIP w Power BI Desktop i robi zrzut okna raportu (PBI-01, etap zrzutów).
+    allowed_roots:
+      - mock_data
+      - workspace
+    params:
+      project_path:
+        required: true
+        type: path

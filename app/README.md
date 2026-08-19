@@ -70,11 +70,30 @@ Najmniejszy samodzielny zestaw: pętla chodzi sama, robi realną pracę, każdą
 
 **Uwaga o odbiorze biznesowym:** bramka jest fail-closed — Bożena (obowiązkowa) bez „tak" eskaluje. Przy żywym modelu robi realny, wymagający przegląd; na minimalnej próbce PBIP (1 plik TMDL) zwykle znajduje coś do dopracowania i słusznie eskaluje. To działa zgodnie z projektem, nie jest błędem. Podgląd na żywo: `python dashboard.py` → `http://127.0.0.1:8787/`.
 
+## Warstwa agenta lokalnego (nowa) — wizja, OCR, okna, kontekst, koszt
+
+Fundament, którego brakowało: zdolność agenta do "widzenia" ekranu, pracy na wielu oknach, twardego odczytu liczb i utrzymania kontekstu decydenta. Wszystkie moduły degradują się łagodnie bez opcjonalnych bibliotek (zwracają `available=False` z powodem, nigdy nie rzucają) i mają test dymny wpięty w `self_check`. Opcjonalne pakiety (mss, Pillow, pytesseract, pygetwindow, pywinauto) i binarka Tesseract — patrz `requirements.txt` (sekcja "Agent lokalny").
+
+| Moduł | Co robi | Test |
+|---|---|---|
+| `screenshot_capture.py` | Zrzut całego ekranu / obszaru / KONKRETNEGO okna (mss → Pillow ImageGrab). Produkuje `screenshot_path` do `runs/screenshots/` — to domyka pętlę wizyjną (wcześniej nikt tego pola nie ustawiał, więc Oskar nie miał czego oglądać) | ✅ `screenshot_capture_smoke_test.py` (atrapa backendu, bez realnego zrzutu pulpitu) |
+| `window_manager.py` | Listowanie/znajdowanie/fokus okien + granice okna (pygetwindow → pywinauto UI Automation). Podstawa pracy na wielu okienkach | ✅ `window_manager_smoke_test.py` (logika dopasowania + degradacja) |
+| `ui_lock.py` | Serializacja sterowania ekranem: "jedno aktywne okno na zadanie", z kradzieżą blokady po TTL | ✅ `ui_lock_smoke_test.py` |
+| `ocr_extract.py` | Twardy ODCZYT tekstu/liczb ze zrzutu (Tesseract → model wizyjny Anthropic). Oddzielony od oceny "czy wygląda dobrze" — do konfrontacji liczb ze źródłem | ✅ `ocr_extract_smoke_test.py` (degradacja + parsowanie liczb pl/en) |
+| `file_search.py` | Szybkie przeszukiwanie/znajdowanie plików dla skryptów (ripgrep → czysty Python), wyniki zawsze ograniczone | ✅ `file_search_smoke_test.py` |
+| `task_brief_builder.py` | Brief decydenta z TRWAŁEJ historii (`state_store.events`) + pól + wyniku wykonania — model zawsze ma kontekst zadania, niezależnie od restartu | ✅ `task_brief_builder_smoke_test.py` |
+| `cost_estimator.py` | Szacunek kosztu wywołania modelu (Claude Code = proxy wolumenu, SDK = po tokenach). Naprawia dziurę: koszt 0.0 dla Claude Code omijał kill switch | ✅ `cost_estimator_smoke_test.py` |
+| `risk_hint.py` | Kolor ryzyka Z TREŚCI zadania (wysyłka/budżet/publikacja → red), zamiast sztywnego "yellow" z mapowania Projectly | ✅ `risk_hint_smoke_test.py` |
+| `pbi_desktop_bridge.py` | Otwiera PBIP w Power BI Desktop i robi zrzut okna raportu (PBI-01, etap zrzutów) — karmi Oskara | ⚠️ `pbi_desktop_bridge_smoke_test.py` pokrywa walidację ścieżki i degradację (atrapa uruchomienia, bez GUI); **sama warstwa GUI wymaga prawdziwego Windows z Power BI Desktop — niezweryfikowana** |
+| `executor.py` (nowe zdolności) | Akcje `capture_screenshot` i `open_pbip_capture` produkują `screenshot_path` + `functional_checks` (nonempty_file) — realny efekt do bramki. Kontrakty w `tool_contracts.yaml` | ✅ `executor_capture_smoke_test.py` |
+| `task_thinker.py` (kontekst+koszt) | Decydent dostaje brief z kontekstem (nie 4 surowe pola) i uruchamia Claude Code w KATALOGU ZADANIA (nie w temp), gdy `project_path` jest bezpieczny; koszt wywołania realnie raportowany | pokryte przez `validation_gate_smoke_test.py` (ask_model) + `task_brief_builder_smoke_test.py` |
+| `bot_oskar_wizja.py` (przebudowa) | Model chmurowy jako GŁÓWNY recenzent (pewniejszy na cyfrach), Ollama jako druga opinia; OCR jako wsparcie promptu; parsowanie JSON zamiast kruchego regexa | pokryte przez `validation_gate_smoke_test.py` (ścieżka bez zrzutu → skipped) |
+
 ## Czego celowo brakuje (uczciwie, nie udawane)
 
 - **Prawdziwe połączenie z Projectly** (`projectly_client.py`) — endpointy/autoryzacja nie są znane z tej sesji. Domyślnie `MockProjectlyClient` (czyta/pisze pliki w `mock_data/` i `runs/`). Ustaw `PROJECTLY_API_KEY` + `PROJECTLY_BASE_URL`, dopisz metody `ProjectlyClient`.
 - **Realne wywołanie modelu w `validator_visual.py`** — kod jest napisany i wywoła prawdziwy model, jeśli podasz `ANTHROPIC_API_KEY` i zrzut ekranu; bez nich zwraca `approved=False` z jasnym wyjaśnieniem, zgodnie z fail-closed. Sama rozmowa z modelem nietestowana z tej sesji (brak klucza) — zweryfikuj na docelowej maszynie z prawdziwym zrzutem.
-- **Prawdziwe workery** (Power BI Desktop Bridge + zrzuty, CRM, Meta Ads, SharePoint...) — `runner_loop.py` dziś tylko klasyfikuje i komentuje (`execution_result` to zaślepka), nie wykonuje realnej pracy w tych systemach. `pbip_validate.py` sprawdza tylko warstwę plikową — zrzuty stron wymagają Desktop Bridge na prawdziwym Windows z Power BI Desktop.
+- **Prawdziwe workery** (CRM, Meta Ads, SharePoint, computer use / klikanie w UI) — dla większości typów zadań `runner_loop.py` wciąż tylko klasyfikuje i komentuje (`execution_result` to zaślepka), nie wykonuje realnej pracy. Warstwa agenta lokalnego (zrzut ekranu, okna, OCR, blokada UI) już ISTNIEJE i jest przetestowana logicznie — brakuje na niej dopiero **workera computer use** (pętla zobacz→kliknij→zweryfikuj) oraz `browser_worker.py` (Playwright). `pbi_desktop_bridge.py` otwiera PBIP i robi zrzut, ale **warstwa GUI jest niezweryfikowana bez prawdziwego Windows z Power BI Desktop** — sprawdź ją przy pierwszym uruchomieniu na maszynie docelowej.
 - **Realna wysyłka maila** (`email_client.py`) — wymaga rejestracji aplikacji w Azure AD (Microsoft Entra) i pakietu `msal`; do czasu podania `MS_GRAPH_CLIENT_ID/SECRET/TENANT_ID/MAILBOX` w `secrets/.env` działa w trybie mock (draft zapisywany do `runs/mock_outbox/`, nic nie wysyła naprawdę).
 - **`bootstrap_install.ps1`** — napisany wiernie wg `SKALOWANIE.md`, ale nieprzetestowany (środowisko budowy to Linux bez dostępu do docelowego Windows). Sprawdź krok po kroku przy pierwszym użyciu.
 

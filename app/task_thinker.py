@@ -22,9 +22,16 @@ import urllib.request
 from pathlib import Path
 
 import env_bootstrap  # noqa: F401  # wczytuje .env / secrets/.env (ANTHROPIC_API_KEY fallback)
+import cost_estimator
+import task_brief_builder
 
 THINK_TIMEOUT_SECONDS = 120
-MAX_FIELD_CHARS = 1500
+
+APP_DIR = Path(__file__).parent
+# Katalogi, w których wolno uruchomić decydenta z KONTEKSTEM repo (Claude Code
+# czyta wtedy pliki zadania). Spójne z allowed_roots kontraktów — poza nimi
+# uruchamiamy w katalogu neutralnym (temp), żeby nie wciągać cudzego kontekstu.
+_SAFE_CWD_ROOTS = [(APP_DIR / r).resolve() for r in ("workspace", "mock_data")]
 
 # Lokalny model tekstowy (Ollama) jako ostatni fallback wołania modelu —
 # używany przez ask_model() (np. Bożena, gdy nie ma ani Claude Code, ani klucza).
@@ -46,30 +53,32 @@ def _find_claude():
 
 
 def build_prompt(task):
-    def trim(value):
-        text = str(value) if value not in (None, "") else "(brak)"
-        return text[:MAX_FIELD_CHARS]
-
-    return (
-        "Jesteś wirtualnym pracownikiem. Przeanalizuj zadanie i odpowiedz zwięźle "
-        "(maks. 8 zdań), w punktach:\n"
-        "1. Co rozumiesz, że trzeba zrobić.\n"
-        "2. Proponowany plan/podejście (kroki).\n"
-        "3. Ryzyka albo czego brakuje, żeby to wykonać.\n"
-        "4. Rekomendacja: automatycznie czy potrzebna decyzja człowieka.\n\n"
-        f"Tytuł: {trim(task.get('title'))}\n"
-        f"Oczekiwany rezultat: {trim(task.get('expected_result'))}\n"
-        f"Kryteria akceptacji: {trim(task.get('acceptance_criteria'))}\n"
-        f"Opis: {trim(task.get('description'))}\n"
-    )
+    """Prompt kroku myślenia = instrukcja + brief z pełnym kontekstem zadania
+    (pola + oś czasu z trwałej historii). Kontekst decydenta rekonstruowany z
+    state_store, nie z pamięci procesu (task_brief_builder)."""
+    return task_brief_builder.build_thinking_prompt(task)
 
 
-def _think_via_claude_code(claude_exe, prompt):
-    """Wywołuje Claude Code headless. cwd = katalog neutralny (temp), żeby CLI
-    nie wciągało kontekstu tego repo. Subskrypcja -> koszt per-call nieraportowany."""
+def _safe_cwd(task):
+    """Katalog uruchomienia decydenta: repozytorium zadania (żeby model CZYTAŁ
+    pliki zadania), gdy project_path jest istniejącym katalogiem w bezpiecznym
+    korzeniu; inaczej katalog neutralny (temp)."""
+    raw = task.get("project_path") if isinstance(task, dict) else None
+    if raw:
+        candidate = Path(raw).resolve()
+        if candidate.is_dir() and any(candidate == r or r in candidate.parents for r in _SAFE_CWD_ROOTS):
+            return str(candidate)
+    return tempfile.gettempdir()
+
+
+def _think_via_claude_code(claude_exe, prompt, cwd=None):
+    """Wywołuje Claude Code headless. cwd = repo zadania (kontekst) albo temp.
+    Koszt subskrypcji szacowany proxy (cost_estimator), żeby kill switch liczył
+    wolumen wywołań (wcześniej 0.0 -> bezpiecznik nie działał)."""
+    cost = cost_estimator.estimate_call("claude_code")
     result = subprocess.run(
         [claude_exe, "-p", prompt],
-        cwd=tempfile.gettempdir(),
+        cwd=cwd or tempfile.gettempdir(),
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -78,9 +87,9 @@ def _think_via_claude_code(claude_exe, prompt):
     if result.returncode != 0:
         return {"available": True, "ok": False, "reasoning": None,
                 "detail": f"claude -p zwrócił kod {result.returncode}: {(result.stderr or '').strip()[:300]}",
-                "cost_usd": 0.0, "source": "claude_code"}
+                "cost_usd": cost, "source": "claude_code"}
     return {"available": True, "ok": True, "reasoning": (result.stdout or "").strip(),
-            "detail": "OK", "cost_usd": 0.0, "source": "claude_code"}
+            "detail": "OK", "cost_usd": cost, "source": "claude_code"}
 
 
 def _think_via_sdk(prompt):
@@ -96,8 +105,9 @@ def _think_via_sdk(prompt):
         messages=[{"role": "user", "content": prompt}],
     )
     text = "".join(block.text for block in message.content if getattr(block, "type", None) == "text")
+    cost = cost_estimator.estimate_call("anthropic_sdk", input_chars=len(prompt), output_chars=len(text))
     return {"available": True, "ok": True, "reasoning": text.strip(), "detail": "OK (SDK)",
-            "cost_usd": 0.0, "source": "anthropic_sdk"}
+            "cost_usd": cost, "source": "anthropic_sdk"}
 
 
 def _ask_ollama_text(prompt):
@@ -155,7 +165,7 @@ def think(task):
     claude_exe = _find_claude()
     if claude_exe:
         try:
-            return _think_via_claude_code(claude_exe, prompt)
+            return _think_via_claude_code(claude_exe, prompt, cwd=_safe_cwd(task))
         except (subprocess.TimeoutExpired, OSError) as exc:
             return {"available": True, "ok": False, "reasoning": None,
                     "detail": f"Claude Code niedostępny/timeout: {exc}", "cost_usd": 0.0, "source": "claude_code"}

@@ -6,6 +6,19 @@ requests>=2.31            # mailerlite_client.py, microsoft_graph_mail_client.py
 psutil>=5.9               # system_health_monitor.py — RAM i lista procesów identycznie na Windows/Linux
 msal>=1.26               # microsoft_graph_mail_client.py — token app-only do Microsoft Graph (wysyłka maila)
 
+# --- Agent lokalny (wizja/OCR/okna) ---
+# Moduły screenshot_capture / window_manager / ocr_extract DZIAŁAJĄ bez tych
+# pakietów (degradują się do available=False z jasnym powodem). Zainstaluj je na
+# DOCELOWEJ maszynie Windows, żeby agent faktycznie "widział" ekran i pracował na
+# oknach. OCR wymaga też binarki Tesseract (poza pip: instalator Windows +
+# pakiety językowe pol/eng) — patrz docs/instrukcja.html.
+#
+# mss>=9.0                   # screenshot_capture — szybki zrzut ekranu/obszaru (wieloplatformowy)
+# Pillow>=10.0               # screenshot_capture (fallback ImageGrab), ocr_extract (wejście do Tesseractu)
+# pytesseract>=0.3.10        # ocr_extract — twardy odczyt tekstu/liczb (wymaga binarki Tesseract w PATH)
+# pygetwindow>=0.0.9         # window_manager — proste listowanie/fokus okien
+# pywinauto>=0.6.8           # window_manager — pewniejszy backend UI Automation dla aplikacji desktopowych (Windows)
+
 # Kolejne warstwy (SKRYPTY.md) — NIE instaluj, dopóki nie piszesz danego
 # workera; premature dependency bloat to ten sam problem co premature scope.
 # Odkomentuj/dodaj w miarę realnej potrzeby:

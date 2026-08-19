@@ -14,15 +14,22 @@ listy ścieżek — źródłem prawdy jest kontrakt.
 
 from pathlib import Path
 
+import pbi_desktop_bridge
 import pbip_validate
+import screenshot_capture
 import tool_registry
 
 
 def execute(task):
     """Zwraca execution_result z REALNYM efektem, gdy typ zadania jest obsługiwany,
     albo None, gdy dla tego typu nie ma jeszcze workera."""
+    action = (task.get("action") or "").lower()
     if _is_pbip_validation(task):
         return _run_pbip_validation(task)
+    if action == "capture_screenshot":
+        return _run_screenshot_capture(task)
+    if action == "open_pbip_capture":
+        return _run_pbip_capture(task)
     return None
 
 
@@ -65,6 +72,61 @@ def _run_pbip_validation(task):
     }
 
 
+def _screenshot_effect(shot, tool, ok_notes, fail_notes):
+    """Wspólny kształt execution_result dla zadań, których efektem jest ZRZUT
+    ekranu — karmi Oskara (kontrola wizualna) i Franka (nonempty_file na PNG)."""
+    if not shot["available"]:
+        # Brak zrzutu to nie odmowa bezpieczeństwa, tylko luka zdolności —
+        # przechodzi przez bramkę uczciwie (Oskar pominie brak zrzutu).
+        return {"cost_usd": 0.0, "tool": tool, "executed": True,
+                "acceptance_notes": f"{fail_notes} Szczegół: {shot['detail']}"}
+    return {
+        "cost_usd": 0.0,
+        "tool": tool,
+        "executed": True,
+        "acceptance_notes": f"{ok_notes} Zrzut: {shot['screenshot_path']}",
+        "screenshot_path": shot["screenshot_path"],
+        "functional_checks": [
+            {"name": "Zrzut ekranu zapisany", "type": "nonempty_file", "target": shot["screenshot_path"]},
+        ],
+    }
+
+
+def _run_screenshot_capture(task):
+    """Zrzut ekranu/okna jako efekt zadania (np. 'pokaż stan aplikacji X')."""
+    out_dir = task.get("out_dir")
+    check = tool_registry.check_call("capture_screenshot", {"out_dir": out_dir})
+    if not check["allowed"]:
+        return _refused(check["reason"], tool="capture_screenshot")
+
+    window_title = task.get("window_title")
+    if window_title:
+        shot = screenshot_capture.capture_window(window_title)
+        # capture_window zwraca {available, path, ...}; ujednolicamy do kształtu bridge.
+        shot = {"available": shot["available"], "screenshot_path": shot.get("path"), "detail": shot["detail"]}
+    else:
+        raw = screenshot_capture.capture_screen()
+        shot = {"available": raw["available"], "screenshot_path": raw.get("path"), "detail": raw["detail"]}
+    return _screenshot_effect(shot, "capture_screenshot",
+                              "Zrzut ekranu wykonany.", "Nie udało się wykonać zrzutu.")
+
+
+def _run_pbip_capture(task):
+    """Otwiera PBIP w Power BI Desktop i robi zrzut okna raportu (PBI-01, dalszy
+    etap po walidacji struktury) — dostarcza screenshot_path do kontroli wizualnej."""
+    raw_path = task.get("project_path") or task.get("source_file_link")
+    check = tool_registry.check_call("open_pbip_capture", {"project_path": raw_path})
+    if not check["allowed"]:
+        return _refused(check["reason"], tool="open_pbip_capture")
+
+    shot = pbi_desktop_bridge.open_and_capture(raw_path)
+    result = _screenshot_effect(shot, "open_pbip_capture",
+                                "Otwarto PBIP i wykonano zrzut strony raportu.",
+                                "Otwarcie/zrzut raportu nie powiodły się.")
+    result["tool"] = "open_pbip_capture"
+    return result
+
+
 def _build_report(project_dir, result, passed):
     """Czytelny raport walidacji: CO sprawdzono, ILE plików, jakie błędy/ostrzeżenia.
     Bez tego odbiór biznesowy słusznie odrzuca ('jedno zdanie to nie raport')."""
@@ -90,12 +152,12 @@ def _build_report(project_dir, result, passed):
     return "\n".join(lines)
 
 
-def _refused(reason):
+def _refused(reason, tool="validate_pbip"):
     """Odmowa wykonania (np. ścieżka poza workspace). Runner obsługuje ją WPROST
     jako eskalację bezpieczeństwa — nie podajemy złej ścieżki dalej do bramki."""
     return {
         "cost_usd": 0.0,
-        "tool": "validate_pbip",
+        "tool": tool,
         "executed": False,
         "acceptance_notes": reason,
         "output": {"refused": reason},

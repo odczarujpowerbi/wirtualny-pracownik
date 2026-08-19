@@ -31,6 +31,7 @@ import heartbeat
 import kill_switch
 import live_status_publisher
 import risk_classifier
+import risk_hint
 import skill_usage_logger
 import state_store
 import task_router
@@ -51,6 +52,16 @@ def now_iso():
 
 
 def process_task(task, policy, routing, client):
+    """Przetwarza zadanie i oznacza DOMKNIĘCIE BLOKU (block_closed) przy statusie
+    końcowym — to granica bezpiecznego resetu kontekstu: brief kolejnych zadań nie
+    wciąga zamkniętego (task_brief_builder). Audyt zostaje, kontekst przestaje ciągnąć."""
+    result = _process_task_core(task, policy, routing, client)
+    if result and result.get("status") in ("done", "needs_approval"):
+        state_store.record_event(result["task_id"], "block_closed", result["status"], now_iso())
+    return result
+
+
+def _process_task_core(task, policy, routing, client):
     task_id = task["task_id"]
     now = now_iso()
 
@@ -74,7 +85,13 @@ def process_task(task, policy, routing, client):
         client.update_status(task_id, status)
         return {"task_id": task_id, "risk": "red", "owner": owner, "status": status}
 
-    action_type = HINT_TO_ACTION.get(task.get("risk_level_hint", "yellow"), "report_build")
+    # Hint ryzyka: gdy źródło nie niesie własnego (albo niesie sztywny domyślny
+    # 'yellow' z mapowania Projectly), wywnioskuj kolor Z TREŚCI zadania —
+    # inaczej akcje czerwone (wysyłka/budżet/publikacja) nie byłyby rozpoznane.
+    hint = task.get("risk_level_hint")
+    if not hint or hint == "yellow":
+        hint = risk_hint.hint_from_task(task)
+    action_type = HINT_TO_ACTION.get(hint, "report_build")
     risk = risk_classifier.classify(action_type, policy)
     owner, confident = task_router.route_task(task["title"], routing)
 
