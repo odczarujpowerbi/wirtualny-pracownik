@@ -31,7 +31,14 @@ $lines += "-- Narzedzia --"
 $lines += "Git:          $(Ver 'git' '--version')"
 $lines += "Python:       $(Ver 'python' '--version')"
 $lines += "Node.js:      $(Ver 'node' '--version')"
-$lines += "Claude Code:  $(Ver 'claude' '--version')"
+# Claude Code czesto instaluje sie do .local\bin poza PATH - sprawdzamy tez tam,
+# zeby raport nie pokazywal falszywego BRAK (i przypominamy o PATH).
+$claudeVer = Ver 'claude' '--version'
+if ($claudeVer -eq "BRAK") {
+    $claudeExe = Join-Path $env:USERPROFILE ".local\bin\claude.exe"
+    if (Test-Path $claudeExe) { $claudeVer = "$(& $claudeExe --version 2>&1 | Select-Object -First 1) (w .local\bin, NIE w PATH!)" }
+}
+$lines += "Claude Code:  $claudeVer"
 $lines += "VS Code:      $(Ver 'code' '--version')"
 
 # Rozszerzenia VS Code (czy jest Claude Code).

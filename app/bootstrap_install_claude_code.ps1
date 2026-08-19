@@ -46,15 +46,32 @@ function Test-ClaudeCodeWorks {
     return $false
 }
 
+function Add-LocalBinToUserPath {
+    # KLUCZOWE: natywny instalator klaudka NIE dodaje .local\bin do PATH
+    # (komunikat: "is not in your PATH"). Bez tego AGENT (task_thinker) nie
+    # znajdzie 'claude' -> brak zywego modelu -> bramka wszystko eskaluje.
+    # Dopisujemy .local\bin TRWALE do PATH uzytkownika (nie tylko sesji).
+    if (-not (Test-Path (Join-Path $LocalBin "claude.exe"))) { return }
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    if ($userPath -notlike "*$LocalBin*") {
+        $newPath = if ($userPath) { "$userPath;$LocalBin" } else { $LocalBin }
+        [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
+        Write-Host "Dodano do PATH uzytkownika (trwale): $LocalBin" -ForegroundColor Green
+    }
+    if ($env:Path -notlike "*$LocalBin*") { $env:Path = "$LocalBin;$env:Path" }
+}
+
 if (Test-ClaudeCodeWorks) {
-    Write-Host "Claude Code juz jest zainstalowany - pomijam (szybko)." -ForegroundColor Green
+    Add-LocalBinToUserPath  # nawet gdy juz zainstalowany - upewnij sie, ze jest w PATH
+    Write-Host "Claude Code juz jest zainstalowany - pomijam instalacje." -ForegroundColor Green
     exit 0
 }
 
 Write-Host "Instaluję Claude Code (natywny instalator)..." -ForegroundColor Cyan
 irm https://claude.ai/install.ps1 | iex
 
-# Odśwież PATH w BIEŻĄCEJ sesji PowerShell, żeby nie trzeba było jej zamykać.
+# Trwale dodaj .local\bin do PATH uzytkownika + odswiez PATH biezacej sesji.
+Add-LocalBinToUserPath
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
 
 if (Test-ClaudeCodeWorks) {

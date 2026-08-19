@@ -56,6 +56,7 @@ function Invoke-Python($scriptOrArgs) {
 $steps = @(
     @{ Name = "Git";                              Required = $true;  Run = { Invoke-Step "bootstrap_install_git.ps1" @() } }
     @{ Name = "Python 3.11+";                     Required = $true;  Run = { Invoke-Step "bootstrap_install_python.ps1" @() } }
+    @{ Name = "Node.js (dla statuslinii/npx)";    Required = $false; Run = { Invoke-Step "bootstrap_install_node.ps1" @() } }
     @{ Name = "Claude Code (CLI)";                Required = $false; Run = { Invoke-Step "bootstrap_install_claude_code.ps1" @() } }
     @{ Name = "VS Code + rozszerzenie";           Required = $false; Run = { Invoke-Step "bootstrap_install_vscode.ps1" @() } }
 )
