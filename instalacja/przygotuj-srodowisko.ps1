@@ -13,13 +13,15 @@
 #   8. OneDrive            - lokalny sync projektow stron i skilli
 #   9. Zaleznosci Pythona  - pip install -r requirements.txt (jesli repo obok)
 #  10. Sekrety + rejestracja roli + test dymny (finalizacja aplikacji)
-#  11. Logowania           - interaktywny checklist kont (chmura, personalne, Meta, Gmail...)
-#  12. Raport stanu        - zdjecie konfiguracji do instalacja/STAN-SRODOWISKA.txt
+#  11. Autostart 24/7     - job_scheduler.py przy logowaniu (Harmonogram -> fallback Startup)
+#  12. Logowania           - interaktywny checklist kont (chmura, personalne, Meta, Gmail...)
+#  13. Raport stanu        - zdjecie konfiguracji do instalacja/STAN-SRODOWISKA.txt
 #
 # Przelaczniki:
 #   -SkipOffice       pomija Office
 #   -SkipApps         pomija dodatkowe aplikacje (Power BI, Obsidian, Teams, ...)
 #   -SkipLocalModel   pomija modele lokalne (kilka GB)
+#   -SkipAutostart    pomija konfiguracje autostartu 24/7
 #   -SkipLogins       pomija interaktywny checklist logowan
 #
 # Plik w ASCII (bez polskich znakow) - patrz app/README.md, uwaga o BOM w PS 5.1.
@@ -27,6 +29,7 @@ param(
     [switch]$SkipOffice,
     [switch]$SkipApps,
     [switch]$SkipLocalModel,
+    [switch]$SkipAutostart,
     [switch]$SkipLogins
 )
 
@@ -71,6 +74,9 @@ $steps += @{ Name = "Zaleznosci Pythona";         Required = $false; Run = {
 # register zapisuje role, smoke test tylko weryfikuje.
 $steps += @{ Name = "Sekrety (secrets/)";         Required = $false; Run = { Invoke-Python @("bootstrap_init_secrets.py") } }
 $steps += @{ Name = "Rejestracja roli (dev)";     Required = $false; Run = { Invoke-Python @("bootstrap_register.py", "dev") } }
+if (-not $SkipAutostart) {
+    $steps += @{ Name = "Autostart 24/7";         Required = $false; Run = { Invoke-Step "bootstrap_autostart.ps1" @("-AppPath", "$appDir") } }
+}
 if (-not $SkipLogins) {
     $steps += @{ Name = "Logowania (checklist)";  Required = $false; Run = { Invoke-Step "bootstrap_logins.ps1" @() } }
 }

@@ -27,11 +27,12 @@ Jeden klik: **`Przygotuj-srodowisko.bat`** (dwuklik). Na świeżej maszynie klik
 9. **Zależności Pythona** — `pip install -r requirements.txt`.
 10. **Sekrety** — `bootstrap_init_secrets.py` tworzy `app/secrets/` (klucze uzupełniasz ręcznie).
 11. **Rejestracja roli** — `bootstrap_register.py dev`.
-12. **Logowania** — interaktywny checklist kont (patrz niżej; pomiń: `-SkipLogins`).
-13. **Test dymny** — `bootstrap_smoke_test.py` (weryfikacja pętli).
-14. **Raport stanu** — zdjęcie konfiguracji do `STAN-SRODOWISKA.txt`.
+12. **Autostart 24/7** — `job_scheduler.py` przy logowaniu; Harmonogram zadań, a przy „Odmowa dostępu" fallback na folder Startup (pomiń: `-SkipAutostart`).
+13. **Logowania** — interaktywny checklist kont (patrz niżej; pomiń: `-SkipLogins`).
+14. **Test dymny** — `bootstrap_smoke_test.py` (weryfikacja pętli).
+15. **Raport stanu** — zdjęcie konfiguracji do `STAN-SRODOWISKA.txt`.
 
-Po zakończeniu: uzupełnij klucze w `app/secrets/.env`, potem `python app/job_scheduler.py` (pętla 24/7) + `python app/dashboard.py`.
+Po zakończeniu: uzupełnij klucze w `app/secrets/.env`. Agent startuje sam przy następnym logowaniu (krok 12); od ręki: `python app/job_scheduler.py`. Podgląd: `python app/dashboard.py`.
 
 ## Checklist logowań (krok 8)
 

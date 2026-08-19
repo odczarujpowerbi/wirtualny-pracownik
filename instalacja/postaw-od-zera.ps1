@@ -15,7 +15,9 @@ param(
     [string]$InstallPath = "$env:USERPROFILE\wirtualny-pracownik",
     [string]$Branch = "main",
     [switch]$SkipOffice,
+    [switch]$SkipApps,
     [switch]$SkipLocalModel,
+    [switch]$SkipAutostart,
     [switch]$SkipLogins
 )
 $ErrorActionPreference = "Stop"
@@ -70,7 +72,9 @@ if (-not (Test-Path $orchestrator)) { throw "Brak orkiestratora: $orchestrator (
 
 $fwd = @()
 if ($SkipOffice)     { $fwd += "-SkipOffice" }
+if ($SkipApps)       { $fwd += "-SkipApps" }
 if ($SkipLocalModel) { $fwd += "-SkipLocalModel" }
+if ($SkipAutostart)  { $fwd += "-SkipAutostart" }
 if ($SkipLogins)     { $fwd += "-SkipLogins" }
 
 Write-Host "`n[3/3] Uruchamiam pelny instalator srodowiska..." -ForegroundColor Cyan
