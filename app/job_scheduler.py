@@ -40,6 +40,7 @@ from pathlib import Path
 
 import yaml
 
+import control
 import env_bootstrap  # noqa: F401 — wymusza UTF-8 na stdout/stderr dla procesu schedulera (autostart Windows)
 import kill_switch
 
@@ -260,6 +261,10 @@ def run_scheduler(tick_seconds=5, schedule_path=SCHEDULE_PATH):
         while True:
             if kill_switch.is_active():
                 print(f"Kill switch aktywny ({kill_switch.reason()}) — nie odpalam nowych zadań.")
+                time.sleep(tick_seconds)
+                continue
+            if control.is_paused():
+                print(f"PAUSE ({control.pause_reason()}) — nie odpalam nowych zadań.")
                 time.sleep(tick_seconds)
                 continue
 

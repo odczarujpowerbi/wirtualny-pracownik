@@ -53,6 +53,18 @@
   .badge.failed { background:#fde8e8; color:var(--err); }
   .badge.planning, .badge.queued, .badge.validating { background:#eceef1; color:var(--muted); }
 
+  /* Panel operatora (sterowanie + kondycja). */
+  .ctrl { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; margin-bottom:18px; flex-wrap:wrap; }
+  .ctrl-left { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+  .ctrl-state { font-weight:700; font-size:14px; border-radius:999px; padding:5px 15px; white-space:nowrap; }
+  .ctrl-state.running { background:#e6f6ee; color:var(--ok); }
+  .ctrl-state.paused { background:#fdf3e2; color:#a9701a; }
+  .ctrl-state.stopped { background:#fde8e8; color:var(--err); }
+  .ctrl-metrics { color:var(--muted); font-size:13px; display:flex; gap:16px; flex-wrap:wrap; }
+  .ctrl-metrics b { color:var(--ink); font-weight:600; }
+  .ctrl-btns { display:flex; gap:8px; flex-wrap:wrap; }
+  button.danger { background:var(--err); border-color:var(--err); color:#fff; }
+
   /* Formularz dodawania zadania. */
   .addtask { padding:14px 16px; }
   .addtask-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
@@ -123,6 +135,19 @@
   <span class="sub">Kliknij w status przebiegu albo w wiersz historii, żeby zobaczyć pełne wyjście skryptu. Kolumny można rozsuwać.</span>
 </header>
 <main>
+  <div class="card ctrl">
+    <div class="ctrl-left">
+      <span class="ctrl-state" id="ctrl-state" title="">…</span>
+      <span class="ctrl-metrics" id="ctrl-metrics"></span>
+    </div>
+    <div class="ctrl-btns">
+      <button id="btn-pause">⏸ Pauza</button>
+      <button id="btn-resume">▶ Wznów</button>
+      <button id="btn-stop" class="danger">■ Stop</button>
+      <button id="btn-start">Start</button>
+    </div>
+  </div>
+
   <h2>Dodaj zadanie</h2>
   <div class="card addtask">
     <div class="addtask-row">
@@ -262,6 +287,51 @@ function startResize(e, th, ths, key) {
   };
   document.addEventListener("pointermove", move);
   document.addEventListener("pointerup", up);
+}
+
+// ---- Panel operatora: kondycja + sterowanie (PAUSE/RESUME/STOP/START) ----
+const CTRL_LABEL = { running: "● Pracuje", paused: "⏸ Wstrzymany", stopped: "■ Zatrzymany" };
+
+function money(v, limit) {
+  const a = (typeof v === "number") ? v.toFixed(2) : (v ?? "—");
+  return `${a} / ${limit ?? "—"} $`;
+}
+
+function renderHealth(h) {
+  const st = document.getElementById("ctrl-state");
+  st.className = "ctrl-state " + (h.control || "");
+  st.textContent = CTRL_LABEL[h.control] || h.control || "—";
+  st.title = h.control === "paused" ? h.pause_reason : (h.control === "stopped" ? h.stop_reason : "");
+  document.getElementById("ctrl-metrics").innerHTML =
+    `Maszyna: <b>${h.machine || "—"}</b>` +
+    ` · Kolejka: <b>${h.queue_depth ?? "—"}</b>` +
+    ` · Do decyzji: <b>${h.needs_approval_count ?? "—"}</b>` +
+    ` · Koszt dziś: <b>${money(h.cost_today_usd, h.cost_limit_usd)}</b>` +
+    ` · Zdrowie: <b>${h.health || "—"}</b>`;
+  document.getElementById("btn-pause").disabled = h.control !== "running";
+  document.getElementById("btn-resume").disabled = h.control !== "paused";
+  document.getElementById("btn-stop").disabled = h.control === "stopped";
+  document.getElementById("btn-start").disabled = h.control !== "stopped";
+}
+
+async function loadHealth() {
+  try {
+    const res = await fetch("/api/health");
+    renderHealth(await res.json());
+  } catch (e) { /* cicho */ }
+}
+
+async function sendControl(action) {
+  try {
+    const res = await fetch("/api/control", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error ? json.error.message : "Błąd sterowania");
+    toast(json.data.message || "OK");
+    loadHealth();
+  } catch (e) { toast(e.message, true); }
 }
 
 // ---- Zadania: grupowanie po zadaniu z osia czasu krokow/decyzji/statusow ----
@@ -559,20 +629,27 @@ async function refresh() {
     stamp();
   } catch (e) { /* cicho */ }
   loadTasks();
+  loadHealth();
 }
 
-// Zadania to widok "na zywo" — odswiezamy czesciej niz reszte.
+// Zadania i kondycja to widok "na zywo" — odswiezamy czesciej niz reszte.
 const TASKS_REFRESH_MS = 4000;
 
 document.getElementById("t-add").addEventListener("click", submitTask);
 document.getElementById("t-title").addEventListener("keydown", (e) => { if (e.key === "Enter") submitTask(); });
 document.getElementById("t-path").addEventListener("keydown", (e) => { if (e.key === "Enter") submitTask(); });
+document.getElementById("btn-pause").addEventListener("click", () => sendControl("pause"));
+document.getElementById("btn-resume").addEventListener("click", () => sendControl("resume"));
+document.getElementById("btn-stop").addEventListener("click", () => sendControl("stop"));
+document.getElementById("btn-start").addEventListener("click", () => sendControl("start"));
 
 makeResizable(document.getElementById("jobs"), "cols-jobs-v1");
 makeResizable(document.getElementById("history"), "cols-history-v1");
 load();
+loadHealth();
 setInterval(refresh, REFRESH_MS);
 setInterval(loadTasks, TASKS_REFRESH_MS);
+setInterval(loadHealth, TASKS_REFRESH_MS);
 </script>
 </body>
 </html>

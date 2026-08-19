@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 import env_bootstrap  # noqa: F401  # wczytuje .env / secrets/.env (patrz .env.example, bootstrap_init_secrets.py)
 
 import bot_gustaw_bramka
+import control
 import cost_tracker
 import executor
 import heartbeat
@@ -203,6 +204,9 @@ def _gate_failure_reason(gate):
 def run_once(client=None):
     if kill_switch.is_active():
         print(f"Kill switch aktywny ({kill_switch.reason()}) — runner nie podejmuje akcji.")
+        return []
+    if control.is_paused():
+        print(f"PAUSE ({control.pause_reason()}) — runner nie podejmuje nowej pracy.")
         return []
 
     policy = risk_classifier.load_policy()

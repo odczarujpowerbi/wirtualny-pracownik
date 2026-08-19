@@ -25,6 +25,7 @@ import hashlib
 import json
 from pathlib import Path
 
+import control
 import env_bootstrap  # noqa: F401 — UTF-8 na stdout (Windows)
 import kill_switch
 import risk_classifier
@@ -110,6 +111,9 @@ def run_once(client=None, inbox_path=INBOX_PATH, processed_path=PROCESSED_PATH):
     if kill_switch.is_active():
         print(f"Kill switch aktywny ({kill_switch.reason()}) — notebook intake nie podejmuje akcji.")
         return {"processed": 0, "reason": "kill_switch"}
+    if control.is_paused():
+        print(f"PAUSE ({control.pause_reason()}) — notebook intake nie podejmuje nowej pracy.")
+        return {"processed": 0, "reason": "paused"}
 
     inbox_path = Path(inbox_path)
     if not inbox_path.exists():

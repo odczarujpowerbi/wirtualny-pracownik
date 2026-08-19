@@ -166,6 +166,12 @@ def run():
             empty_rejected = True
         checks.append(("append_task odrzuca pustą treść", empty_rejected))
 
+    # 17. build_health zwraca stan sterowania + metryki kondycji (read-only).
+    health = dashboard.build_health()
+    checks.append(("build_health zwraca stan sterowania i metryki",
+                   health.get("control") in ("running", "paused", "stopped")
+                   and "queue_depth" in health and "cost_today_usd" in health))
+
     print("\n--- Wynik testu dymnego dashboardu ---")
     all_passed = True
     for name, passed in checks:

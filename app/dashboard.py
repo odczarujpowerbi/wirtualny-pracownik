@@ -28,7 +28,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import control
 import job_scheduler
+import kill_switch
+import live_status_publisher
 import notebook_intake
 import state_store
 
@@ -62,6 +65,16 @@ def _process_notebook_safely():
         notebook_intake.run_once()
     except Exception as exc:  # noqa: BLE001 — wątek w tle: błąd logujemy, nie wywracamy serwera
         print(f"[dashboard] błąd przetwarzania notatnika: {exc}")
+
+
+def build_health():
+    """Pasek kondycji panelu operatora: stan sterowania (running/paused/stopped) +
+    metryki na żywo (kolejka, koszt, zdrowie, heartbeat) z live_status_publisher."""
+    status = live_status_publisher.build_status(role="dev")
+    status["control"] = control.state()
+    status["pause_reason"] = control.pause_reason()
+    status["stop_reason"] = kill_switch.reason() or ""
+    return status
 
 
 def _validate_updates(body):
@@ -102,6 +115,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._send_json(build_flows())
         elif parsed.path == "/api/tasks":
             self._send_json(build_tasks())
+        elif parsed.path == "/api/health":
+            self._send_json(build_health())
         elif parsed.path == "/api/run-log":
             self._handle_run_log(parse_qs(parsed.query))
         else:
@@ -126,6 +141,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._handle_run()
             elif self.path == "/api/add-task":
                 self._handle_add_task()
+            elif self.path == "/api/control":
+                self._handle_control()
             else:
                 self._send_error("not_found", "Nieznana ścieżka.", status=404)
         except ValueError as exc:
@@ -164,6 +181,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
         line = notebook_intake.append_task(title, risk=risk, project_path=project_path)
         threading.Thread(target=_process_notebook_safely, daemon=True).start()
         self._send_json({"data": {"message": f"Dodano i przetwarzam: {line}"}}, status=202)
+
+    def _handle_control(self):
+        """Panel operatora: pause / resume / stop / start (M3, OPS-01)."""
+        body = self._read_json_body()
+        new_state, message = control.apply(body.get("action"))
+        self._send_json({"data": {"state": new_state, "message": message}})
 
     def _serve_html(self):
         body = HTML_PATH.read_bytes()
