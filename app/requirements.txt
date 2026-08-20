@@ -4,7 +4,13 @@ python-dotenv>=1.0
 anthropic>=0.40           # validator_visual.py, ad_copy_generator.py, mailerlite_report_analyzer.py
 requests>=2.31            # mailerlite_client.py, microsoft_graph_mail_client.py (REST Graph)
 psutil>=5.9               # system_health_monitor.py — RAM i lista procesów identycznie na Windows/Linux
-msal>=1.26               # microsoft_graph_mail_client.py — token app-only do Microsoft Graph (wysyłka maila)
+msal>=1.26               # microsoft_graph_mail_client.py / graph_verify.py — token app-only do Microsoft Graph
+
+# --- Konektory zewnętrzne (używane przez napisane klienty) ---
+# Meta Ads (meta_ads_client.py) NIE wymaga osobnego SDK — używa `requests` (wyżej).
+# Google Workspace (google_workspace_client.py) — konto serwisowe:
+google-auth>=2.0            # google_workspace_client.py — autoryzacja konta serwisowego
+google-api-python-client>=2.0  # google_workspace_client.py — Drive/Sheets/... API
 
 # --- Agent lokalny (wizja/OCR/okna) ---
 # Moduły screenshot_capture / window_manager / ocr_extract DZIAŁAJĄ bez tych
@@ -27,7 +33,4 @@ msal>=1.26               # microsoft_graph_mail_client.py — token app-only do 
 # pandas>=2.0                # data_tidy.py, report_builder.py, source_schema_watcher.py (diff schematu)
 # openpyxl>=3.1              # silnik Excela dla pandas przy plikach .xlsx
 # Pillow>=10.0                # screenshot_diff.py, screenshot_annotate.py
-# google-api-python-client   # Google Workspace (Docs/Sheets), Search Console, Analytics
-# google-auth-httplib2
-# google-auth-oauthlib
-# msal>=1.26                 # Microsoft Graph (SharePoint, Microsoft 365) — inny kanał niż Playwright/UI
+# facebook-business          # opcjonalny SDK Meta — meta_ads_client.py działa bez niego (przez requests)
