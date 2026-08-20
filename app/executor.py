@@ -231,11 +231,31 @@ def _run_web_fetch(task):
             return _refused(check["reason"], tool="fetch_url")
         wyniki.append(web_fetch_worker.fetch(url, allowed_hosts=domeny))
 
+    # Błąd źródła nie zawsze znaczy, że zadania nie da się wykonać: skill może
+    # znać adres zastępczy (np. NBP nie publikuje tabeli w dni wolne, więc bierzemy
+    # ostatnie notowanie). Próbujemy RAZ, a adnotacja mówi modelowi, że dane są
+    # z innego dnia i musi to napisać wprost.
+    if not task.get("_po_fallbacku"):
+        for i, wynik in enumerate(wyniki):
+            if wynik["available"]:
+                continue
+            kod = re.search(r"HTTP (\d{3})", wynik.get("detail") or "")
+            if not kod:
+                continue
+            zastepczy, adnotacja = web_source_fixer.fallback_po_bledzie(wynik["url"], int(kod.group(1)))
+            if zastepczy:
+                nowe_urls = list(urls)
+                nowe_urls[i] = zastepczy
+                return _run_web_fetch({**task, "url": nowe_urls, "_po_fallbacku": True,
+                                       "_adnotacja_zrodla": adnotacja})
+
     udane = [w for w in wyniki if w["available"]]
     if not udane:
-        powody = "; ".join(f"{w['url']}: {w['detail']}" for w in wyniki)
+        # Komunikat dla CZŁOWIEKA, nie zrzut techniczny: bez adresu API, bez kodów
+        # HTTP i angielskich fraz. Odbiór biznesowy słusznie odrzucał materiał,
+        # w którym stało "HTTP 404: Not Found" i pełny link z parametrem format=json.
         return {"cost_usd": 0.0, "tool": "fetch_url", "executed": True,
-                "acceptance_notes": f"Nie udało się pobrać danych. Szczegóły: {powody}",
+                "acceptance_notes": "NIE WYKONANO — " + " ".join(_powod_po_ludzku(w) for w in wyniki),
                 "output": {"zrodla": [_web_signature(w) for w in wyniki]}}
 
     for wynik in udane:
@@ -257,8 +277,14 @@ def _run_web_fetch(task):
     # Samo pobranie to jeszcze nie wykonanie zadania — model odpowiada na pytanie
     # z tytułu zadania na podstawie treści. Model dostaje OPIS źródła, nie surowy
     # adres, żeby mógł doprecyzować, czym są dane (np. że to kurs średni z tabeli A).
-    answer = web_answer.answer(task.get("title", ""), tresc_zrodel, url=udane[0]["url"],
-                               zrodlo_opis=etykiety)
+    pytanie = task.get("title", "")
+    adnotacja = task.get("_adnotacja_zrodla")
+    if adnotacja:
+        # Dane pochodzą z adresu zastępczego — model musi wiedzieć, czym się różnią
+        # od zamówionych, żeby nie podał ich jako danych z zamówionego dnia.
+        pytanie = f"{pytanie}\n\nWAŻNE o danych, które dostajesz: {adnotacja}"
+
+    answer = web_answer.answer(pytanie, tresc_zrodel, url=udane[0]["url"], zrodlo_opis=etykiety)
 
     tresc = (answer.get("answer") or "").strip()
     if answer.get("available") and tresc.startswith("BRAK_ODPOWIEDZI_W_ZRODLE"):
@@ -348,6 +374,38 @@ def _source_label(result):
     if nazwa and czytelny:
         return f"{nazwa} — {link}"
     return nazwa or link
+
+
+def _powod_po_ludzku(wynik):
+    """Dlaczego nie udało się pobrać danych — językiem odbiorcy. Kod odpowiedzi
+    serwera tłumaczymy na wyjaśnienie ze skilla (np. że NBP nie publikuje tabeli
+    w dni wolne); gdy skill nic nie wie, mówimy krótko, co się stało."""
+    host = (urlparse(wynik.get("url") or "").hostname or "").lower()
+    nazwa = _nazwa_zrodla(host) or "wskazane źródło"
+
+    kod = re.search(r"HTTP (\d{3})", wynik.get("detail") or "")
+    if kod:
+        wyjasnienie = _wyjasnienie_bledu(host, int(kod.group(1)))
+        if wyjasnienie:
+            return f"{nazwa}: {wyjasnienie}"
+        return f"{nazwa} nie udostępniło danych pod wskazanym adresem (odpowiedź serwera {kod.group(1)})."
+    return f"Nie udało się połączyć ze źródłem {nazwa}."
+
+
+def _wpis_skilla(host):
+    try:
+        dane = yaml.safe_load(SKILL_PATH.read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        return {}
+    return (dane.get("zrodla") or {}).get(host) or {}
+
+
+def _nazwa_zrodla(host):
+    return _wpis_skilla(host).get("nazwa")
+
+
+def _wyjasnienie_bledu(host, kod):
+    return (_wpis_skilla(host).get("bledy") or {}).get(kod)
 
 
 def _link_publiczny(host):

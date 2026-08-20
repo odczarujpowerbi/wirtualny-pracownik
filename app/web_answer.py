@@ -115,6 +115,13 @@ dane nie zawierają szukanej informacji) — NIE pisz namiastki odpowiedzi ani o
 Zwróć wtedy dokładnie jedną linię w formacie:
 BRAK_ODPOWIEDZI_W_ZRODLE: <czego konkretnie brakuje i czego zamiast tego dotyczy treść>
 
+WYJĄTEK: jeśli w zadaniu stoi adnotacja zaczynająca się od "WAŻNE o danych, które
+dostajesz", to znaczy, że system świadomie podstawił dane zastępcze (np. notowanie
+z innego dnia, bo w zamówionym dniu źródło nic nie publikuje). Wtedy NIE zwracaj
+BRAK_ODPOWIEDZI_W_ZRODLE — podaj te dane i w tym samym zdaniu napisz wprost, czym
+się różnią od zamówionych (np. z którego dnia pochodzą). To jest pełnoprawna
+odpowiedź, a nie brak.
+
 WSKAZÓWKI DO TEGO KONKRETNEGO ŹRÓDŁA (wiedza zebrana z wcześniejszych odbiorów):
 {wskazowki}
 
