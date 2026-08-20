@@ -53,6 +53,10 @@ tools:
       - api.open-meteo.com        # pogoda (bez klucza API)
       - learn.microsoft.com       # dokumentacja Power BI / Microsoft 365
       - powerbi.microsoft.com     # blog i ogloszenia produktowe Power BI
+      # Wlasne strony firmy — zrodlo prawdy o ofercie, cenach i terminach.
+      - odczarujpowerbi.pl        # marka szkoleniowa (kursy, szkolenia, spolecznosc)
+      - powerbiday.com.pl         # konferencja Power BI Day
+      - clickless.pl              # marka wdrozeniowa (automatyzacje, raporty)
     # Czytelne nazwy źródeł do stopki materiału dla odbiorcy — surowy adres API
     # jest dla człowieka nieczytelny (uwaga z odbioru biznesowego).
     source_names:
@@ -62,6 +66,9 @@ tools:
       api.open-meteo.com: Open-Meteo, publiczne dane pogodowe
       learn.microsoft.com: Microsoft Learn, dokumentacja produktowa
       powerbi.microsoft.com: Microsoft, blog produktowy Power BI
+      odczarujpowerbi.pl: Odczaruj Power BI, strona marki szkoleniowej
+      powerbiday.com.pl: Power BI Day, strona konferencji
+      clickless.pl: Clickless, strona marki wdrozeniowej
     params:
       url:
         required: true
@@ -77,3 +84,42 @@ tools:
       project_path:
         required: true
         type: path
+
+  mailerlite_report:
+    risk: green
+    description: >
+      Odczyt wysłanych kampanii i ich statystyk z MailerLite (GET po REST API,
+      bez żadnego zapisu). Samo zestawienie jest zielone — read-only. Tworzenie,
+      harmonogramowanie i wysyłka kampanii NIE jest tym narzędziem i pozostaje
+      czerwona w approval_policy.yaml (mass_email).
+    allowed_domains:
+      - connect.mailerlite.com
+    source_names:
+      connect.mailerlite.com: MailerLite, statystyki wysłanych kampanii
+    params:
+      od:
+        required: true
+        type: string      # data początku okresu (RRRR-MM-DD), rozwiązana przez period_resolver
+      do:
+        required: true
+        type: string      # data końca okresu (RRRR-MM-DD), włącznie
+
+  zanfia_query:
+    risk: green
+    description: >
+      Odczyt danych z platformy kursów zanfia.com przez MCP. Narzędzia MCP
+      serwera są odkrywane w locie (tools/list), ale wywołać wolno WYŁĄCZNIE
+      odczytowe — zanfia_client.py odrzuca każdą nazwę z czasownikiem zapisu
+      niezależnie od uprawnień tokenu.
+    allowed_domains:
+      - app.zanfia.com
+      - zanfia.com
+    source_names:
+      app.zanfia.com: Zanfia, platforma sprzedaży kursów online
+    params:
+      od:
+        required: true
+        type: string
+      do:
+        required: true
+        type: string

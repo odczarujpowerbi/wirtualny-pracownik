@@ -25,6 +25,7 @@ from pathlib import Path
 
 import yaml
 
+import kontekst_firmy
 import task_thinker
 from bot_common import verdict
 
@@ -91,9 +92,13 @@ def build_prompt(task, execution_result, context, persona, ustalenia=None):
         "--- KWESTIE JUŻ ROZSTRZYGNIĘTE (respektuj, nie oceniaj ich od nowa) ---\n"
         f"{_lista(ustalenia.get('ustalenia'))}\n\n"
     ) if ustalenia else ""
+    # Odbiór ocenia materiał w realiach firmy, nie w próżni: inaczej wymagałby
+    # od materiału marki szkoleniowej rzeczy właściwych dla wdrożeniowej.
+    firma = kontekst_firmy.zbuduj(" ".join(str(task.get(k) or "") for k in ("title", "description")))
     return (
         f"{persona}\n\n"
-        "--- KONTEKST BIZNESOWY (czego oczekuje użytkownik) ---\n"
+        + (f"{firma}\n\n" if firma else "")
+        + "--- KONTEKST BIZNESOWY (czego oczekuje użytkownik) ---\n"
         f"{context['oczekiwania']}\n"
         f"Na co zwrócić szczególną uwagę:\n{uwagi}\n\n"
         "--- ZADANIE ---\n"

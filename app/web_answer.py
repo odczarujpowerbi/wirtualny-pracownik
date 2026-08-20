@@ -28,6 +28,7 @@ import yaml
 
 import cost_estimator
 import env_bootstrap  # noqa: F401 — UTF-8 na stdout (Windows)
+import kontekst_firmy
 import task_thinker
 
 MAX_CONTENT_CHARS = 12_000
@@ -57,7 +58,7 @@ def wskazowki_zrodla(url, path=SKILL_PATH):
 
 PROMPT = """Jesteś asystentem, który odpowiada na pytanie WYŁĄCZNIE na podstawie treści pobranej ze źródła.
 
-ZADANIE UŻYTKOWNIKA:
+{kontekst_firmy}ZADANIE UŻYTKOWNIKA:
 {question}
 
 ŹRÓDŁO: {url}
@@ -110,6 +111,14 @@ wcześniejszej wersji odpowiedzi:
 - Nie dopisuj pod odpowiedzią źródła, daty pobrania ani żadnej stopki — pochodzenie danych
   dokleja system w osobnym polu.
 
+MATERIAŁ SPRZEDAŻOWY (post, zaproszenie, oferta, opis produktu) — dodatkowy rygor,
+bo na podstawie takiego zdania ktoś podejmuje decyzję zakupową:
+- NIE wymyślaj cech oferty. Formy zajęć, tematu prelekcji, terminu dostarczenia
+  materiałów, zakresu wsparcia ani skali ("ogólnopolska", "największa") nie wolno
+  dopisać, jeśli nie stoi to wprost w treści źródła.
+- Skalę opisuj liczbami ze źródła (np. "ponad 200 uczestników"), nie przymiotnikami.
+- Cytując cenę, podaj też, do kiedy obowiązuje, jeśli źródło ma progi cenowe.
+
 GDY TREŚĆ NIE ODPOWIADA NA ZADANIE (pobrano nie to źródło, artykuł o czym innym,
 dane nie zawierają szukanej informacji) — NIE pisz namiastki odpowiedzi ani ogólników.
 Zwróć wtedy dokładnie jedną linię w formacie:
@@ -161,7 +170,9 @@ def answer(question, content, url="", zrodlo_opis=None, ask=None):
                 "detail": "Brak treści do analizy — nie ma na czym oprzeć odpowiedzi."}
 
     trimmed = content[:MAX_CONTENT_CHARS]
-    prompt = PROMPT.format(question=question or "Streść pobraną treść.",
+    blok_firmy = kontekst_firmy.zbuduj(question or "")
+    prompt = PROMPT.format(kontekst_firmy=(blok_firmy + "\n\n") if blok_firmy else "",
+                           question=question or "Streść pobraną treść.",
                            url=zrodlo_opis or url or "nieznane",
                            content=trimmed,
                            wskazowki=wskazowki_zrodla(url) or "- (brak dodatkowych wskazówek dla tego źródła)")

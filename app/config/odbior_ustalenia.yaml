@@ -15,6 +15,7 @@ blokujace:
   - 'Materiał nie odpowiada na to, o co proszono w zadaniu (brak zamówionego elementu).'
   - 'Błąd merytoryczny albo liczbowy: zła wartość, zła data, zły okres, dane z innego dnia niż zamówiony.'
   - 'Dane spoza źródła: twierdzenie, którego w pobranej treści nie ma.'
+  - 'Wymyślona cecha oferty w materiale sprzedażowym: format zajęć, temat, termin dostarczenia, zakres albo określenie skali, którego nie ma w źródle. Klient kupuje na podstawie takiego zdania, więc to błąd, nie stylistyka.'
   - 'Porada w obszarze prawnym, podatkowym lub rozliczeniowym, o którą nikt nie prosił.'
   - 'Treść robocza w materiale: komentarze do zlecającego, pytania, "mogę dodatkowo", placeholdery.'
   - 'Zły język materiału (angielskie wstawki albo kod tam, gdzie ma być tekst po polsku).'
