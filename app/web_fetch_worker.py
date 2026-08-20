@@ -251,7 +251,7 @@ def fetch(url, allowed_hosts=(), timeout=TIMEOUT_SECONDS, max_bytes=MAX_BYTES, o
         "bytes": len(raw[:max_bytes]),
         "truncated": truncated,
         "human_url": human_url(final_url),
-        "fetched_at": datetime.now().strftime("%d.%m.%Y"),
+        "fetched_at": datetime.now().strftime("%d.%m.%Y o %H:%M"),
         "saved_path": _save(url, text),
         "detail": f"Pobrano {len(raw[:max_bytes])} B ze statusem {status}."
                   + (" Treść przycięta do limitu." if truncated else ""),

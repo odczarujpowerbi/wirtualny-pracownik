@@ -16,6 +16,8 @@ import re
 from pathlib import Path
 from urllib.parse import urlparse
 
+import yaml
+
 import pbi_desktop_bridge
 import pbip_validate
 import screenshot_capture
@@ -24,6 +26,8 @@ import validator_prompt
 import web_answer
 import web_source_fixer
 import web_fetch_worker
+
+SKILL_PATH = Path(__file__).parent / "skills" / "web_research_operations.yaml"
 
 
 def execute(task):
@@ -63,6 +67,26 @@ def _url_spoza_allowlisty(task):
         if not web_fetch_worker.host_allowed(kandydat, domeny):
             return kandydat
     return None
+
+
+def _urls_from_task(task, limit=3):
+    """Wszystkie adresy źródeł z treści zadania (z allowlisty), do `limit` sztuk.
+    Zadanie potrafi wskazać kilka źródeł naraz ("porównaj kurs EUR i USD")."""
+    wskazany = task.get("url")
+    if isinstance(wskazany, list):
+        return wskazany[:limit]
+    if wskazany:
+        return [wskazany]
+
+    tekst = " ".join(str(task.get(p) or "") for p in ("title", "description", "expected_result",
+                                                      "acceptance_criteria", "source_file_link"))
+    domeny = tool_registry.allowed_domains(tool_registry.get_contract("fetch_url") or {})
+    znalezione = []
+    for kandydat in re.findall(r"https://\S+", tekst):
+        kandydat = kandydat.rstrip(".,;:!?)\"']")
+        if web_fetch_worker.host_allowed(kandydat, domeny) and kandydat not in znalezione:
+            znalezione.append(kandydat)
+    return znalezione[:limit]
 
 
 def _url_from_task(task):
@@ -186,81 +210,102 @@ def _run_web_fetch(task):
     w kontrakcie `fetch_url` — executor nie trzyma własnej listy, tak samo jak
     przy ścieżkach plików.
 
+    Zadanie może wskazywać KILKA źródeł (np. "porównaj kurs EUR i USD") — wtedy
+    pobieramy każde i model dostaje wszystkie treści naraz. Wcześniej brany był
+    tylko pierwszy adres, więc zadanie porównawcze nie miało z czego powstać.
+
     Treść z internetu jest z definicji NIEZAUFANA, więc zanim trafi do modelu
     przechodzi przez kontrolę wstrzyknięcia instrukcji. Wykrycie = odmowa
     z eskalacją, nie 'ostrzeżenie w raporcie'."""
-    url = _url_from_task(task)
-    check = tool_registry.check_call("fetch_url", {"url": url})
-    if not check["allowed"]:
-        return _refused(check["reason"], tool="fetch_url")
+    urls = _urls_from_task(task)
+    if not urls:
+        return _refused("Zadanie nie wskazuje adresu źródła do pobrania.", tool="fetch_url")
 
     contract = tool_registry.get_contract("fetch_url") or {}
-    result = web_fetch_worker.fetch(url, allowed_hosts=tool_registry.allowed_domains(contract))
-    if not result["available"]:
-        # Niepowodzenie pobrania to luka dostępności źródła, nie odmowa
-        # bezpieczeństwa — idzie przez bramkę uczciwie, z powodem.
-        return {"cost_usd": 0.0, "tool": "fetch_url", "executed": True,
-                "acceptance_notes": f"Nie udało się pobrać danych z {url}. Szczegół: {result['detail']}",
-                "output": _web_signature(result)}
+    domeny = tool_registry.allowed_domains(contract)
 
-    safety = validator_prompt.check_prompt_safety(result["text"][:4000])
-    if not safety["safe"]:
-        return _refused(
-            f"Pobrana treść z '{url}' wygląda na próbę wstrzyknięcia instrukcji "
-            f"({safety['detail']}) — treść NIE jest podawana dalej do modelu. Plik: {result['saved_path']}",
-            tool="fetch_url")
+    wyniki = []
+    for url in urls:
+        check = tool_registry.check_call("fetch_url", {"url": url})
+        if not check["allowed"]:
+            return _refused(check["reason"], tool="fetch_url")
+        wyniki.append(web_fetch_worker.fetch(url, allowed_hosts=domeny))
+
+    udane = [w for w in wyniki if w["available"]]
+    if not udane:
+        powody = "; ".join(f"{w['url']}: {w['detail']}" for w in wyniki)
+        return {"cost_usd": 0.0, "tool": "fetch_url", "executed": True,
+                "acceptance_notes": f"Nie udało się pobrać danych. Szczegóły: {powody}",
+                "output": {"zrodla": [_web_signature(w) for w in wyniki]}}
+
+    for wynik in udane:
+        safety = validator_prompt.check_prompt_safety(wynik["text"][:4000])
+        if not safety["safe"]:
+            return _refused(
+                f"Pobrana treść z '{wynik['url']}' wygląda na próbę wstrzyknięcia instrukcji "
+                f"({safety['detail']}) — treść NIE jest podawana dalej do modelu. "
+                f"Plik: {wynik['saved_path']}",
+                tool="fetch_url")
+
+    # Dwa adresy z tego samego serwisu dawały "NBP...; NBP..." w stopce — etykiety
+    # deduplikujemy z zachowaniem kolejności.
+    etykiety = "; ".join(dict.fromkeys(_source_label(w) for w in udane))
+    tresc_zrodel = "\n\n".join(
+        f"=== ŹRÓDŁO {i}: {_source_label(w)} ===\n{w['text']}" for i, w in enumerate(udane, 1)
+    ) if len(udane) > 1 else udane[0]["text"]
 
     # Samo pobranie to jeszcze nie wykonanie zadania — model odpowiada na pytanie
-    # z tytułu zadania na podstawie treści. Bez tego kroku odbiór biznesowy
-    # słusznie odrzuca surowy JSON jako "efekt" (realny werdykt Bożeny).
-    # Model dostaje OPIS źródła (np. "Narodowy Bank Polski, tabela kursów średnich (A)"),
-    # a nie surowy adres — dzięki temu może doprecyzować w odpowiedzi, czym są dane.
-    # Odbiór biznesowy słusznie pytał "to kurs średni, kupna czy sprzedaży?".
-    answer = web_answer.answer(task.get("title", ""), result["text"], url=url,
-                               zrodlo_opis=_source_label(result))
+    # z tytułu zadania na podstawie treści. Model dostaje OPIS źródła, nie surowy
+    # adres, żeby mógł doprecyzować, czym są dane (np. że to kurs średni z tabeli A).
+    answer = web_answer.answer(task.get("title", ""), tresc_zrodel, url=udane[0]["url"],
+                               zrodlo_opis=etykiety)
 
-    # Źródło nie zawiera odpowiedzi — oddawanie pustej treści ze stopką "pobrano
-    # dziś" sugerowałoby wykonaną pracę. Zamiast tego jasno mówimy, czego brakuje,
-    # i prosimy o wskazanie źródła (uwaga odbioru biznesowego: "zadanie zostało
-    # po prostu odłożone, nikt nie zapytał o inne źródło").
     tresc = (answer.get("answer") or "").strip()
-    if answer.get("available") and tresc.startswith("BRAK_ODPOWIEDZI_W_ZRODLE") and not task.get("_po_korekcie"):
-        # Zanim oddamy zadanie człowiekowi: jeśli skill zna regułę korekty adresu
-        # dla tego źródła (np. inna waluta w tabeli NBP), poprawiamy adres i
-        # próbujemy RAZ jeszcze. Flaga _po_korekcie blokuje pętlę.
-        tekst_zadania = " ".join(str(task.get(k) or "") for k in ("title", "description"))
-        lepszy = web_source_fixer.popraw_adres(url, tekst_zadania)
-        if lepszy:
-            return _run_web_fetch({**task, "url": lepszy, "_po_korekcie": True})
-
     if answer.get("available") and tresc.startswith("BRAK_ODPOWIEDZI_W_ZRODLE"):
+        # Zanim oddamy zadanie człowiekowi: jeśli skill zna regułę korekty adresu
+        # (np. inna waluta w tej samej tabeli NBP), poprawiamy adres i próbujemy
+        # RAZ jeszcze. Flaga _po_korekcie blokuje pętlę.
+        tekst_zadania = " ".join(str(task.get(k) or "") for k in ("title", "description"))
+        if not task.get("_po_korekcie"):
+            lepsze = [web_source_fixer.popraw_adres(w["url"], tekst_zadania) for w in udane]
+            lepsze = [a for a in lepsze if a]
+            if lepsze:
+                return _run_web_fetch({**task, "url": lepsze, "_po_korekcie": True})
+
         powod = tresc.split(":", 1)[1].strip() if ":" in tresc else tresc
+        powod = powod[:1].upper() + powod[1:] if powod else powod
         return {
             "cost_usd": answer.get("cost_usd", 0.0),
             "tool": "fetch_url",
             "executed": True,
-            "acceptance_notes": (f"NIE WYKONANO: wskazane źródło nie zawiera odpowiedzi na to zadanie. "
-                                 f"{powod} Proszę o wskazanie właściwego źródła — wtedy dokończę zadanie."),
-            "output": _web_signature(result),
+            "acceptance_notes": (f"NIE WYKONANO — wskazane źródło nie zawiera odpowiedzi na to zadanie. "
+                                 f"{powod} Żeby dokończyć, potrzebuję źródła z tymi danymi."),
+            "output": {"zrodla": [_web_signature(w) for w in udane]},
         }
 
+    sygnatura = {"zrodla": [_web_signature(w) for w in udane]}
     return {
         "cost_usd": answer.get("cost_usd", 0.0),
         "tool": "fetch_url",
         "executed": True,
-        "acceptance_notes": _build_web_report(result, answer),
+        "acceptance_notes": _build_web_report(udane[0], answer),
         # Pochodzenie danych trafia do komentarza, NIE do materiału — odbiorca
         # dostaje czysty tekst do przeklejenia, audyt i tak wie, skąd dane.
-        "source_note": f"{_source_label(result)}, pobrano {result.get('fetched_at', 'dziś')}.",
-        "output": _web_signature(result),
+        # Każde źródło w osobnej linii — sklejone przecinkiem sugerowały, że cały
+        # materiał pochodzi z pierwszego z nich (realna uwaga przy notatce
+        # łączącej kurs waluty z prognozą pogody).
+        "source_note": "\n".join(
+            f"{_source_label(w)} (pobrano {w.get('fetched_at', 'dziś')})"
+            for w in {_source_label(x): x for x in udane}.values()),
+        "output": sygnatura,
         "functional_checks": [
-            {"name": "Pobrana treść zapisana na dysku", "type": "nonempty_file", "target": result["saved_path"]},
+            {"name": f"Pobrana treść zapisana na dysku ({_source_label(w)})",
+             "type": "nonempty_file", "target": w["saved_path"]} for w in udane
         ],
         # Bartek porównuje SYGNATURY, więc rerun musi zwracać dokładnie ten sam
-        # kształt co `output` — inaczej każde zadanie wygląda na niedeterministyczne
-        # (realnie napotkane na pierwszym przebiegu).
-        "rerun": lambda: _web_signature(web_fetch_worker.fetch(
-            url, allowed_hosts=tool_registry.allowed_domains(tool_registry.get_contract("fetch_url") or {}))),
+        # kształt co `output` — inaczej każde zadanie wygląda na niedeterministyczne.
+        "rerun": lambda: {"zrodla": [_web_signature(web_fetch_worker.fetch(w["url"], allowed_hosts=domeny))
+                                     for w in udane]},
     }
 
 
@@ -294,10 +339,25 @@ def _source_label(result):
     # Adres endpointu API w materiale dla odbiorcy "wygląda technicznie i roboczo"
     # (uwaga odbioru biznesowego) — link podajemy tylko wtedy, gdy da się go
     # otworzyć i zrozumieć: bez /api/ i bez parametrów zapytania.
+    # Publiczny odpowiednik adresu (strona, na której dane widać) — dla API bez
+    # czytelnego adresu bierzemy go ze skilla, żeby odbiorca miał co kliknąć.
+    publiczny = _link_publiczny(host)
     czytelny = link and "/api/" not in link and "?" not in link
+    if nazwa and publiczny:
+        return f"{nazwa} — {publiczny}"
     if nazwa and czytelny:
         return f"{nazwa} — {link}"
     return nazwa or link
+
+
+def _link_publiczny(host):
+    """Strona do pokazania człowiekowi zamiast adresu API (skill web_research_operations)."""
+    try:
+        dane = yaml.safe_load(SKILL_PATH.read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        return None
+    wpis = (dane.get("zrodla") or {}).get(host) or {}
+    return wpis.get("link_publiczny")
 
 
 def _build_web_report(result, answer=None):

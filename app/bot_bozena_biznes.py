@@ -79,9 +79,23 @@ def build_prompt(task, execution_result, context, persona):
         f"Kryteria akceptacji: {task.get('acceptance_criteria')}\n\n"
         "--- CO BOT WYKONAŁ (efekt do oceny) ---\n"
         f"{execution_result.get('acceptance_notes') or execution_result.get('output') or '(brak opisu efektu)'}\n\n"
+        f"{_dopisek_o_zrodlach(execution_result)}"
         "Oceń, czy to jest efekt, jakiego oczekiwałby użytkownik biznesowy. "
         "Odpowiedz w formacie z persony (AKCEPTACJA / UZASADNIENIE / ZASTRZEŻENIA)."
     )
+
+
+def _dopisek_o_zrodlach(execution_result):
+    """Pochodzenie danych system dokleja POZA materiałem (osobne pole komentarza),
+    więc bez tej informacji odbiór biznesowy zarzucał brak źródeł, których po prostu
+    nie widział — i odrzucał poprawny efekt. Pokazujemy je wprost, z zaznaczeniem,
+    że nie są częścią materiału i nie trzeba ich powtarzać w treści."""
+    zrodla = execution_result.get("source_note")
+    if not zrodla:
+        return ""
+    return ("--- POCHODZENIE DANYCH (system dołącza je do zadania automatycznie; NIE są częścią "
+            "materiału dla odbiorcy, więc nie wymagaj powtórzenia ich w treści) ---\n"
+            f"{zrodla}\n\n")
 
 
 def _parse_acceptance(text):

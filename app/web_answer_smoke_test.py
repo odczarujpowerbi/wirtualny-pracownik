@@ -79,9 +79,11 @@ def run():
                    "opad" in pogoda.lower() and "tabela A" not in pogoda.lower()))
 
     obcy = web_answer.wskazowki_zrodla("https://nieznane-zrodlo.example/x")
+    # Frazy sprawdzane niżej muszą być UNIKALNE dla danego źródła — reguły ogólne
+    # też mówią o opadach i kursach, więc szersze dopasowanie dawało fałszywy alarm.
     checks.append(("Skill: nieznane źródło dostaje same reguły ogólne, bez wywrotki",
                    "DOKŁADNIE ten okres" in obcy
-                   and "tabela A" not in obcy.lower() and "opad" not in obcy.lower()))
+                   and "tabela a" not in obcy.lower() and "precipitation_sum" not in obcy))
 
     brak = web_answer.wskazowki_zrodla("https://api.nbp.pl/x", path="nie_ma_takiego_pliku.yaml")
     checks.append(("Skill: brak pliku -> pusty tekst, nie wyjątek", brak == ""))
