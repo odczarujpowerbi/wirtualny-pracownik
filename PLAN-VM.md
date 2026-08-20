@@ -95,6 +95,15 @@ Substrat gotowy: `screenshot_capture`, `window_manager`, `ui_lock` (serializacja
 
 Zasada: computer use i przeglądarka trzymają fokus sekwencyjnie (`ui_lock`); równolegle idą tylko zadania plikowe.
 
+**Substrat wielookienkowy (gotowy, do ~16 okien Power BI / VS Code / ERP):**
+- `window_manager.py` — `virtual_screen_size()` (rozmiar dużego pulpitu sesji) + `move_resize()` (kafelkowanie), uchwyty HWND.
+- `multi_window.py` — `plan_grid()` (siatka, 16 → 4×4 po Full HD), `arrange()` (rozłóż okna), `capture_all()` (RÓWNOLEGLE zrzuty wszystkich okien).
+- `screenshot_capture.capture_window()` — przez **PrintWindow/DWM**, odporne na odłączenie RDP i zasłonięcie okna (zwykły grab framebuffera czernieje).
+- `ui_actions.py` — klik/wpisywanie przez **UI Automation** (pewne dla Power BI/VS Code/Chromium), akcje serializowane `ui_lock`.
+- Wzorzec pętli: co ~45 s `capture_all()` (równolegle) → analiza → akcje po kolei.
+
+**Konfiguracja serwera pod duży pulpit:** uruchom `instalacja\skrypty\bootstrap_setup_bigdesktop.ps1` (wyłącza wygaszacz/blokadę/limity sesji, DPI 100%) i zastosuj kroki, które wypisze: duży pulpit (`.rdp` 7680×4320 / `mstsc /multimon` / wirtualny monitor) oraz anty-czarny-ekran (`RemoteDesktop_SuppressWhenMinimized=2` po stronie klienta albo `tscon <id> /dest:console`). Deps na maszynie: `pip install pywin32 pywinauto mss Pillow pytesseract pygetwindow`.
+
 ---
 
 ## 5. Faza 4 — skille i konektory (model: skill wyzwala skrypt i patrzy na output)

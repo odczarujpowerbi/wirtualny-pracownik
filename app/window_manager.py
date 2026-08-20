@@ -15,6 +15,22 @@ i available=False — nigdy nie rzuca.
 """
 
 
+import ctypes
+
+# SW_RESTORE (przywroc zminimalizowane) i indeksy wirtualnego pulpitu (GetSystemMetrics).
+_SW_RESTORE = 9
+_SM_CXVIRTUALSCREEN = 78
+_SM_CYVIRTUALSCREEN = 79
+
+
+def _user32():
+    """user32 tylko na Windows; gdzie indziej None (moduly degraduja sie lagodnie)."""
+    try:
+        return ctypes.windll.user32
+    except (AttributeError, OSError):
+        return None
+
+
 def _match(title, query):
     """Dopasowanie okna: fragment tytułu, case-insensitive. Wydzielone, bo to
     jedyna nietrywialna logika, którą chcemy testować bez systemu okien."""
@@ -35,6 +51,7 @@ def _via_pygetwindow():
             "title": title,
             "left": win.left, "top": win.top,
             "width": win.width, "height": win.height,
+            "hwnd": getattr(win, "_hWnd", None),
             "_handle": win,
         })
     return windows
@@ -54,6 +71,7 @@ def _via_pywinauto():
                 "title": title,
                 "left": rect.left, "top": rect.top,
                 "width": rect.width(), "height": rect.height(),
+                "hwnd": getattr(win, "handle", None),
                 "_handle": win,
             })
         except Exception:  # noqa: BLE001 — pojedyncze okno bez dostępu nie psuje listy
@@ -120,7 +138,37 @@ def focus_window(title_query):
         return {"ok": False, "detail": f"Nie udało się wysunąć okna: {exc}"}
 
 
+def virtual_screen_size():
+    """(szerokosc, wysokosc) CALEGO wirtualnego pulpitu sesji (suma monitorow /
+    duzy framebuffer RDP). None poza Windows. Do planowania siatki okien."""
+    u = _user32()
+    if u is None:
+        return None
+    w, h = u.GetSystemMetrics(_SM_CXVIRTUALSCREEN), u.GetSystemMetrics(_SM_CYVIRTUALSCREEN)
+    return (w, h) if w and h else None
+
+
+def move_resize(title_query, left, top, width, height):
+    """Ustawia pozycje i rozmiar okna (kafelkowanie w siatce). Najpierw przywraca
+    zminimalizowane. Zwraca {ok, detail}. Uzywa MoveWindow (ctypes) - dziala z
+    dowolnym uchwytem, niezaleznie od backendu. Nie rzuca."""
+    win = find_window(title_query)
+    if win is None or not win.get("hwnd"):
+        return {"ok": False, "detail": f"Brak okna/uchwytu dla '{title_query}'."}
+    u = _user32()
+    if u is None:
+        return {"ok": False, "detail": "MoveWindow dostepne tylko na Windows."}
+    hwnd = int(win["hwnd"])
+    try:
+        u.ShowWindow(hwnd, _SW_RESTORE)
+        ok = bool(u.MoveWindow(hwnd, int(left), int(top), int(width), int(height), True))
+        return {"ok": ok, "detail": f"{win['title']} -> ({left},{top}) {width}x{height}"}
+    except Exception as exc:  # noqa: BLE001 - nieudane ustawienie okna to nie crash
+        return {"ok": False, "detail": f"MoveWindow zawiodlo: {exc}"}
+
+
 if __name__ == "__main__":
     print(available())
+    print("virtual screen:", virtual_screen_size())
     for w in list_windows()[:15]:
         print(f"  {w['title']!r} @ ({w['left']},{w['top']}) {w['width']}x{w['height']}")

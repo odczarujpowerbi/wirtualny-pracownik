@@ -76,8 +76,10 @@ Fundament, którego brakowało: zdolność agenta do "widzenia" ekranu, pracy na
 
 | Moduł | Co robi | Test |
 |---|---|---|
-| `screenshot_capture.py` | Zrzut całego ekranu / obszaru / KONKRETNEGO okna (mss → Pillow ImageGrab). Produkuje `screenshot_path` do `runs/screenshots/` — to domyka pętlę wizyjną (wcześniej nikt tego pola nie ustawiał, więc Oskar nie miał czego oglądać) | ✅ `screenshot_capture_smoke_test.py` (atrapa backendu, bez realnego zrzutu pulpitu) |
-| `window_manager.py` | Listowanie/znajdowanie/fokus okien + granice okna (pygetwindow → pywinauto UI Automation). Podstawa pracy na wielu okienkach | ✅ `window_manager_smoke_test.py` (logika dopasowania + degradacja) |
+| `screenshot_capture.py` | Zrzut całego ekranu / obszaru / KONKRETNEGO okna. Okno przez **PrintWindow/DWM** (odporne na odłączenie RDP i zasłonięcie), z fallbackiem mss/Pillow. Produkuje `screenshot_path` do `runs/screenshots/` — domyka pętlę wizyjną | ✅ `screenshot_capture_smoke_test.py` (atrapa backendu, bez realnego zrzutu) |
+| `window_manager.py` | Listowanie/fokus/granice okien + HWND, `virtual_screen_size()` (duży pulpit sesji) i `move_resize()` (kafelkowanie) — podstawa pracy na wielu okienkach | ✅ `window_manager_smoke_test.py` |
+| `multi_window.py` | Praca na ~16 oknach: `plan_grid()` (siatka 4×4), `arrange()` (rozłożenie), `capture_all()` (RÓWNOLEGLE zrzuty wszystkich okien). Wzorzec pętli 45 s: skan → analiza → akcje po kolei | ✅ `multi_window_smoke_test.py` (matematyka siatki + degradacja) |
+| `ui_actions.py` | Klik/wpisywanie/odczyt kontrolek przez **UI Automation** (pywinauto uia) — pewne dla Power BI/VS Code/Chromium, bez zabierania fokusu; serializacja przez `ui_lock` | ✅ `ui_actions_smoke_test.py` (kontrakt + degradacja) |
 | `ui_lock.py` | Serializacja sterowania ekranem: "jedno aktywne okno na zadanie", z kradzieżą blokady po TTL | ✅ `ui_lock_smoke_test.py` |
 | `ocr_extract.py` | Twardy ODCZYT tekstu/liczb ze zrzutu (Tesseract → model wizyjny Anthropic). Oddzielony od oceny "czy wygląda dobrze" — do konfrontacji liczb ze źródłem | ✅ `ocr_extract_smoke_test.py` (degradacja + parsowanie liczb pl/en) |
 | `file_search.py` | Szybkie przeszukiwanie/znajdowanie plików dla skryptów (ripgrep → czysty Python), wyniki zawsze ograniczone | ✅ `file_search_smoke_test.py` |

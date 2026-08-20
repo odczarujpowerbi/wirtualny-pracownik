@@ -36,6 +36,14 @@ def run():
     checks.append(("available: zwraca {available, backend}",
                    set(avail.keys()) == {"available", "backend"}))
 
+    vs = window_manager.virtual_screen_size()
+    checks.append(("virtual_screen_size: None albo (w,h) z dodatnimi",
+                   vs is None or (isinstance(vs, tuple) and len(vs) == 2 and vs[0] > 0 and vs[1] > 0)))
+
+    mr = window_manager.move_resize(_UNLIKELY, 0, 0, 800, 600)
+    checks.append(("move_resize: nieistniejace -> ok False + detail",
+                   mr["ok"] is False and bool(mr["detail"])))
+
     print("\n--- Wynik testu dymnego window_manager ---")
     all_passed = True
     for name, passed in checks:
