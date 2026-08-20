@@ -32,6 +32,25 @@ function Update-PathFromRegistry {
     $env:Path = "$machine;$user"
 }
 
+function Install-GitDirect {
+    # Bezposrednia instalacja Git dla Windows (bez winget) - dla czystego Windows
+    # Server 2022, gdzie winget czesto nie istnieje. Pobiera najnowszy oficjalny
+    # instalator git-for-windows z GitHub Releases i instaluje cicho. Ta sama
+    # metoda co bootstrap_install_git.ps1 (tam nieuzywalne tutaj, bo repo nie jest
+    # jeszcze sklonowane - git jest potrzebny wlasnie do klonowania).
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Write-Host "Pobieram najnowszy instalator Git dla Windows z GitHub..."
+    $release = Invoke-RestMethod -Uri "https://api.github.com/repos/git-for-windows/git/releases/latest" -Headers @{ "User-Agent" = "wirtualny-pracownik-bootstrap" }
+    $asset = $release.assets | Where-Object { $_.name -match "^Git-.*-64-bit\.exe$" } | Select-Object -First 1
+    if (-not $asset) { throw "Nie znalazlem 64-bitowego instalatora Git w najnowszym wydaniu. Zainstaluj recznie z https://git-scm.com/download/win i uruchom ponownie." }
+    $installer = Join-Path $env:TEMP $asset.name
+    Write-Host "Pobieram $($asset.name)..."
+    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $installer -UseBasicParsing
+    Write-Host "Instaluje cicho (bez okienek)..."
+    Start-Process -FilePath $installer -ArgumentList "/VERYSILENT", "/NORESTART", "/NOCANCEL", "/SP-" -Wait
+    Remove-Item $installer -ErrorAction SilentlyContinue
+}
+
 Write-Host "=== POSTAW OD ZERA - Wirtualny Pracownik AI ===" -ForegroundColor Cyan
 Write-Host "Repo:    $RepoUrl ($Branch)"
 Write-Host "Docelowo: $InstallPath"
@@ -43,7 +62,8 @@ if (-not (Test-Command "git")) {
     if (Test-Command "winget") {
         winget install -e --id Git.Git --accept-source-agreements --accept-package-agreements
     } else {
-        throw "winget niedostepny i brak gita. Zainstaluj gita recznie (https://git-scm.com) i uruchom ponownie."
+        Write-Host "winget niedostepny (typowe na Windows Server 2022) - instaluje Git bezposrednio z GitHub..." -ForegroundColor Yellow
+        Install-GitDirect
     }
     Update-PathFromRegistry
     if (-not (Test-Command "git")) {
