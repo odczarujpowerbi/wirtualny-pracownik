@@ -67,6 +67,8 @@ Kolejność ma znaczenie: bez realnej kolejki zadań i modelu reszta jest ślepa
 
 Po każdym podpunkcie: `self_check` zielony, zanim idziesz dalej.
 
+**1.6 Zestaw skilli/pluginów/agentów (`~/.claude`).** Po zalogowaniu (OneDrive zsynchronizowany + `claude login`) uruchom `instalacja\skrypty\bootstrap_install_claude_assets.ps1` (robi to też automatycznie koniec `Zaloguj.bat`). Kopiuje ~45 skilli i agentów ogólnych z biblioteki OneDrive `Aplikacje Claude - Documents` do `~/.claude` i instaluje pluginy przez marketplace (power-bi-agentic-development, claude-plugins-official, claude-powerline, oaustegard-claude-skills). **Buyer persony (Odczaruj i Clickless) zostają per-projekt** w folderach `Buyer persony ...` (mają kolidujące nazwy, np. `persona-tomek`) i są na VM przez sync OneDrive — używasz ich pracując w danym projekcie, nie globalnie.
+
 ---
 
 ## 3. Faza 2 — domknij pętlę wizyjną Power BI (pierwszy realny worker z efektem)

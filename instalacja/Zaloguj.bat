@@ -14,4 +14,10 @@ echo czy zalogowane.
 echo.
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0skrypty\bootstrap_logins.ps1"
 echo.
+echo === Provisioning zasobow Claude (skille / agenci / pluginy) ===
+echo Teraz, gdy OneDrive i Claude sa zalogowane, dogram Twoj zestaw skilli i pluginow do ~/.claude.
+echo (Mozesz pominac zamykajac to okno - uruchomisz pozniej: skrypty\bootstrap_install_claude_assets.ps1)
+echo.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0skrypty\bootstrap_install_claude_assets.ps1"
+echo.
 pause
