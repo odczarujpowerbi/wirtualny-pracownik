@@ -36,7 +36,7 @@ _SAFE_CWD_ROOTS = [(APP_DIR / r).resolve() for r in ("workspace", "mock_data")]
 # Lokalny model tekstowy (Ollama) jako ostatni fallback wołania modelu —
 # używany przez ask_model() (np. Bożena, gdy nie ma ani Claude Code, ani klucza).
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
-OLLAMA_TEXT_MODEL = os.environ.get("OLLAMA_TEXT_MODEL", "hermes3")
+OLLAMA_TEXT_MODEL = os.environ.get("OLLAMA_TEXT_MODEL", "llama3.2:3b")
 OLLAMA_TIMEOUT_SECONDS = 20
 
 
