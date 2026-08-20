@@ -10,7 +10,8 @@
 #
 # Użycie:
 #   .\bootstrap_install_local_model.ps1
-#   .\bootstrap_install_local_model.ps1 -VisionModel llama3.2-vision -TextModel hermes3
+#   .\bootstrap_install_local_model.ps1 -VisionModel llama3.2-vision -TextModel llama3.2:3b
+#   .\bootstrap_install_local_model.ps1 -TextModel hermes3   # mocniejszy, ale 6 GB RAM
 #   .\bootstrap_install_local_model.ps1 -SkipModels   # sama instalacja Ollamy
 
 param(
@@ -18,7 +19,10 @@ param(
     [string]$VisionModel = "llama3.2-vision",
 
     # Model tekstowy — druga opinia w validator_prompt.py. OLLAMA_TEXT_MODEL w .env.
-    [string]$TextModel = "hermes3",
+    # Domyslnie 3B: ~2 GB wag, ~3 GB RAM po zaladowaniu, ok. 8 tok/s na 3 rdzeniach CPU.
+    # hermes3 (8B) daje lepsza jakosc, ale zajmuje 6 GB RAM i ok. 5 tok/s — na maszynie
+    # bez GPU i z 12 GB RAM dlawi caly system. Zmien na hermes3 tylko przy GPU lub >16 GB RAM.
+    [string]$TextModel = "llama3.2:3b",
 
     [switch]$SkipModels
 )
