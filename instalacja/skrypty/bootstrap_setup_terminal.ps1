@@ -21,9 +21,56 @@ param(
 )
 $ErrorActionPreference = "Stop"
 
+function Install-TerminalFromGitHub {
+    # Windows Server 2022 nie ma Sklepu ani (domyslnie) winget, a Terminal nie jest
+    # wbudowany. Instalujemy recznie: zaleznosci (VCLibs Desktop + Microsoft.UI.Xaml)
+    # oraz najnowszy .msixbundle z GitHub Releases (microsoft/terminal), przez Add-AppxPackage.
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    $tmp = Join-Path $env:TEMP "wt-install"
+    New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+    $ua = @{ "User-Agent" = "wirtualny-pracownik-bootstrap" }
+    $deps = @()
+
+    # Zaleznosc 1: VCLibs Desktop (oficjalny link aka.ms).
+    $vclibs = Join-Path $tmp "Microsoft.VCLibs.x64.14.00.Desktop.appx"
+    Write-Host "Pobieram zaleznosc VCLibs..."
+    Invoke-WebRequest -Uri "https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx" -OutFile $vclibs -UseBasicParsing
+    $deps += $vclibs
+
+    # Zaleznosc 2 (best-effort): Microsoft.UI.Xaml.2.8 - nowsze wersje Terminala jej
+    # wymagaja. Pakiet nuget to zip; wyciagamy appx x64. Gdy sie nie uda, lecimy dalej
+    # z sama VCLibs (starsze bundlee wystarczaja).
+    try {
+        $nupkg = Join-Path $tmp "muxaml.zip"
+        Write-Host "Pobieram zaleznosc Microsoft.UI.Xaml.2.8..."
+        Invoke-WebRequest -Uri "https://www.nuget.org/api/v2/package/Microsoft.UI.Xaml/2.8.6" -OutFile $nupkg -UseBasicParsing
+        $muxDir = Join-Path $tmp "muxaml"
+        if (Test-Path $muxDir) { Remove-Item $muxDir -Recurse -Force }
+        Expand-Archive -Path $nupkg -DestinationPath $muxDir -Force
+        $muxAppx = Join-Path $muxDir "tools\AppX\x64\Release\Microsoft.UI.Xaml.2.8.appx"
+        if (Test-Path $muxAppx) { $deps += $muxAppx }
+    } catch {
+        Write-Host "  (Microsoft.UI.Xaml pominiete: $($_.Exception.Message))"
+    }
+
+    # Najnowszy Terminal (.msixbundle) z GitHub Releases (API wymaga naglowka User-Agent).
+    Write-Host "Szukam najnowszego wydania Terminala na GitHub..."
+    $rel = Invoke-RestMethod -Uri "https://api.github.com/repos/microsoft/terminal/releases/latest" -Headers $ua -UseBasicParsing
+    $asset = $rel.assets | Where-Object { $_.name -like "*.msixbundle" } | Select-Object -First 1
+    if (-not $asset) { throw "Nie znalazlem pliku .msixbundle w najnowszym wydaniu microsoft/terminal." }
+    $bundle = Join-Path $tmp $asset.name
+    Write-Host "Pobieram $($asset.name)..."
+    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $bundle -UseBasicParsing
+
+    Write-Host "Instaluje Terminal (Add-AppxPackage, zaleznosci: $($deps.Count))..."
+    Add-AppxPackage -Path $bundle -DependencyPath $deps
+    Write-Host "Terminal zainstalowany."
+}
+
 Write-Host "=== Terminal Windows: instalacja + konfiguracja pod Claude ==="
 
-# 1. Instalacja, jesli brak (winget, idempotentny).
+# 1. Instalacja, jesli brak (idempotentny). Kolejnosc: winget (gdy jest) -> bezposredni
+#    MSIX + zaleznosci z GitHub Releases (Windows Server 2022: brak Sklepu i winget).
 $installed = (Get-Command wt -ErrorAction SilentlyContinue) -or
              (Get-AppxPackage -Name "Microsoft.WindowsTerminal" -ErrorAction SilentlyContinue)
 if ($installed) {
@@ -32,7 +79,13 @@ if ($installed) {
     Write-Host "Instaluje Terminal Windows (winget)..."
     winget install -e --id Microsoft.WindowsTerminal --accept-source-agreements --accept-package-agreements --disable-interactivity
 } else {
-    Write-Host "UWAGA: winget niedostepny - zainstaluj Terminal ze Sklepu, potem uruchom ten skrypt ponownie dla konfiguracji."
+    Write-Host "winget/Sklep niedostepne (typowe na Windows Server 2022) - instaluje Terminal bezposrednio z GitHub Releases..."
+    try {
+        Install-TerminalFromGitHub
+    } catch {
+        Write-Host "UWAGA: bezposrednia instalacja Terminala nie powiodla sie: $($_.Exception.Message)"
+        Write-Host "Konfiguracja profili i tak zostanie zapisana; Terminal doinstalujesz pozniej recznie (MSIX + VCLibs z GitHub)."
+    }
 }
 
 # 2. Fragment z profilami. Budujemy przez hashtable -> ConvertTo-Json (poprawny JSON).
