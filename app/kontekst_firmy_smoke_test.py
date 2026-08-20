@@ -68,6 +68,17 @@ def run():
     checks.append(("Kontekst trafia do odbioru biznesowego", "KONTEKST FIRMY" in ocena))
     checks.append(("Odbiór dostaje właściwą markę", "Clickless — marka wdrożeniowa" in ocena))
 
+    # --- kontekst projektu ---
+    projekt = kontekst_firmy.dopasuj_projekt("Popraw raport dla Magnapharm")
+    checks.append(("Projekt rozpoznany po nazwie w zadaniu",
+                   projekt is not None and projekt.name == "dev-magnapharm.md"))
+    checks.append(("Zadanie bez projektu nie dobiera pliku projektu",
+                   kontekst_firmy.dopasuj_projekt("Sprawdź kurs EUR wg NBP") is None))
+    # Szkic z samymi znacznikami [do uzupełnienia] nic nie wnosi, a zajmuje miejsce
+    # w prompcie — dokładamy dopiero plik faktycznie wypełniony.
+    checks.append(("Niewypełniony szkic projektu nie trafia do promptu",
+                   "DEV - Magnapharm" not in kontekst_firmy.zbuduj("raport dla Magnapharm")))
+
     print("\n--- Wynik testu dymnego kontekstu firmowego ---")
     all_passed = True
     for name, passed in checks:

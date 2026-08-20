@@ -80,6 +80,34 @@ def wybierz_pliki(tekst, katalog=KONTEKST_DIR):
     return wybrane
 
 
+def dopasuj_projekt(tekst, katalog=KONTEKST_DIR):
+    """Ścieżka pliku projektu, gdy zadanie wskazuje projekt po nazwie.
+
+    Dopasowanie idzie po nazwie z NAGŁÓWKA pliku ("# DEV - Magnapharm"), a nie po
+    nazwie pliku, bo w zadaniu ludzie piszą "Magnapharm", a nie "dev-magnapharm".
+    Wymagamy członu dłuższego niż 3 znaki, żeby "AXL" nie łapało przypadkowych
+    skrótów, a krótkie słowa nie dopasowywały cudzych projektów."""
+    katalog = Path(katalog) / "projekty"
+    if not katalog.is_dir():
+        return None
+    nisko = (tekst or "").lower()
+    najlepszy, dlugosc = None, 0
+    for plik in sorted(katalog.glob("*.md")):
+        if plik.name.lower() == "readme.md":
+            continue
+        try:
+            naglowek = plik.read_text(encoding="utf-8").splitlines()[0].lstrip("# ").strip()
+        except (OSError, IndexError):
+            continue
+        # Pełna nazwa też jest członem — projekt "Power BI Day Q3 2026" ludzie
+        # wołają całą nazwą, nie fragmentem po myślniku.
+        czlony = [naglowek.strip().lower()] + [c.strip().lower() for c in naglowek.split("-")]
+        for czlon in czlony:
+            if len(czlon) > 3 and czlon in nisko and len(czlon) > dlugosc:
+                najlepszy, dlugosc = plik, len(czlon)
+    return najlepszy
+
+
 def zbuduj(tekst, katalog=KONTEKST_DIR, max_znakow=MAX_ZNAKOW):
     """Gotowy blok kontekstu do wklejenia w prompt. Pusty tekst, gdy nie ma plików —
     brak kontekstu nie może wywrócić zadania, po prostu agent pracuje bez osadzenia."""
@@ -91,6 +119,20 @@ def zbuduj(tekst, katalog=KONTEKST_DIR, max_znakow=MAX_ZNAKOW):
             continue
         if tresc:
             czesci.append(tresc)
+
+    # Kontekst projektu dokładamy na końcu, bo jest najbardziej szczegółowy —
+    # ustalenia z konkretnym klientem biją ogólne zasady marki.
+    plik_projektu = dopasuj_projekt(tekst, katalog)
+    if plik_projektu:
+        try:
+            tresc = plik_projektu.read_text(encoding="utf-8").strip()
+            # Same nagłówki "[do uzupełnienia]" nic nie wnoszą do promptu, a zajmują
+            # miejsce — dokładamy plik dopiero, gdy ktoś go faktycznie wypełnił.
+            if tresc and tresc.count("[do uzupełnienia]") < 3:
+                czesci.append(tresc)
+        except OSError:
+            pass
+
     if not czesci:
         return ""
 
