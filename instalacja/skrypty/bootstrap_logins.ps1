@@ -5,9 +5,11 @@
 # czeka na potwierdzenie, zamyka otwarte przez siebie okno i zapisuje stan do
 # app/runs/logins_status.json.
 #
-# Konta (dwa profile logowania wg ustalen):
-#   - KONTO CHMUROWE (firmowe) - Microsoft 365 / OneDrive, glowny profil pracy.
-#   - KONTO PERSONALNE - drugi profil w VS Code (Settings Sync / GitHub).
+# Konta:
+#   - VS Code: JEDNO konto (GitHub) - repozytoria + Settings Sync. Wystarcza;
+#     nie trzeba logowac Microsoft 365 do samego edytora.
+#   - Microsoft 365 (firmowe): logowanie w PRZEGLADARCE (mail/SharePoint/OneDrive),
+#     osobno od VS Code - dostep do danych idzie przez Graph, nie przez edytor.
 #
 # Plik w ASCII (bez polskich znakow) - patrz app/README.md, uwaga o BOM w PS 5.1.
 #
@@ -32,11 +34,8 @@ $logins = @(
     @{ Key = "claude_code";   Name = "Claude Code (CLI)";
        Info = "Otwieram terminal z poleceniem `claude` - zaloguj sie na subskrypcje. To naped glownego modelu agenta.";
        Terminal = "claude"; Proc = @("WindowsTerminal", "powershell", "pwsh") }
-    @{ Key = "vscode_cloud";  Name = "VS Code - konto CHMUROWE (firmowe)";
-       Info = "Otworz VS Code, LEWY dolny rog (ikona konta) -> Sign in. Zaloguj konto firmowe (Microsoft 365).";
-       App = "code"; Proc = @("Code") }
-    @{ Key = "vscode_personal"; Name = "VS Code - konto PERSONALNE";
-       Info = "W VS Code dodaj drugie konto: LEWY dolny rog (ikona konta) -> Sign in - personalne, do Settings Sync / GitHub.";
+    @{ Key = "vscode"; Name = "VS Code - zaloguj (GitHub)";
+       Info = "Otworz VS Code, LEWY dolny rog (ikona konta) -> Sign in. Jedno konto wystarcza: GitHub daje dostep do repozytoriow i Settings Sync.";
        App = "code"; Proc = @("Code") }
     @{ Key = "microsoft365";  Name = "Microsoft 365 (chmura) w przegladarce";
        Info = "Zaloguj konto firmowe - mail, SharePoint, OneDrive. Czesc pracy idzie przez interfejs, nie tylko API.";
@@ -79,6 +78,24 @@ function Open-Terminal($command) {
     }
 }
 
+function Resolve-AppPath($app) {
+    # Pelna sciezka .exe aplikacji: najpierw PATH (Get-Command), potem rejestr
+    # App Paths (tak Windows znajduje np. Excela, ktorego NIE MA w PATH - realnie
+    # napotkane: 'Get-Command excel' zwraca brak, a Excel jest w
+    # C:\Program Files\Microsoft Office\Root\Office16\EXCEL.EXE, wpisany w App Paths).
+    $cmd = Get-Command $app -ErrorAction SilentlyContinue
+    if ($cmd -and $cmd.Source) { return $cmd.Source }
+    $exe = if ($app -like "*.exe") { $app } else { "$app.exe" }
+    foreach ($root in @("HKLM:", "HKCU:")) {
+        $key = "$root\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\$exe"
+        if (Test-Path $key) {
+            $val = (Get-ItemProperty -Path $key -ErrorAction SilentlyContinue).'(default)'
+            if ($val -and (Test-Path $val)) { return $val }
+        }
+    }
+    return $null
+}
+
 function Get-WindowPids($names) {
     # Id procesow o podanych nazwach - "zdjecie" PRZED otwarciem, zeby pozniej
     # rozpoznac, ktore okno otworzyl ten skrypt.
@@ -104,7 +121,7 @@ function Close-NewWindows($names, $beforePids) {
 }
 
 Write-Host "=== Przewodnik po logowaniach ==="
-Write-Host "Dwa profile: KONTO CHMUROWE (firmowe) oraz KONTO PERSONALNE."
+Write-Host "Przejdziemy po kolei. Po kazdym potwierdzeniu zamykam otwarte okno i ide dalej."
 Write-Host ""
 
 if ($NonInteractive) {
@@ -133,8 +150,9 @@ foreach ($l in $logins) {
         Write-Host ("    Otwieram: $($l.Url)")
         Start-Process $l.Url
     } elseif ($l.App) {
-        if (Get-Command $l.App -ErrorAction SilentlyContinue) { Start-Process $l.App }
-        else { Write-Host ("    (Aplikacja '$($l.App)' niedostepna w PATH - otworz recznie)") -ForegroundColor Yellow }
+        $exe = Resolve-AppPath $l.App
+        if ($exe) { Write-Host ("    Otwieram: $exe"); Start-Process $exe }
+        else { Write-Host ("    (Nie znalazlem '$($l.App)' - otworz recznie)") -ForegroundColor Yellow }
     }
     # Czekamy na JEDNOZNACZNA odpowiedz - dopiero wtedy przechodzimy dalej.
     # Przypadkowy Enter / bledny znak nie pomija kroku (pyta ponownie).
