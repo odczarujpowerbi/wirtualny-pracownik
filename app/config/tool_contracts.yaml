@@ -11,8 +11,12 @@
 #   allowed_roots — katalogi (względem app/), w których narzędziu wolno operować
 #                   na plikach; ścieżka poza nimi = odmowa. Pomiń, gdy narzędzie
 #                   nie dotyka plików.
-#   params        — schemat parametrów: required (bool) + type (path/string/bool/number)
-#                   Parametr type=path jest sprawdzany wobec allowed_roots.
+#   allowed_domains — hosty, do których narzędziu wolno sięgnąć przez sieć (dokładnie
+#                   albo jako subdomena). Odpowiednik allowed_roots dla internetu;
+#                   brak wpisu = narzędzie nie może pobrać niczego.
+#   params        — schemat parametrów: required (bool) + type (path/url/string/bool/number)
+#                   Parametr type=path jest sprawdzany wobec allowed_roots,
+#                   type=url wobec allowed_domains (i musi być https).
 
 tools:
   validate_pbip:
@@ -35,6 +39,33 @@ tools:
       out_dir:
         required: false
         type: path
+
+  fetch_url:
+    risk: green
+    description: >
+      Pobranie informacji ze strony/API przez HTTPS GET (read-only, bez wysyłania
+      danych). Allowlista hostów jest jedynym źródłem prawdy — dopisanie nowego
+      źródła to świadoma decyzja właściciela, nie decyzja modelu.
+    allowed_domains:
+      - api.nbp.pl                # kursy walut NBP (dane publiczne, stabilne API)
+      - pl.wikipedia.org          # kontekst merytoryczny (REST API i strony)
+      - en.wikipedia.org
+      - api.open-meteo.com        # pogoda (bez klucza API)
+      - learn.microsoft.com       # dokumentacja Power BI / Microsoft 365
+      - powerbi.microsoft.com     # blog i ogloszenia produktowe Power BI
+    # Czytelne nazwy źródeł do stopki materiału dla odbiorcy — surowy adres API
+    # jest dla człowieka nieczytelny (uwaga z odbioru biznesowego).
+    source_names:
+      api.nbp.pl: Narodowy Bank Polski, tabela kursów średnich (A)
+      pl.wikipedia.org: Wikipedia (wersja polska)
+      en.wikipedia.org: Wikipedia (wersja angielska)
+      api.open-meteo.com: Open-Meteo, publiczne dane pogodowe
+      learn.microsoft.com: Microsoft Learn, dokumentacja produktowa
+      powerbi.microsoft.com: Microsoft, blog produktowy Power BI
+    params:
+      url:
+        required: true
+        type: url
 
   open_pbip_capture:
     risk: yellow

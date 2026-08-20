@@ -12,6 +12,7 @@ action_risk:
   read_report: green
   screenshot: green
   draft_comment: green
+  fetch_url: green          # HTTPS GET z allowlisty hostow (tool_contracts.yaml) — czysty odczyt
 
   git_commit_branch: yellow
   update_crm_record: yellow

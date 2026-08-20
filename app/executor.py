@@ -13,11 +13,15 @@ listy ścieżek — źródłem prawdy jest kontrakt.
 """
 
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pbi_desktop_bridge
 import pbip_validate
 import screenshot_capture
 import tool_registry
+import validator_prompt
+import web_answer
+import web_fetch_worker
 
 
 def execute(task):
@@ -30,6 +34,8 @@ def execute(task):
         return _run_screenshot_capture(task)
     if action == "open_pbip_capture":
         return _run_pbip_capture(task)
+    if action == "fetch_url":
+        return _run_web_fetch(task)
     return None
 
 
@@ -125,6 +131,108 @@ def _run_pbip_capture(task):
                                 "Otwarcie/zrzut raportu nie powiodły się.")
     result["tool"] = "open_pbip_capture"
     return result
+
+
+def _run_web_fetch(task):
+    """Pobranie informacji z internetu (read-only GET). Allowlista hostów siedzi
+    w kontrakcie `fetch_url` — executor nie trzyma własnej listy, tak samo jak
+    przy ścieżkach plików.
+
+    Treść z internetu jest z definicji NIEZAUFANA, więc zanim trafi do modelu
+    przechodzi przez kontrolę wstrzyknięcia instrukcji. Wykrycie = odmowa
+    z eskalacją, nie 'ostrzeżenie w raporcie'."""
+    url = task.get("url") or task.get("source_file_link")
+    check = tool_registry.check_call("fetch_url", {"url": url})
+    if not check["allowed"]:
+        return _refused(check["reason"], tool="fetch_url")
+
+    contract = tool_registry.get_contract("fetch_url") or {}
+    result = web_fetch_worker.fetch(url, allowed_hosts=tool_registry.allowed_domains(contract))
+    if not result["available"]:
+        # Niepowodzenie pobrania to luka dostępności źródła, nie odmowa
+        # bezpieczeństwa — idzie przez bramkę uczciwie, z powodem.
+        return {"cost_usd": 0.0, "tool": "fetch_url", "executed": True,
+                "acceptance_notes": f"Nie udało się pobrać danych z {url}. Szczegół: {result['detail']}",
+                "output": _web_signature(result)}
+
+    safety = validator_prompt.check_prompt_safety(result["text"][:4000])
+    if not safety["safe"]:
+        return _refused(
+            f"Pobrana treść z '{url}' wygląda na próbę wstrzyknięcia instrukcji "
+            f"({safety['detail']}) — treść NIE jest podawana dalej do modelu. Plik: {result['saved_path']}",
+            tool="fetch_url")
+
+    # Samo pobranie to jeszcze nie wykonanie zadania — model odpowiada na pytanie
+    # z tytułu zadania na podstawie treści. Bez tego kroku odbiór biznesowy
+    # słusznie odrzuca surowy JSON jako "efekt" (realny werdykt Bożeny).
+    answer = web_answer.answer(task.get("title", ""), result["text"], url=url)
+
+    return {
+        "cost_usd": answer.get("cost_usd", 0.0),
+        "tool": "fetch_url",
+        "executed": True,
+        "acceptance_notes": _build_web_report(result, answer),
+        "output": _web_signature(result),
+        "functional_checks": [
+            {"name": "Pobrana treść zapisana na dysku", "type": "nonempty_file", "target": result["saved_path"]},
+        ],
+        # Bartek porównuje SYGNATURY, więc rerun musi zwracać dokładnie ten sam
+        # kształt co `output` — inaczej każde zadanie wygląda na niedeterministyczne
+        # (realnie napotkane na pierwszym przebiegu).
+        "rerun": lambda: _web_signature(web_fetch_worker.fetch(
+            url, allowed_hosts=tool_registry.allowed_domains(tool_registry.get_contract("fetch_url") or {}))),
+    }
+
+
+def _web_signature(result):
+    """Sygnatura pobrania do kontroli regresji (Bartek): CO odpowiedziało źródło,
+    a nie co dokładnie było w treści. Żywe strony zmieniają w każdej odpowiedzi
+    identyfikatory i znaczniki czasu (np. pole `tid` w API Wikipedii), więc
+    porównywanie pełnej treści dawałoby stały fałszywy alarm 'niedeterminizm'.
+    Merytoryczną zawartość ocenia Franek (plik) i Bożena (odbiór)."""
+    if not result.get("available"):
+        return {"available": False, "url": result.get("url"), "detail": result.get("detail")}
+    return {
+        "available": True,
+        "url": result["url"],
+        "final_url": result["final_url"],
+        "human_url": result.get("human_url"),
+        "status": result["status"],
+        "content_type": result["content_type"],
+        "title": result["title"],
+    }
+
+
+def _source_label(result):
+    """Opis źródła dla człowieka: nazwa instytucji z kontraktu + klikalny link
+    w nawiasie. Sam adres API jest dla odbiorcy nieczytelny — realna uwaga
+    z odbioru biznesowego ("chcę 'NBP, tabela nr ...', link może być w nawiasie")."""
+    link = result.get("human_url") or result.get("url") or ""
+    host = urlparse(link).hostname or ""
+    nazwy = (tool_registry.get_contract("fetch_url") or {}).get("source_names") or {}
+    nazwa = nazwy.get(host)
+    return f"{nazwa} ({link})" if nazwa else link
+
+
+def _build_web_report(result, answer=None):
+    """Materiał dla ODBIORCY: odpowiedź na zadanie + klikalne źródło i data pobrania.
+    Dane techniczne (status HTTP, rozmiar, lokalna ścieżka pliku) celowo NIE trafiają
+    tutaj — odbiór biznesowy słusznie zauważył, że w materiale dla klienta nie mają
+    czego szukać, a ścieżka ujawnia strukturę katalogów maszyny. Zostają w `output`
+    i w kontroli funkcjonalnej, czyli tam, gdzie służą audytowi."""
+    stopka = f"Źródło: {_source_label(result)}, pobrano {result.get('fetched_at', 'dziś')}."
+
+    if answer and answer.get("available"):
+        return f"{answer['answer']}\n\n{stopka}"
+
+    powod = answer["detail"] if answer else "brak modelu"
+    return "\n".join([
+        f"UWAGA: nie udało się opracować odpowiedzi modelem ({powod}) — poniżej surowa treść źródła.",
+        "",
+        result["text"][:1500],
+        "",
+        stopka,
+    ])
 
 
 def _build_report(project_dir, result, passed):

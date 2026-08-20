@@ -27,7 +27,7 @@ _GREEN_KEYWORDS = (
     "raport tylko do odczytu", "wylistuj", "policz",
 )
 # Akcje workerów, które są z definicji read-only (zielone) niezależnie od tytułu.
-_GREEN_ACTIONS = {"validate_pbip", "read_report", "capture_screenshot"}
+_GREEN_ACTIONS = {"validate_pbip", "read_report", "capture_screenshot", "fetch_url"}
 
 
 def _haystack(task):
