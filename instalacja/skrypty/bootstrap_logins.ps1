@@ -16,18 +16,22 @@
 param([switch]$NonInteractive)
 
 $ErrorActionPreference = "Stop"
-$statusPath = Join-Path $PSScriptRoot "runs\logins_status.json"
+# Stan to plik runtime -> app/runs/ (w .gitignore). NIE do instalacja/skrypty/runs/,
+# bo tamta sciezka jest sledzona przez git (konflikt przy git pull - patrz CLAUDE.md).
+$statusPath = Join-Path $PSScriptRoot "..\..\app\runs\logins_status.json"
 
 # Kazda pozycja: nazwa, instrukcja, opcjonalny URL do otwarcia w przegladarce
 # albo aplikacja do uruchomienia.
 $logins = @(
     @{ Key = "claude_code";   Name = "Claude Code (CLI)";
-       Info = "W terminalu wpisz: claude   i zaloguj sie na subskrypcje. To naped glownego modelu agenta." }
+       Info = "Otwieram terminal z poleceniem `claude` - zaloguj sie na subskrypcje. To naped glownego modelu agenta.";
+       Terminal = "claude" }
     @{ Key = "vscode_cloud";  Name = "VS Code - konto CHMUROWE (firmowe)";
        Info = "Otworz VS Code, prawy dolny rog -> Accounts -> Sign in. Zaloguj konto firmowe (Microsoft 365).";
        App = "code" }
     @{ Key = "vscode_personal"; Name = "VS Code - konto PERSONALNE";
-       Info = "W VS Code dodaj drugie konto (Accounts -> Sign in) - personalne, do Settings Sync / GitHub." }
+       Info = "W VS Code dodaj drugie konto (Accounts -> Sign in) - personalne, do Settings Sync / GitHub.";
+       App = "code" }
     @{ Key = "microsoft365";  Name = "Microsoft 365 (chmura) w przegladarce";
        Info = "Zaloguj konto firmowe - mail, SharePoint, OneDrive. Czesc pracy idzie przez interfejs, nie tylko API.";
        Url = "https://www.office.com/" }
@@ -58,6 +62,17 @@ function Save-Status($done) {
         ConvertTo-Json -Depth 4 | Set-Content -Path $statusPath -Encoding UTF8
 }
 
+function Open-Terminal($command) {
+    # Otwiera NOWE okno terminala i uruchamia w nim polecenie, zostawiajac je
+    # otwarte (uzytkownik loguje sie interaktywnie, np. `claude`). Preferuje
+    # Windows Terminal (wt); gdy go nie ma - zwykly PowerShell.
+    if (Get-Command wt -ErrorAction SilentlyContinue) {
+        Start-Process "wt" -ArgumentList "powershell -NoExit -Command $command"
+    } else {
+        Start-Process "powershell" -ArgumentList "-NoExit", "-Command", $command
+    }
+}
+
 Write-Host "=== Przewodnik po logowaniach ==="
 Write-Host "Dwa profile: KONTO CHMUROWE (firmowe) oraz KONTO PERSONALNE."
 Write-Host ""
@@ -78,13 +93,22 @@ foreach ($l in $logins) {
     $num++
     Write-Host ("`n[$num/$($logins.Count)] $($l.Name)") -ForegroundColor Cyan
     Write-Host ("    $($l.Info)")
-    if ($l.Url) {
+    if ($l.Terminal) {
+        Write-Host ("    Otwieram terminal i uruchamiam: $($l.Terminal)")
+        Open-Terminal $l.Terminal
+    } elseif ($l.Url) {
         Write-Host ("    Otwieram: $($l.Url)")
         Start-Process $l.Url
     } elseif ($l.App) {
         if (Get-Command $l.App -ErrorAction SilentlyContinue) { Start-Process $l.App }
+        else { Write-Host ("    (Aplikacja '$($l.App)' niedostepna w PATH - otworz recznie)") -ForegroundColor Yellow }
     }
-    $ans = Read-Host "    Zalogowane? [t=tak / p=pomin / q=przerwij]"
+    # Czekamy na JEDNOZNACZNA odpowiedz - dopiero wtedy przechodzimy dalej.
+    # Przypadkowy Enter / bledny znak nie pomija kroku (pyta ponownie).
+    $ans = ""
+    while ($ans -notin @("t", "p", "q")) {
+        $ans = (Read-Host "    Zalogowane? [t=tak / p=pomin / q=przerwij]").ToLower().Trim()
+    }
     if ($ans -eq "q") { Write-Host "Przerwano."; break }
     if ($ans -eq "t") { $done += $l.Key; Write-Host "    OK" -ForegroundColor Green }
     else { Write-Host "    Pominieto" -ForegroundColor Yellow }
