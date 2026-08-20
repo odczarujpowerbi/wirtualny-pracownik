@@ -21,12 +21,39 @@ Użycie:
 """
 
 import sys
+from pathlib import Path
+from urllib.parse import urlparse
+
+import yaml
 
 import cost_estimator
 import env_bootstrap  # noqa: F401 — UTF-8 na stdout (Windows)
 import task_thinker
 
 MAX_CONTENT_CHARS = 12_000
+SKILL_PATH = Path(__file__).parent / "skills" / "web_research_operations.yaml"
+
+
+def wskazowki_zrodla(url, path=SKILL_PATH):
+    """Wiedza ze skilla web_research_operations: reguły ogólne + reguły dla TEGO
+    źródła. Skill jest konfiguracją, nie kodem — dopisanie reguły działa od razu,
+    bez wdrożenia. Brak/uszkodzony plik nie może wywalić workera, więc zwracamy
+    pusty tekst i pracujemy dalej na samych regułach ogólnych promptu."""
+    try:
+        dane = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        return ""
+
+    linie = list(dane.get("ogolne") or [])
+    host = (urlparse(url or "").hostname or "").lower()
+    # W url bywa OPIS źródła (np. "Narodowy Bank Polski — https://..."), nie sam
+    # adres, więc dopasowujemy też po nazwie hosta zawartej w tekście.
+    for klucz, wpis in (dane.get("zrodla") or {}).items():
+        if host == klucz or host.endswith("." + klucz) or klucz in (url or ""):
+            linie += list((wpis or {}).get("wskazowki") or [])
+    if not linie:
+        return ""
+    return "\n".join(f"- {w}" for w in linie)
 
 PROMPT = """Jesteś asystentem, który odpowiada na pytanie WYŁĄCZNIE na podstawie treści pobranej ze źródła.
 
@@ -61,16 +88,48 @@ wcześniejszej wersji odpowiedzi:
 - Nie pisz, czego NIE ma.
 - Nie rozdmuchuj jednego zdania na kilka punktów i nie powtarzaj w punktach tego, co już
   napisałeś w odpowiedzi. Lepiej 3 konkretne punkty niż 5 pustych.
+- Jedno zdanie = jedna myśl. Żadnych zdań na cztery linijki z wtrąceniami w nawiasach.
+- Odbiorca jest nietechniczny. Nie używaj żargonu ("modele tabelaryczne", "kolumny
+  obliczeniowe", "zabezpieczenia na poziomie wiersza") bez wyjaśnienia, co z niego wynika
+  w praktyce. Zamiast nazwy mechanizmu napisz, co dzięki niemu można zrobić.
+- Żadnych angielskich wstawek ani przykładów kodu po angielsku w materiale po polsku.
+- Nie dosypuj technikaliów spoza pytania. Jeśli masz ograniczoną liczbę zdań, każde ma
+  odpowiadać na zadane pytanie, a nie opisywać powiązane narzędzia.
+- Napisz też, PO CO to odbiorcy w praktyce — jedno zdanie o realnym zastosowaniu.
+  UWAGA: ta reguła ustępuje formatowi z zadania. Gdy zadanie ogranicza długość
+  ("jedno zdanie", "trzy zdania"), podaj sam fakt i nic więcej.
+- Nigdy nie doradzaj zastosowań prawnych, podatkowych ani rozliczeniowych (faktury, VAT,
+  umowy, przeliczenia księgowe), nawet jeśli wydają się oczywiste. To obszar, w którym
+  drobna nadinterpretacja jest błędem merytorycznym — a nikt o nią nie prosił.
+
 - Konkret zamiast ogólnika: napisz, co narzędzie/dane realnie robią i do czego służą
   (np. "raporty i pulpity, udostępniane w organizacji"), a nie "jest przyjazny dla użytkownika".
 - Daty zapisuj po polsku w formacie DD.MM.RRRR (np. 20.08.2026), nigdy 2026-08-20.
 - Nie dopisuj wiedzy spoza treści. Nie używaj technicznych kluczy JSON jako odpowiedzi —
-  przetłumacz je na normalne zdania."""
+  przetłumacz je na normalne zdania.
+- Nie dopisuj pod odpowiedzią źródła, daty pobrania ani żadnej stopki — pochodzenie danych
+  dokleja system w osobnym polu.
+
+GDY TREŚĆ NIE ODPOWIADA NA ZADANIE (pobrano nie to źródło, artykuł o czym innym,
+dane nie zawierają szukanej informacji) — NIE pisz namiastki odpowiedzi ani ogólników.
+Zwróć wtedy dokładnie jedną linię w formacie:
+BRAK_ODPOWIEDZI_W_ZRODLE: <czego konkretnie brakuje i czego zamiast tego dotyczy treść>
+
+WSKAZÓWKI DO TEGO KONKRETNEGO ŹRÓDŁA (wiedza zebrana z wcześniejszych odbiorów):
+{wskazowki}
+
+PIERWSZEŃSTWO REGUŁ, gdy się kłócą:
+1. Format i długość zamówione w zadaniu.
+2. Zakaz treści spoza pobranego źródła.
+3. Reszta zasad redakcyjnych powyżej."""
 
 
-def answer(question, content, url="", ask=None):
+def answer(question, content, url="", zrodlo_opis=None, ask=None):
     """Zwraca {available, answer, cost_usd, source, detail}. Nigdy nie rzuca.
 
+    url: techniczny adres źródła — po nim dobierane są wskazówki ze skilla.
+    zrodlo_opis: czytelny opis do promptu ("Narodowy Bank Polski, tabela A"); gdy brak,
+        model widzi sam adres.
     ask: wstrzykiwane wołanie modelu (test dymny nie rusza modelu ani sieci)."""
     ask = ask or task_thinker.ask_model
     content = (content or "").strip()
@@ -79,7 +138,10 @@ def answer(question, content, url="", ask=None):
                 "detail": "Brak treści do analizy — nie ma na czym oprzeć odpowiedzi."}
 
     trimmed = content[:MAX_CONTENT_CHARS]
-    prompt = PROMPT.format(question=question or "Streść pobraną treść.", url=url or "nieznane", content=trimmed)
+    prompt = PROMPT.format(question=question or "Streść pobraną treść.",
+                           url=zrodlo_opis or url or "nieznane",
+                           content=trimmed,
+                           wskazowki=wskazowki_zrodla(url) or "- (brak dodatkowych wskazówek dla tego źródła)")
 
     try:
         result = ask(prompt)

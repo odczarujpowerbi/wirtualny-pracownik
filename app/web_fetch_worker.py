@@ -159,6 +159,16 @@ def _save(url, text):
     return str(path)
 
 
+def prefer_polish_variant(url):
+    """Dokumentacja Microsoft Learn ma wersje jezykowe pod tym samym adresem
+    (/en-us/ -> /pl-pl/). Do materialu po polsku odbior biznesowy sluszznie chce
+    polskiego zrodla, wiec proponujemy wariant PL — wywolujacy sprawdza, czy
+    istnieje, i wraca do oryginalu, gdy go nie ma."""
+    if "learn.microsoft.com/en-us/" in (url or ""):
+        return url.replace("/en-us/", "/pl-pl/")
+    return None
+
+
 def human_url(url):
     """Adres do POKAZANIA człowiekowi. Odbiór biznesowy słusznie zauważył, że
     link do API REST jest bezużyteczny dla odbiorcy raportu ("jak szef zapyta
@@ -175,7 +185,8 @@ def _unavailable(url, detail):
             "status": None, "title": "", "text": "", "saved_path": None}
 
 
-def fetch(url, allowed_hosts=(), timeout=TIMEOUT_SECONDS, max_bytes=MAX_BYTES, opener=None):
+def fetch(url, allowed_hosts=(), timeout=TIMEOUT_SECONDS, max_bytes=MAX_BYTES, opener=None,
+          try_polish=True):
     """Pobiera stronę/API i zwraca ustrukturyzowany wynik. Nigdy nie rzuca —
     problem sieci/HTTP wraca jako available=False z powodem.
 
@@ -196,6 +207,14 @@ def fetch(url, allowed_hosts=(), timeout=TIMEOUT_SECONDS, max_bytes=MAX_BYTES, o
         opener = urllib.request.build_opener(
             urllib.request.HTTPSHandler(context=context),
             _GuardedRedirectHandler(allowed_hosts))
+
+    # Wariant polski dokumentacji MS, gdy istnieje — nie wszystkie strony maja
+    # tlumaczenie, wiec brak wariantu po prostu zostawia oryginal.
+    if try_polish and (wariant := prefer_polish_variant(url)):
+        po_polsku = fetch(wariant, allowed_hosts=allowed_hosts, timeout=timeout,
+                          max_bytes=max_bytes, opener=opener, try_polish=False)
+        if po_polsku["available"]:
+            return po_polsku
 
     request = urllib.request.Request(url, headers={
         "User-Agent": USER_AGENT,

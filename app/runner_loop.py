@@ -181,6 +181,11 @@ def _process_task_core(task, policy, routing, client):
     state_store.upsert_task(task_id, payload=task, status=status, assigned_to=owner, risk_level=risk, now=now_iso())
     state_store.record_event(task_id, "status_set", status, now_iso())
 
+    # Pochodzenie danych: metadane komentarza, nie część dostarczonego materiału.
+    source_note = execution_result.get("source_note")
+    if source_note:
+        comment += "\n\n📎 Źródło: " + source_note
+
     reasoning = execution_result.get("thinking", {}).get("reasoning")
     if reasoning:
         comment += "\n\n🧠 Analiza (Claude):\n" + reasoning

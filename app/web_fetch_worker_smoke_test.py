@@ -175,7 +175,7 @@ def run():
                 "available": True, "url": url, "final_url": url, "status": 200,
                 "content_type": "application/json", "title": "", "text": '{"mid": 4.3165}',
                 "bytes": 15, "truncated": False, "saved_path": str(plik), "detail": "OK"}
-            executor.web_answer.answer = lambda question, content, url="", ask=None: {
+            executor.web_answer.answer = lambda question, content, url="", zrodlo_opis=None, ask=None: {
                 "available": True, "answer": "Kurs EUR: 4,3165 zł.", "cost_usd": 0.001,
                 "source": "atrapa", "detail": "OK"}
 

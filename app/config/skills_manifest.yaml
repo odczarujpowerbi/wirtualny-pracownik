@@ -3,6 +3,13 @@
 # wdrożenie, nie zaszyta w kodzie.
 
 skills:
+  - name: web_research_operations
+    version: "0.1.0"
+    risk: green
+    description: >
+      Wiedza, jak korzystać z każdego źródła internetowego z allowlisty (skills/web_research_operations.yaml):
+      dobór właściwego okresu danych, jednostki i zaokrąglenia, czego nie wolno dopowiadać.
+      Wstrzykiwana do promptu przez web_answer.py; hydraulika w web_fetch_worker.py
   - name: pbip_validate
     version: "0.1.0"
     risk: green

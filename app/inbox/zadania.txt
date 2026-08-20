@@ -19,3 +19,21 @@
 # Przejrzyj notatki ze spotkania i wypisz zadania !yellow
 # Zwiększ budżet kampanii Meta Ads !red
 # ============================================================
+Podaj aktualny kurs EUR wedlug NBP wraz z data notowania i numerem tabeli @ https://api.nbp.pl/api/exchangerates/rates/a/eur/?format=json
+Wypisz kluczowe fakty o Power BI na podstawie Wikipedii: co to jest, producent, do czego sluzy @ https://pl.wikipedia.org/api/rest_v1/page/summary/Power_BI
+Podaj kurs EUR z NBP: wartosc, data notowania, numer tabeli @ https://api.nbp.pl/api/exchangerates/rates/a/eur/?format=json
+Krotko: czym jest Power BI, kto jest producentem, do czego sluzy @ https://pl.wikipedia.org/api/rest_v1/page/summary/Power_BI
+Jaki jest dzis kurs EUR wedlug NBP @ https://api.nbp.pl/api/exchangerates/rates/a/eur/?format=json
+Power BI w trzech zdaniach dla klienta: co to, czyj produkt, do czego @ https://pl.wikipedia.org/api/rest_v1/page/summary/Power_BI
+Podaj kurs USD z NBP na dzis @ https://api.nbp.pl/api/exchangerates/rates/a/usd/?format=json
+Power BI - dokladnie trzy zdania dla klienta: co to, czyj produkt, do czego sluzy @ https://pl.wikipedia.org/api/rest_v1/page/summary/Power_BI
+Podaj prognoze temperatury dla Warszawy na dzis (max i min) @ https://api.open-meteo.com/v1/forecast?latitude=52.23&longitude=21.01&daily=temperature_2m_max,temperature_2m_min&timezone=Europe/Warsaw
+Podaj kurs CHF wedlug NBP: wartosc, data, numer tabeli @ https://api.nbp.pl/api/exchangerates/rates/a/chf/?format=json
+Wyjasnij w 4 zdaniach czym jest jezyk DAX i do czego sluzy @ https://learn.microsoft.com/en-us/dax/dax-overview
+Czym jest Power Query - krotko, po polsku @ https://en.wikipedia.org/api/rest_v1/page/summary/Power_Query
+Wyjasnij prosto w 4 zdaniach czym jest DAX i po co go uzywac w raportach @ https://learn.microsoft.com/en-us/dax/dax-overview
+Kurs euro NBP z dzisiaj - jedno zdanie dla klienta @ https://api.nbp.pl/api/exchangerates/rates/a/eur/?format=json
+Kurs euro NBP z dzisiaj - dokladnie jedno zdanie, sam kurs i data @ https://api.nbp.pl/api/exchangerates/rates/a/eur/?format=json
+Prognoza pogody dla Krakowa na dzis: temperatura max i min, dwa zdania @ https://api.open-meteo.com/v1/forecast?latitude=50.06&longitude=19.94&daily=temperature_2m_max,temperature_2m_min&timezone=Europe/Warsaw
+Kurs euro NBP - dokladnie jedno zdanie dla klienta, sam kurs i data @ https://api.nbp.pl/api/exchangerates/rates/a/eur/?format=json
+Czym jest Microsoft Fabric - trzy zdania dla klienta @ https://en.wikipedia.org/api/rest_v1/page/summary/Microsoft_Fabric

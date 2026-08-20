@@ -59,9 +59,40 @@ def run():
     checks.append(("Wyjątek modelu jest łapany, nie wywala workera",
                    wyjatek["available"] is False and "RuntimeError" in wyjatek["detail"]))
 
+    # Mierzymy SAMĄ treść w prompcie (liczba znaków 'x'), nie długość całego
+    # promptu — ta rośnie z każdą nową regułą redakcyjną i dawała kruche czerwone.
     dluga = web_answer.answer("Pytanie", "x" * (web_answer.MAX_CONTENT_CHARS + 5000), ask=_ask_ok)
-    checks.append(("Długa treść jest przycinana do limitu przed wysłaniem do modelu",
-                   dluga["available"] and len(_ask_ok.prompt) < web_answer.MAX_CONTENT_CHARS + 3000))
+    checks.append(("Długa treść jest przycinana dokładnie do limitu przed wysłaniem do modelu",
+                   dluga["available"] and _ask_ok.prompt.count("x") == web_answer.MAX_CONTENT_CHARS))
+
+    # --- skill web_research_operations: wiedza o źródłach trafia do promptu ---
+    # Skill jest plikiem YAML, a błąd składni (np. niecytowany dwukropek) degraduje
+    # się po cichu do "brak wskazówek" — realnie się zdarzyło, więc test pilnuje,
+    # że plik się parsuje I że wskazówki faktycznie wchodzą do promptu.
+    nbp = web_answer.wskazowki_zrodla("https://api.nbp.pl/api/exchangerates/rates/a/eur/")
+    checks.append(("Skill: wskazówki dla NBP wczytane (plik się parsuje)",
+                   "tabela A" in nbp.lower() or "ŚREDNI" in nbp))
+    checks.append(("Skill: reguły ogólne dołączane do każdego źródła", "DOKŁADNIE ten okres" in nbp))
+
+    pogoda = web_answer.wskazowki_zrodla("https://api.open-meteo.com/v1/forecast?x=1")
+    checks.append(("Skill: wskazówki dobierane po hoście źródła",
+                   "opad" in pogoda.lower() and "tabela A" not in pogoda.lower()))
+
+    obcy = web_answer.wskazowki_zrodla("https://nieznane-zrodlo.example/x")
+    checks.append(("Skill: nieznane źródło dostaje same reguły ogólne, bez wywrotki",
+                   "DOKŁADNIE ten okres" in obcy
+                   and "tabela A" not in obcy.lower() and "opad" not in obcy.lower()))
+
+    brak = web_answer.wskazowki_zrodla("https://api.nbp.pl/x", path="nie_ma_takiego_pliku.yaml")
+    checks.append(("Skill: brak pliku -> pusty tekst, nie wyjątek", brak == ""))
+
+    web_answer.answer("Pytanie", "tresc", url="https://api.open-meteo.com/v1/forecast", ask=_ask_ok)
+    checks.append(("Skill: wskazówki źródła są w prompcie wysłanym do modelu",
+                   "opad" in _ask_ok.prompt.lower()))
+    checks.append(("Opis źródła (nie surowy adres) idzie do promptu, gdy podany",
+                   web_answer.answer("P", "t", url="https://api.nbp.pl/api/x",
+                                     zrodlo_opis="Narodowy Bank Polski, tabela A", ask=_ask_ok)
+                   and "Narodowy Bank Polski, tabela A" in _ask_ok.prompt))
 
     print("\n--- Wynik testu dymnego web_answer ---")
     all_passed = True

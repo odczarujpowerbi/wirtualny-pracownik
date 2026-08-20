@@ -12,6 +12,7 @@ kontraktu = worker nie wykonuje nic (fail-closed). Executor nie trzyma już wła
 listy ścieżek — źródłem prawdy jest kontrakt.
 """
 
+import re
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -34,8 +35,30 @@ def execute(task):
         return _run_screenshot_capture(task)
     if action == "open_pbip_capture":
         return _run_pbip_capture(task)
-    if action == "fetch_url":
+    if action == "fetch_url" or _url_from_task(task):
         return _run_web_fetch(task)
+    return None
+
+
+def _url_from_task(task):
+    """Adres źródła wyłuskany z treści zadania. Zadania z Projectly nie mają pola
+    'url' — niosą adres w tytule albo opisie. Bierzemy TYLKO adresy z allowlisty
+    kontraktu: dzięki temu zwykły link w opisie (SharePoint, załącznik) nie
+    uruchamia pobierania, a zadanie bez pasującego źródła idzie dotychczasową
+    ścieżką zamiast produkować odmowę."""
+    if task.get("url"):
+        return task["url"]
+    tekst = " ".join(str(task.get(p) or "") for p in ("title", "description", "expected_result",
+                                                      "acceptance_criteria", "source_file_link"))
+    domeny = tool_registry.allowed_domains(tool_registry.get_contract("fetch_url") or {})
+    # Przecinek MUSI być dozwolony w środku adresu — parametry API mają postać
+    # "daily=temperature_2m_max,temperature_2m_min,precipitation_sum". Wycinanie
+    # go z zakresu znaków ucinało adres w połowie, więc model dostawał inne dane
+    # niż zamówione (realnie: brak opadów i minimum w zadaniu o pogodzie).
+    for kandydat in re.findall(r"https://\S+", tekst):
+        kandydat = kandydat.rstrip(".,;:!?)\"']")
+        if web_fetch_worker.host_allowed(kandydat, domeny):
+            return kandydat
     return None
 
 
@@ -141,7 +164,7 @@ def _run_web_fetch(task):
     Treść z internetu jest z definicji NIEZAUFANA, więc zanim trafi do modelu
     przechodzi przez kontrolę wstrzyknięcia instrukcji. Wykrycie = odmowa
     z eskalacją, nie 'ostrzeżenie w raporcie'."""
-    url = task.get("url") or task.get("source_file_link")
+    url = _url_from_task(task)
     check = tool_registry.check_call("fetch_url", {"url": url})
     if not check["allowed"]:
         return _refused(check["reason"], tool="fetch_url")
@@ -165,13 +188,36 @@ def _run_web_fetch(task):
     # Samo pobranie to jeszcze nie wykonanie zadania — model odpowiada na pytanie
     # z tytułu zadania na podstawie treści. Bez tego kroku odbiór biznesowy
     # słusznie odrzuca surowy JSON jako "efekt" (realny werdykt Bożeny).
-    answer = web_answer.answer(task.get("title", ""), result["text"], url=url)
+    # Model dostaje OPIS źródła (np. "Narodowy Bank Polski, tabela kursów średnich (A)"),
+    # a nie surowy adres — dzięki temu może doprecyzować w odpowiedzi, czym są dane.
+    # Odbiór biznesowy słusznie pytał "to kurs średni, kupna czy sprzedaży?".
+    answer = web_answer.answer(task.get("title", ""), result["text"], url=url,
+                               zrodlo_opis=_source_label(result))
+
+    # Źródło nie zawiera odpowiedzi — oddawanie pustej treści ze stopką "pobrano
+    # dziś" sugerowałoby wykonaną pracę. Zamiast tego jasno mówimy, czego brakuje,
+    # i prosimy o wskazanie źródła (uwaga odbioru biznesowego: "zadanie zostało
+    # po prostu odłożone, nikt nie zapytał o inne źródło").
+    tresc = (answer.get("answer") or "").strip()
+    if answer.get("available") and tresc.startswith("BRAK_ODPOWIEDZI_W_ZRODLE"):
+        powod = tresc.split(":", 1)[1].strip() if ":" in tresc else tresc
+        return {
+            "cost_usd": answer.get("cost_usd", 0.0),
+            "tool": "fetch_url",
+            "executed": True,
+            "acceptance_notes": (f"NIE WYKONANO: wskazane źródło nie zawiera odpowiedzi na to zadanie. "
+                                 f"{powod} Proszę o wskazanie właściwego źródła — wtedy dokończę zadanie."),
+            "output": _web_signature(result),
+        }
 
     return {
         "cost_usd": answer.get("cost_usd", 0.0),
         "tool": "fetch_url",
         "executed": True,
         "acceptance_notes": _build_web_report(result, answer),
+        # Pochodzenie danych trafia do komentarza, NIE do materiału — odbiorca
+        # dostaje czysty tekst do przeklejenia, audyt i tak wie, skąd dane.
+        "source_note": f"{_source_label(result)}, pobrano {result.get('fetched_at', 'dziś')}.",
         "output": _web_signature(result),
         "functional_checks": [
             {"name": "Pobrana treść zapisana na dysku", "type": "nonempty_file", "target": result["saved_path"]},
@@ -211,7 +257,13 @@ def _source_label(result):
     host = urlparse(link).hostname or ""
     nazwy = (tool_registry.get_contract("fetch_url") or {}).get("source_names") or {}
     nazwa = nazwy.get(host)
-    return f"{nazwa} ({link})" if nazwa else link
+    # Adres endpointu API w materiale dla odbiorcy "wygląda technicznie i roboczo"
+    # (uwaga odbioru biznesowego) — link podajemy tylko wtedy, gdy da się go
+    # otworzyć i zrozumieć: bez /api/ i bez parametrów zapytania.
+    czytelny = link and "/api/" not in link and "?" not in link
+    if nazwa and czytelny:
+        return f"{nazwa} — {link}"
+    return nazwa or link
 
 
 def _build_web_report(result, answer=None):
@@ -223,7 +275,9 @@ def _build_web_report(result, answer=None):
     stopka = f"Źródło: {_source_label(result)}, pobrano {result.get('fetched_at', 'dziś')}."
 
     if answer and answer.get("available"):
-        return f"{answer['answer']}\n\n{stopka}"
+        # Separator oddziela materiał do wklejenia od metadanych o źródle —
+        # odbiór biznesowy chce czystą treść, ale audyt musi wiedzieć skąd dane.
+        return f"{answer['answer']}\n\n---\n{stopka}"
 
     powod = answer["detail"] if answer else "brak modelu"
     return "\n".join([

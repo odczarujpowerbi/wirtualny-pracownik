@@ -1,0 +1,55 @@
+# Skill: web_research_operations — WIEDZA, jak dobrze korzystać z każdego źródła
+# internetowego z allowlisty (hydraulika jest w web_fetch_worker.py, tu jest "jak").
+#
+# To jest konfiguracja firmy (SKALOWANIE.md sekcja 2): edytowalna bez zmiany kodu.
+# web_answer.py dokleja wskazówki pasujące do hosta źródła wprost do promptu, więc
+# każda reguła dopisana tutaj działa od następnego zadania — bez wdrożenia kodu.
+#
+# Każdy wpis to lekcja z realnego odrzucenia przez odbiór biznesowy, nie teoria.
+# UWAGA: wskazówki cytujemy pojedynczym apostrofem — bez tego dwukropek w zdaniu
+# wywraca parsowanie YAML, a skill po cichu przestaje działać (realnie napotkane).
+
+ogolne:
+  - 'Gdy dane obejmują kilka dni, pozycji albo notowań, wybierz DOKŁADNIE ten okres, o który pyta zadanie. Nigdy nie mieszaj dnia dzisiejszego z jutrzejszym w jednej odpowiedzi.'
+  - 'Nie podawaj większej dokładności niż mają dane. Prognoza pogody to "ok. 24 stopnie", nie "24,3 stopnia"; kursy walut podawaj dokładnie tak, jak publikuje NBP.'
+  - 'Jeśli odnosisz się do daty z danych, zapisz ją w formacie DD.MM.RRRR.'
+
+zrodla:
+  api.nbp.pl:
+    nazwa: 'Narodowy Bank Polski, tabela kursów średnich (A)'
+    wskazowki:
+      - 'Tabela A to kurs ŚREDNI — napisz to wprost, bo odbiorca musi wiedzieć, że to nie kurs kupna ani sprzedaży.'
+      - 'Podaj numer tabeli (pole "no") i datę notowania (pole "effectiveDate") — bez nich kursu nie da się zweryfikować w źródle.'
+      - 'Tabela jest publikowana w dni robocze około 12:15. Jeżeli data notowania jest wcześniejsza niż dzisiejsza, to jest ostatnie dostępne notowanie, nie błąd.'
+      - 'Nigdy nie doradzaj, do czego kurs zastosować (faktury, VAT, umowy) — do rozliczeń stosuje się inne kursy niż bieżący i to nie jest nasza decyzja.'
+
+  api.open-meteo.com:
+    nazwa: 'Open-Meteo, publiczne dane pogodowe'
+    wskazowki:
+      - 'Odpowiedź zawiera tablicę dni ("daily.time") — weź pozycję odpowiadającą dacie z zadania, zwykle pierwszą, i nie opisuj kolejnych dni.'
+      - 'Podawaj temperaturę maksymalną RAZEM z minimalną. Jedna liczba nie opisuje dnia.'
+      - 'Jeśli w danych są opady ("precipitation_sum"), zawsze o nich napisz — to pierwsza rzecz, o którą pyta odbiorca po temperaturze.'
+      - 'Zaokrąglaj temperatury do pełnych stopni.'
+
+  pl.wikipedia.org:
+    nazwa: 'Wikipedia (wersja polska)'
+    wskazowki:
+      - 'Streszczenie z API to kilka zdań wstępu, nie całe hasło — pisz z niego zwięźle i nie udawaj, że masz pełny artykuł.'
+      - 'Przy materiale dla klienta pisz własnymi słowami. Kalka encyklopedyczna typu "zbiorcza nazwa dla szeregu aplikacji i usług" brzmi ciężko i bywa odrzucana.'
+
+  en.wikipedia.org:
+    nazwa: 'Wikipedia (wersja angielska)'
+    wskazowki:
+      - 'Treść jest po angielsku, a materiał ma być po polsku — tłumacz, nie cytuj.'
+      - 'Sprawdź, czy artykuł faktycznie dotyczy tematu z zadania. Streszczenie potrafi wskazać stronę zbiorczą (listę produktów) zamiast szukanego hasła.'
+
+  learn.microsoft.com:
+    nazwa: 'Microsoft Learn, dokumentacja produktowa'
+    wskazowki:
+      - 'Dokumentacja jest pisana dla wdrożeniowców. Odbiorca biznesowy potrzebuje tłumaczenia na korzyść — co dzięki temu policzy albo zobaczy w raporcie.'
+      - 'Nie przenoś przykładów kodu ani angielskich nazw funkcji do materiału po polsku.'
+
+  powerbi.microsoft.com:
+    nazwa: 'Microsoft, blog produktowy Power BI'
+    wskazowki:
+      - 'To źródło marketingowe producenta — oddzielaj zapowiedzi ("wkrótce") od funkcji już dostępnych i pisz, co jest czym.'
