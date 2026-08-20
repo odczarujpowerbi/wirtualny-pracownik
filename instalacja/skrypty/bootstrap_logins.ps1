@@ -2,7 +2,8 @@
 # Nie wszystko da sie zrobic przez API: czesc pracy idzie przez interfejs
 # (Meta, Gmail), a VS Code / Claude Code loguje sie raz na konto. Ten skrypt
 # prowadzi krok po kroku: pokazuje CO zrobic, otwiera odpowiednia aplikacje/URL,
-# czeka na potwierdzenie i zapisuje stan do runs/logins_status.json.
+# czeka na potwierdzenie, zamyka otwarte przez siebie okno i zapisuje stan do
+# app/runs/logins_status.json.
 #
 # Konta (dwa profile logowania wg ustalen):
 #   - KONTO CHMUROWE (firmowe) - Microsoft 365 / OneDrive, glowny profil pracy.
@@ -20,33 +21,38 @@ $ErrorActionPreference = "Stop"
 # bo tamta sciezka jest sledzona przez git (konflikt przy git pull - patrz CLAUDE.md).
 $statusPath = Join-Path $PSScriptRoot "..\..\app\runs\logins_status.json"
 
-# Kazda pozycja: nazwa, instrukcja, opcjonalny URL do otwarcia w przegladarce
-# albo aplikacja do uruchomienia.
+# Procesy przegladarek, ktore krok URL moze otworzyc - do zamkniecia okna po
+# potwierdzeniu (zamykamy TYLKO okno otwarte przez ten skrypt, patrz Close-NewWindows).
+$browsers = @("chrome", "msedge", "firefox", "brave", "opera", "iexplore")
+
+# Kazda pozycja: nazwa, instrukcja, cel do otwarcia (Url / App / Terminal) oraz
+# Proc = nazwy procesow, ktorych NOWE okno zamykamy po potwierdzeniu (redukcja
+# liczby okienek - user prosil, zeby skrypt sprzatal po sobie).
 $logins = @(
     @{ Key = "claude_code";   Name = "Claude Code (CLI)";
        Info = "Otwieram terminal z poleceniem `claude` - zaloguj sie na subskrypcje. To naped glownego modelu agenta.";
-       Terminal = "claude" }
+       Terminal = "claude"; Proc = @("WindowsTerminal", "powershell", "pwsh") }
     @{ Key = "vscode_cloud";  Name = "VS Code - konto CHMUROWE (firmowe)";
-       Info = "Otworz VS Code, prawy dolny rog -> Accounts -> Sign in. Zaloguj konto firmowe (Microsoft 365).";
-       App = "code" }
+       Info = "Otworz VS Code, LEWY dolny rog (ikona konta) -> Sign in. Zaloguj konto firmowe (Microsoft 365).";
+       App = "code"; Proc = @("Code") }
     @{ Key = "vscode_personal"; Name = "VS Code - konto PERSONALNE";
-       Info = "W VS Code dodaj drugie konto (Accounts -> Sign in) - personalne, do Settings Sync / GitHub.";
-       App = "code" }
+       Info = "W VS Code dodaj drugie konto: LEWY dolny rog (ikona konta) -> Sign in - personalne, do Settings Sync / GitHub.";
+       App = "code"; Proc = @("Code") }
     @{ Key = "microsoft365";  Name = "Microsoft 365 (chmura) w przegladarce";
        Info = "Zaloguj konto firmowe - mail, SharePoint, OneDrive. Czesc pracy idzie przez interfejs, nie tylko API.";
-       Url = "https://www.office.com/" }
+       Url = "https://www.office.com/"; Proc = $browsers }
     @{ Key = "office_activate"; Name = "Office (Excel/Word) - AKTYWACJA licencji";
        Info = "Otworz Excela lub Worda, zaloguj sie kontem Microsoft 365 Business Standard - to aktywuje pakiet. Instalacja dziala bez logowania, ale bez aktywacji Office chodzi w trybie ograniczonym.";
-       App = "excel" }
+       App = "excel"; Proc = @("EXCEL") }
     @{ Key = "gmail";         Name = "Gmail / Google (przegladarka)";
        Info = "Zaloguj konto Google. Potrzebne, bo nie wszystko robimy przez API - czasem trzeba przez interfejs.";
-       Url = "https://accounts.google.com/" }
+       Url = "https://accounts.google.com/"; Proc = $browsers }
     @{ Key = "meta_business"; Name = "Meta Business (przegladarka)";
        Info = "Zaloguj Business Manager - kampanie i zmiany, ktore robimy przez interfejs Meta.";
-       Url = "https://business.facebook.com/" }
+       Url = "https://business.facebook.com/"; Proc = $browsers }
     @{ Key = "github";        Name = "GitHub (repozytoria stron)";
        Info = "Zaloguj GitHub w przegladarce i/lub w VS Code - repozytoria stron internetowych.";
-       Url = "https://github.com/login" }
+       Url = "https://github.com/login"; Proc = $browsers }
 )
 
 function Load-Status {
@@ -73,6 +79,30 @@ function Open-Terminal($command) {
     }
 }
 
+function Get-WindowPids($names) {
+    # Id procesow o podanych nazwach - "zdjecie" PRZED otwarciem, zeby pozniej
+    # rozpoznac, ktore okno otworzyl ten skrypt.
+    if (-not $names) { return @() }
+    @(Get-Process -ErrorAction SilentlyContinue |
+        Where-Object { $names -contains $_.Name } | Select-Object -ExpandProperty Id)
+}
+
+function Close-NewWindows($names, $beforePids) {
+    # Zamyka TYLKO nowe okna top-level (MainWindowHandle != 0) procesow z `names`,
+    # ktorych PID nie bylo w $beforePids - czyli te otwarte przez ten krok skryptu.
+    # Nie rusza okien, ktore user mial otwarte wczesniej (np. wlasna przegladarka).
+    if (-not $names) { return }
+    $new = @(Get-Process -ErrorAction SilentlyContinue | Where-Object {
+        ($names -contains $_.Name) -and ($beforePids -notcontains $_.Id) -and ($_.MainWindowHandle -ne 0)
+    })
+    if (-not $new) { return }
+    foreach ($p in $new) { try { [void]$p.CloseMainWindow() } catch {} }
+    Start-Sleep -Milliseconds 1200
+    foreach ($p in $new) {
+        try { $p.Refresh(); if (-not $p.HasExited) { $p.Kill() } } catch {}
+    }
+}
+
 Write-Host "=== Przewodnik po logowaniach ==="
 Write-Host "Dwa profile: KONTO CHMUROWE (firmowe) oraz KONTO PERSONALNE."
 Write-Host ""
@@ -93,6 +123,9 @@ foreach ($l in $logins) {
     $num++
     Write-Host ("`n[$num/$($logins.Count)] $($l.Name)") -ForegroundColor Cyan
     Write-Host ("    $($l.Info)")
+    # "Zdjecie" procesow PRZED otwarciem - po potwierdzeniu zamkniemy tylko to,
+    # co ten krok otworzyl (zeby nie robilo sie wiele okienek naraz).
+    $beforePids = Get-WindowPids $l.Proc
     if ($l.Terminal) {
         Write-Host ("    Otwieram terminal i uruchamiam: $($l.Terminal)")
         Open-Terminal $l.Terminal
@@ -112,6 +145,8 @@ foreach ($l in $logins) {
     if ($ans -eq "q") { Write-Host "Przerwano."; break }
     if ($ans -eq "t") { $done += $l.Key; Write-Host "    OK" -ForegroundColor Green }
     else { Write-Host "    Pominieto" -ForegroundColor Yellow }
+    # Zamknij okno otwarte przez ten krok, zanim przejdziemy do nastepnego.
+    Close-NewWindows $l.Proc $beforePids
 }
 
 Save-Status $done
