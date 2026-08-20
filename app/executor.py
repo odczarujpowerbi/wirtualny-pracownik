@@ -361,25 +361,23 @@ def _link_publiczny(host):
 
 
 def _build_web_report(result, answer=None):
-    """Materiał dla ODBIORCY: odpowiedź na zadanie + klikalne źródło i data pobrania.
-    Dane techniczne (status HTTP, rozmiar, lokalna ścieżka pliku) celowo NIE trafiają
-    tutaj — odbiór biznesowy słusznie zauważył, że w materiale dla klienta nie mają
-    czego szukać, a ścieżka ujawnia strukturę katalogów maszyny. Zostają w `output`
-    i w kontroli funkcjonalnej, czyli tam, gdzie służą audytowi."""
-    stopka = f"Źródło: {_source_label(result)}, pobrano {result.get('fetched_at', 'dziś')}."
+    """CZYSTY materiał dla odbiorcy — dokładnie to, co zamówiono, i nic więcej.
 
+    Żadnej stopki, separatora ani danych technicznych: pochodzenie danych jedzie
+    osobnym polem `source_note` do komentarza, a status HTTP i ścieżka pliku
+    zostają w `output` i w kontroli funkcjonalnej. Odbiór biznesowy odrzucał
+    materiał za każdym razem, gdy pod zamówionym tekstem stało cokolwiek jeszcze
+    ("muszę to ręcznie skasować przed wysłaniem, a właśnie tego chciałam uniknąć")."""
     if answer and answer.get("available"):
-        # Separator oddziela materiał do wklejenia od metadanych o źródle —
-        # odbiór biznesowy chce czystą treść, ale audyt musi wiedzieć skąd dane.
-        return f"{answer['answer']}\n\n---\n{stopka}"
+        return answer["answer"]
 
+    # Bez modelu nie ma opracowanej odpowiedzi — oddajemy surową treść, ale mówimy
+    # wprost, że to materiał do samodzielnej oceny, a nie gotowy efekt.
     powod = answer["detail"] if answer else "brak modelu"
     return "\n".join([
         f"UWAGA: nie udało się opracować odpowiedzi modelem ({powod}) — poniżej surowa treść źródła.",
         "",
         result["text"][:1500],
-        "",
-        stopka,
     ])
 
 

@@ -1,0 +1,40 @@
+# Zasady odbioru biznesowego (Bożena) — co BLOKUJE zadanie, co jest tylko sugestią
+# i jakie kwestie konwencji są już rozstrzygnięte.
+#
+# Powód powstania: ten sam materiał bywał raz przyjmowany, raz odrzucany, bo każdy
+# przebieg oceniał go od nowa i bez pamięci wcześniejszych rozstrzygnięć. Na tych
+# samych zadaniach padały sprzeczne uwagi — raz "dopiszcie, że to kurs średni",
+# raz "to wypełniacz, każdy to wie"; raz "brakuje linku do źródła", raz "stopka ze
+# źródłem nie do wysłania klientowi".
+#
+# To jest konfiguracja firmy (SKALOWANIE.md sekcja 2) — właściciel rozstrzyga tu
+# spory o konwencję raz, zamiast rozstrzygać je w każdym zadaniu osobno.
+
+# Wady, które WSTRZYMUJĄ zadanie i wymagają decyzji człowieka.
+blokujace:
+  - 'Materiał nie odpowiada na to, o co proszono w zadaniu (brak zamówionego elementu).'
+  - 'Błąd merytoryczny albo liczbowy: zła wartość, zła data, zły okres, dane z innego dnia niż zamówiony.'
+  - 'Dane spoza źródła: twierdzenie, którego w pobranej treści nie ma.'
+  - 'Porada w obszarze prawnym, podatkowym lub rozliczeniowym, o którą nikt nie prosił.'
+  - 'Treść robocza w materiale: komentarze do zlecającego, pytania, "mogę dodatkowo", placeholdery.'
+  - 'Zły język materiału (angielskie wstawki albo kod tam, gdzie ma być tekst po polsku).'
+  - 'Naruszenie formatu wprost zamówionego w zadaniu (np. poproszono o trzy zdania, jest pięć).'
+
+# Uwagi, które są WARTOŚCIOWE, ale nie wstrzymują zadania — trafiają do komentarza
+# jako sugestie i do rozwoju skilla. Bez tego podziału każdy drobiazg redakcyjny
+# blokował zadanie tak samo jak błąd w liczbie.
+nie_blokuje:
+  - 'Preferencje stylistyczne: dobór słów, szyk zdania, "brzmi ciężko".'
+  - 'Propozycje rozszerzenia zakresu, o które zadanie nie prosiło (dynamika rok do roku, historia, dodatkowe wskaźniki).'
+  - 'Uwagi o rzeczach, których nie było w zamówionym zakresie ani w źródle.'
+  - 'Prośby o dodatkowe potwierdzenie danych, które pochodzą z oficjalnego źródła.'
+
+# Kwestie konwencji rozstrzygnięte RAZ. Bożena ma je respektować, a nie oceniać
+# od nowa w każdym zadaniu.
+ustalenia:
+  - 'Pochodzenie danych (źródło, link, godzina pobrania) system dokleja automatycznie do zadania. NIE ma go w materiale dla odbiorcy i nie jest to brak.'
+  - 'Materiał ma zawierać dokładnie to, co zamówiono — bez stopek, nagłówków i sekcji, o które nie proszono.'
+  - 'Przy kursie walut wystarczy wartość, data i numer tabeli. Doprecyzowanie "kurs średni, tabela A" jest wymagane TYLKO wtedy, gdy zadanie nie mówi, o którą tabelę chodzi.'
+  - 'Liczby przepisujemy dokładnie jak w źródle (kurs z czterema miejscami po przecinku), a prognozy zaokrąglamy do pełnych stopni.'
+  - 'Agent nie doradza zastosowań podatkowych, księgowych ani prawnych — to nie jest brak, tylko świadoma zasada.'
+  - 'Zadanie bez wypełnionych kryteriów akceptacji oceniamy WYŁĄCZNIE wobec jego tytułu i opisu — nie dokładamy własnych oczekiwań co do zakresu.'

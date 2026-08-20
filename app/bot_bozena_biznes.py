@@ -31,7 +31,17 @@ from bot_common import verdict
 BOT = "bozena"
 
 CONTEXT_PATH = Path(__file__).parent / "config" / "business_context.yaml"
+USTALENIA_PATH = Path(__file__).parent / "config" / "odbior_ustalenia.yaml"
 PERSONA_PATH = Path(__file__).parent / "personas" / "bozena_biznes.md"
+
+
+def load_ustalenia(path=USTALENIA_PATH):
+    """Zasady odbioru: co blokuje, co jest sugestią, co już rozstrzygnięto.
+    Bez nich ocena była za każdym razem nowa i potrafiła sobie przeczyć."""
+    try:
+        return yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        return {}
 
 
 def load_persona(path=PERSONA_PATH):
@@ -66,8 +76,21 @@ def load_business_context(task, path=CONTEXT_PATH):
     return {"oczekiwania": " ".join(oczekiwania), "na_co_uwaga": na_co_uwaga}
 
 
-def build_prompt(task, execution_result, context, persona):
-    uwagi = "\n".join(f"- {u}" for u in context["na_co_uwaga"]) or "- (brak dodatkowych)"
+def _lista(punkty, pusto="- (brak)"):
+    return "\n".join(f"- {p}" for p in (punkty or [])) or pusto
+
+
+def build_prompt(task, execution_result, context, persona, ustalenia=None):
+    ustalenia = ustalenia or {}
+    uwagi = _lista(context["na_co_uwaga"], "- (brak dodatkowych)")
+    zasady = (
+        "--- CO WSTRZYMUJE ZADANIE (tylko te rzeczy dają AKCEPTACJA: nie) ---\n"
+        f"{_lista(ustalenia.get('blokujace'))}\n\n"
+        "--- CO NIE WSTRZYMUJE ZADANIA (zgłoś jako SUGESTIE, nie jako powód odmowy) ---\n"
+        f"{_lista(ustalenia.get('nie_blokuje'))}\n\n"
+        "--- KWESTIE JUŻ ROZSTRZYGNIĘTE (respektuj, nie oceniaj ich od nowa) ---\n"
+        f"{_lista(ustalenia.get('ustalenia'))}\n\n"
+    ) if ustalenia else ""
     return (
         f"{persona}\n\n"
         "--- KONTEKST BIZNESOWY (czego oczekuje użytkownik) ---\n"
@@ -77,11 +100,20 @@ def build_prompt(task, execution_result, context, persona):
         f"Tytuł: {task.get('title')}\n"
         f"Oczekiwany rezultat: {task.get('expected_result')}\n"
         f"Kryteria akceptacji: {task.get('acceptance_criteria')}\n\n"
-        "--- CO BOT WYKONAŁ (efekt do oceny) ---\n"
-        f"{execution_result.get('acceptance_notes') or execution_result.get('output') or '(brak opisu efektu)'}\n\n"
         f"{_dopisek_o_zrodlach(execution_result)}"
-        "Oceń, czy to jest efekt, jakiego oczekiwałby użytkownik biznesowy. "
-        "Odpowiedz w formacie z persony (AKCEPTACJA / UZASADNIENIE / ZASTRZEŻENIA)."
+        "--- CO BOT WYKONAŁ (efekt do oceny — oceniasz WYŁĄCZNIE to, co jest między znacznikami) ---\n"
+        "[POCZĄTEK MATERIAŁU]\n"
+        f"{execution_result.get('acceptance_notes') or execution_result.get('output') or '(brak opisu efektu)'}\n"
+        "[KONIEC MATERIAŁU]\n\n"
+        f"{zasady}"
+        "Oceń, czy to jest efekt, jakiego oczekiwałby użytkownik biznesowy.\n"
+        "AKCEPTACJA: nie — TYLKO gdy wskażesz co najmniej jedno zastrzeżenie z listy blokujących.\n"
+        "Drobiazgi stylistyczne i propozycje rozszerzeń zgłaszaj w SUGESTIE, a mimo nich daj AKCEPTACJA: tak.\n"
+        "Odpowiedz w formacie:\n"
+        "AKCEPTACJA: tak|nie\n"
+        "UZASADNIENIE: <1-3 zdania>\n"
+        "ZASTRZEŻENIA BLOKUJĄCE:\n- <konkret albo 'brak'>\n"
+        "SUGESTIE:\n- <konkret albo 'brak'>"
     )
 
 
@@ -93,9 +125,14 @@ def _dopisek_o_zrodlach(execution_result):
     zrodla = execution_result.get("source_note")
     if not zrodla:
         return ""
-    return ("--- POCHODZENIE DANYCH (system dołącza je do zadania automatycznie; NIE są częścią "
-            "materiału dla odbiorcy, więc nie wymagaj powtórzenia ich w treści) ---\n"
-            f"{zrodla}\n\n")
+    # Bez tej informacji odbiór zarzucał brak źródeł, których po prostu nie widział.
+    # Ale gdy sekcja wyglądała tak samo jak blok z materiałem, ocena szła w drugą
+    # stronę: model uznawał ją ZA CZĘŚĆ materiału i odrzucał za "stopkę w treści".
+    # Dlatego stoi PRZED materiałem i jest wcięta, a materiał ma własne znaczniki.
+    wciete = "\n".join(f"    {linia}" for linia in str(zrodla).splitlines())
+    return ("INFORMACJA DLA CIEBIE (to NIE jest część materiału — system dokleja pochodzenie danych\n"
+            "do zadania osobno; nie oczekuj tego w treści i nie oceniaj tego):\n"
+            f"{wciete}\n\n")
 
 
 def _parse_acceptance(text):
@@ -105,24 +142,46 @@ def _parse_acceptance(text):
     return False  # brak jednoznacznego "tak" = fail-closed
 
 
-def _parse_concerns(text):
-    concerns = []
+def _parse_section(text, naglowek, konczace=()):
+    """Punkty z jednej sekcji odpowiedzi. Sekcje nie mogą się zlewać, bo lista
+    blokujących musi być rozłączna z sugestiami."""
+    punkty = []
     in_section = False
     for line in text.splitlines():
-        if re.match(r"\s*zastrze[żz]enia\s*:", line, re.IGNORECASE):
+        if re.match(naglowek, line, re.IGNORECASE):
             in_section = True
             continue
         if in_section:
-            stripped = line.strip(" -\t")
-            if stripped and stripped.lower() != "brak":
-                concerns.append(stripped)
-    return concerns
+            if any(re.match(k, line, re.IGNORECASE) for k in konczace):
+                break
+            stripped = line.strip(" -\t*")
+            if stripped and stripped.lower().rstrip(".") != "brak":
+                punkty.append(stripped)
+    return punkty
+
+
+def _parse_blocking(text):
+    """Zastrzeżenia, które wstrzymują zadanie. Starszy format (samo
+    'ZASTRZEŻENIA:') traktujemy jako blokujące — zgodność wstecz."""
+    blokujace = _parse_section(text, r"\s*zastrze[żz]enia\s+blokuj[ąa]ce\s*:", (r"\s*sugestie\s*:",))
+    if blokujace:
+        return blokujace
+    return _parse_section(text, r"\s*zastrze[żz]enia\s*:", (r"\s*sugestie\s*:",))
+
+
+def _parse_suggestions(text):
+    """Uwagi wartościowe, ale nieblokujące — idą do komentarza i do rozwoju skilla."""
+    return _parse_section(text, r"\s*sugestie\s*:")
+
+
+# Zachowane pod starą nazwą — używane przez testy i zewnętrzne wywołania.
+_parse_concerns = _parse_blocking
 
 
 def review(task, execution_result, config=None):
     context = load_business_context(task)
     persona = load_persona()
-    prompt = build_prompt(task, execution_result, context, persona)
+    prompt = build_prompt(task, execution_result, context, persona, load_ustalenia())
 
     answer = task_thinker.ask_model(prompt)
     if not answer["available"]:
@@ -134,10 +193,23 @@ def review(task, execution_result, config=None):
         )
 
     text = (answer["text"] or "").strip()
-    if _parse_acceptance(text):
-        return verdict(BOT, "approved", 0.8, f"[{answer['source']}] {text}")
+    blokujace = _parse_blocking(text)
+    sugestie = _parse_suggestions(text)
 
-    return verdict(
+    # Decyduje BRAK zastrzeżeń blokujących, nie samo słowo "nie". Model przy
+    # swobodnej ocenie odrzucał materiał za drobiazg stylistyczny tak samo jak za
+    # błąd w liczbie — stąd brały się sprzeczne werdykty między przebiegami.
+    if _parse_acceptance(text) or not blokujace:
+        szczegol = f"[{answer['source']}] {text}"
+        if sugestie and not _parse_acceptance(text):
+            szczegol += "\n(Przyjęte mimo uwag — żadna nie jest na liście blokujących.)"
+        wynik = verdict(BOT, "approved", 0.8, szczegol)
+        wynik["suggestions"] = sugestie
+        return wynik
+
+    wynik = verdict(
         BOT, "rejected", 0.8, f"[{answer['source']}] {text}",
-        concerns=_parse_concerns(text) or ["Użytkownik biznesowy nie zaakceptowałby tego efektu."],
+        concerns=blokujace,
     )
+    wynik["suggestions"] = sugestie
+    return wynik
