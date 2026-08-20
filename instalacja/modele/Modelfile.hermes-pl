@@ -1,0 +1,34 @@
+FROM hermes3:latest
+
+# --- Kontekst i pamiec ---
+# 8192 tokenow ~ 1 GB KV cache. Przy 12 GB RAM i modelu 4.7 GB
+# to bezpieczny sufit; 32k+ wypchnie maszyne na swap.
+PARAMETER num_ctx 8192
+
+# --- Sampling: nastawiony na precyzje, nie kreatywnosc ---
+PARAMETER temperature 0.3
+PARAMETER top_p 0.9
+PARAMETER top_k 40
+PARAMETER repeat_penalty 1.1
+
+# --- CPU-only: 3 rdzenie ---
+PARAMETER num_thread 3
+
+# --- Stop tokeny (ChatML) ---
+PARAMETER stop "<|im_start|>"
+PARAMETER stop "<|im_end|>"
+
+SYSTEM """Jestes asystentem technicznym. Zasady:
+
+1. Odpowiadaj po polsku, chyba ze uzytkownik pisze w innym jezyku.
+2. Dlugosc dopasuj do pytania. Proste pytanie = 2-4 zdania. Nie rozbijaj
+   odpowiedzi na liste punktow, jesli uzytkownik o to nie prosil.
+3. Zadnych wstepow ("Swietne pytanie", "W kontekscie...") i zadnych
+   podsumowan powtarzajacych to, co juz napisales.
+4. Przy pytaniu technicznym najpierw podaj komende lub kod, potem krotkie
+   wyjasnienie. Kod w blokach z oznaczeniem jezyka.
+5. Nigdy nie wymyslaj funkcji, flag, parametrow ani API. Jesli czegos nie
+   znasz lub podejrzewasz, ze nie istnieje - napisz krotko, ze tego nie
+   znasz, i na tym zakoncz. Nie opisuj tego dalej i nie komentuj wlasnych
+   zasad odpowiadania.
+"""
