@@ -124,6 +124,22 @@ PIERWSZEŃSTWO REGUŁ, gdy się kłócą:
 3. Reszta zasad redakcyjnych powyżej."""
 
 
+def _bez_stopki(tekst):
+    """Ucina stopke ze zrodlem, ktora model dokleja mimo zakazu w prompcie.
+    Proba trzech kolejnych sformulowan zakazu nie wystarczyla (odbior biznesowy
+    odrzucal materiał za "Zrodlo: Wikipedia" pod tekstem), a to jest warunek
+    deterministyczny — egzekwujemy go kodem, nie prosba do modelu. Pochodzenie
+    danych i tak dokleja system w osobnym polu."""
+    linie = tekst.splitlines()
+    while linie:
+        ostatnia = linie[-1].strip().lstrip("-—*_ ").lower()
+        if not ostatnia or ostatnia.startswith(("źródło", "zrodlo", "source", "pobrano", "stan na")):
+            linie.pop()
+            continue
+        break
+    return "\n".join(linie).strip()
+
+
 def answer(question, content, url="", zrodlo_opis=None, ask=None):
     """Zwraca {available, answer, cost_usd, source, detail}. Nigdy nie rzuca.
 
@@ -153,7 +169,7 @@ def answer(question, content, url="", zrodlo_opis=None, ask=None):
         return {"available": False, "answer": "", "cost_usd": 0.0, "source": None,
                 "detail": (result or {}).get("detail", "Model niedostępny.")}
 
-    text = (result.get("text") or "").strip()
+    text = _bez_stopki((result.get("text") or "").strip())
     # estimate_call zwraca liczbę (USD), nie słownik — łatwo tu o pomyłkę,
     # dlatego test dymny sprawdza typ pola cost_usd.
     cost_usd = cost_estimator.estimate_call(result.get("source") or "claude_code",

@@ -17,11 +17,17 @@ ogolne:
 zrodla:
   api.nbp.pl:
     nazwa: 'Narodowy Bank Polski, tabela kursów średnich (A)'
+    # Gdy wskazany adres dotyczy innej waluty niż zadanie, agent poprawia go sam
+    # zamiast odsylac zadanie do czlowieka (uwaga odbioru biznesowego przy JPY).
+    korekta_adresu:
+      wzorzec_zadania: '\b(EUR|USD|GBP|CHF|JPY|CZK|SEK|NOK|DKK|CAD|AUD|HUF|UAH)\b'
+      szablon: 'https://api.nbp.pl/api/exchangerates/rates/a/{dopasowanie}/?format=json'
     wskazowki:
       - 'Tabela A to kurs ŚREDNI — napisz to wprost, bo odbiorca musi wiedzieć, że to nie kurs kupna ani sprzedaży.'
       - 'Podaj numer tabeli (pole "no") i datę notowania (pole "effectiveDate") — bez nich kursu nie da się zweryfikować w źródle.'
       - 'Tabela jest publikowana w dni robocze około 12:15. Jeżeli data notowania jest wcześniejsza niż dzisiejsza, to jest ostatnie dostępne notowanie, nie błąd.'
       - 'Nigdy nie doradzaj, do czego kurs zastosować (faktury, VAT, umowy) — do rozliczeń stosuje się inne kursy niż bieżący i to nie jest nasza decyzja.'
+      - 'Kurs jena (JPY) NBP publikuje za 100 jenów — napisz to wprost, inaczej wartość jest myląca.'
 
   api.open-meteo.com:
     nazwa: 'Open-Meteo, publiczne dane pogodowe'
@@ -36,6 +42,8 @@ zrodla:
     wskazowki:
       - 'Streszczenie z API to kilka zdań wstępu, nie całe hasło — pisz z niego zwięźle i nie udawaj, że masz pełny artykuł.'
       - 'Przy materiale dla klienta pisz własnymi słowami. Kalka encyklopedyczna typu "zbiorcza nazwa dla szeregu aplikacji i usług" brzmi ciężko i bywa odrzucana.'
+      - 'Streszczenia haseł o produktach IT zwykle NIE opisują zastosowań (raporty, pulpity, udostępnianie w firmie). Jeśli zadanie pyta "do czego służy", a w treści tego nie ma, zwróć BRAK_ODPOWIEDZI_W_ZRODLE zamiast domyślać się — właściwym źródłem jest wtedy dokumentacja producenta.'
+      - 'Nie pisz, że produkt "działa w chmurze", jeśli treść tego nie precyzuje — część narzędzi ma aplikacje instalowane lokalnie i taki skrót wprowadza w błąd.'
 
   en.wikipedia.org:
     nazwa: 'Wikipedia (wersja angielska)'

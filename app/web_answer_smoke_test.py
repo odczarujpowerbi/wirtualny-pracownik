@@ -94,6 +94,17 @@ def run():
                                      zrodlo_opis="Narodowy Bank Polski, tabela A", ask=_ask_ok)
                    and "Narodowy Bank Polski, tabela A" in _ask_ok.prompt))
 
+    # --- stopka doklejana przez model jest ucinana kodem, nie prośbą w prompcie ---
+    checks.append(("Stopka 'Źródło:' od modelu jest usuwana z materiału",
+                   web_answer._bez_stopki("Power BI to narzędzie.\n\nŹródło: Wikipedia")
+                   == "Power BI to narzędzie."))
+    checks.append(("Ucinane są też warianty: separator, 'pobrano', 'stan na'",
+                   web_answer._bez_stopki("Zdanie.\n---\nZrodlo: NBP\npobrano 20.08.2026") == "Zdanie."))
+    checks.append(("Zwykła treść bez stopki zostaje nietknięta",
+                   web_answer._bez_stopki("Kurs wynosi 4,3165 zł.") == "Kurs wynosi 4,3165 zł."))
+    checks.append(("Zdanie o źródle w ŚRODKU tekstu nie jest ucinane",
+                   web_answer._bez_stopki("Źródłem danych jest NBP.\nKurs to 4,31 zł.").count("\n") == 1))
+
     print("\n--- Wynik testu dymnego web_answer ---")
     all_passed = True
     for name, passed in checks:

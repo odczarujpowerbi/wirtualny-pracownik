@@ -22,6 +22,7 @@ import screenshot_capture
 import tool_registry
 import validator_prompt
 import web_answer
+import web_source_fixer
 import web_fetch_worker
 
 
@@ -37,6 +38,30 @@ def execute(task):
         return _run_pbip_capture(task)
     if action == "fetch_url" or _url_from_task(task):
         return _run_web_fetch(task)
+    obcy = _url_spoza_allowlisty(task)
+    if obcy:
+        # Zadanie wskazuje źródło internetowe, którego NIE wolno pobrać. Zwrócenie
+        # None kończyło się "zielone bez efektu -> auto done": zadanie zamykane jako
+        # zrobione, choć nikt niczego nie zrobił (realnie napotkane). Odmowa z
+        # powodem trafia do eskalacji, a właściciel decyduje o dopisaniu domeny.
+        return _refused(
+            f"Zadanie wskazuje źródło '{obcy}', którego nie ma na allowliście narzędzia fetch_url "
+            f"(config/tool_contracts.yaml -> allowed_domains). Nie pobieram niczego spoza listy. "
+            f"Decyzja właściciela: dopisać tę domenę do allowlisty albo wskazać inne źródło.",
+            tool="fetch_url")
+    return None
+
+
+def _url_spoza_allowlisty(task):
+    """Pierwszy adres https w treści zadania, którego nie ma na allowliście —
+    sygnał, że zadanie wymaga źródła, na które nie mamy zgody."""
+    tekst = " ".join(str(task.get(p) or "") for p in ("title", "description", "expected_result",
+                                                      "acceptance_criteria", "source_file_link"))
+    domeny = tool_registry.allowed_domains(tool_registry.get_contract("fetch_url") or {})
+    for kandydat in re.findall(r"https://\S+", tekst):
+        kandydat = kandydat.rstrip(".,;:!?)\"']")
+        if not web_fetch_worker.host_allowed(kandydat, domeny):
+            return kandydat
     return None
 
 
@@ -199,6 +224,15 @@ def _run_web_fetch(task):
     # i prosimy o wskazanie źródła (uwaga odbioru biznesowego: "zadanie zostało
     # po prostu odłożone, nikt nie zapytał o inne źródło").
     tresc = (answer.get("answer") or "").strip()
+    if answer.get("available") and tresc.startswith("BRAK_ODPOWIEDZI_W_ZRODLE") and not task.get("_po_korekcie"):
+        # Zanim oddamy zadanie człowiekowi: jeśli skill zna regułę korekty adresu
+        # dla tego źródła (np. inna waluta w tabeli NBP), poprawiamy adres i
+        # próbujemy RAZ jeszcze. Flaga _po_korekcie blokuje pętlę.
+        tekst_zadania = " ".join(str(task.get(k) or "") for k in ("title", "description"))
+        lepszy = web_source_fixer.popraw_adres(url, tekst_zadania)
+        if lepszy:
+            return _run_web_fetch({**task, "url": lepszy, "_po_korekcie": True})
+
     if answer.get("available") and tresc.startswith("BRAK_ODPOWIEDZI_W_ZRODLE"):
         powod = tresc.split(":", 1)[1].strip() if ":" in tresc else tresc
         return {

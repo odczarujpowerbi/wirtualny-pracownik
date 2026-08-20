@@ -192,8 +192,36 @@ def _process_task_core(task, policy, routing, client):
 
     client.post_comment(task_id, comment)
     client.update_status(task_id, status)
+    _zapisz_feedback(client, task_id, status, execution_result, risk)
 
     return {"task_id": task_id, "risk": risk, "owner": owner, "status": status}
+
+
+def _zapisz_feedback(client, task_id, status, execution_result, risk):
+    """Samoocena agenta w polu `feedback` zadania (MCP update_task) — po to, żeby
+    człowiek widział W ZADANIU, czym się skończyła praca, bez czytania całego
+    wątku komentarzy. Zapisujemy zwięźle: co użyto, ile kosztowało, jaki wynik.
+
+    Feedback to pole informacyjne, więc jego brak nie może wywrócić przebiegu —
+    klient bez tej metody (starszy mock) albo błąd MCP są łapane."""
+    zapis = getattr(client, "set_task_feedback", None)
+    if not callable(zapis):
+        return False
+
+    narzedzie = execution_result.get("tool") or "brak workera"
+    koszt = execution_result.get("cost_usd", 0.0)
+    opis = {
+        "done": "Wykonane i przyjęte przez bramkę jakości.",
+        "needs_approval": "Wykonane, ale bramka jakości nie przepuściła — czeka na decyzję człowieka.",
+    }.get(status, f"Status: {status}.")
+    tresc = f"[agent] {opis} Narzędzie: {narzedzie}. Ryzyko: {risk}. Koszt modelu: {koszt:.2f} USD."
+    try:
+        zapis(task_id, feedback=tresc)
+        return True
+    except Exception as exc:  # noqa: BLE001 — feedback jest dodatkiem, nie może ubić przebiegu
+        state_store.log_decision(task_id, agent="pawel", decision="feedback_failed",
+                                 reason=f"Nie udało się zapisać feedbacku: {exc}", now=now_iso())
+        return False
 
 
 def _has_effect(execution_result):
