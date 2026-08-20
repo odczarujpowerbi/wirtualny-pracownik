@@ -38,8 +38,13 @@ from bot_common import verdict
 BOT = "oskar"
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
-OLLAMA_VISION_MODEL = os.environ.get("OLLAMA_VISION_MODEL", "llama3.2-vision")
-OLLAMA_TIMEOUT_SECONDS = 60
+OLLAMA_VISION_MODEL = os.environ.get("OLLAMA_VISION_MODEL", "qwen2.5vl:3b")
+# Model wizyjny na CPU jest wolny: zmierzone na maszynie bez GPU (3 rdzenie)
+# dla qwen2.5vl:3b i zrzutu 900x520 — zimny start ok. 93 s, kolejne wywolania
+# ok. 80 s (samo przetworzenie obrazu to ok. 61 s, generowanie ok. 18 s).
+# Przy 60 s funkcja zwracala None PRZY KAZDYM wywolaniu z nowym zrzutem, co kod
+# traktuje jako "brak drugiej opinii" — awaria byla cicha (zmierzone 2026-08-20).
+OLLAMA_TIMEOUT_SECONDS = 180
 
 
 def _build_prompt(task, ocr_text=None):

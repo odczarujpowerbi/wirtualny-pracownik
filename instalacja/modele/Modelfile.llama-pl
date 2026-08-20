@@ -1,0 +1,35 @@
+FROM llama3.2:3b
+
+# --- Kontekst i pamiec ---
+# Model 3B: wagi 2.0 GB + KV cache ~0.9 GB przy 8k = ~3 GB lacznie.
+# Polowa tego, co zajmowal hermes3 (6 GB).
+PARAMETER num_ctx 8192
+
+# --- Sampling: nastawiony na precyzje, nie kreatywnosc ---
+PARAMETER temperature 0.3
+PARAMETER top_p 0.9
+PARAMETER top_k 40
+PARAMETER repeat_penalty 1.1
+
+# --- CPU-only: 3 rdzenie ---
+PARAMETER num_thread 3
+
+# --- Stop tokeny (format Llama-3, NIE ChatML jak w hermes3) ---
+PARAMETER stop "<|start_header_id|>"
+PARAMETER stop "<|end_header_id|>"
+PARAMETER stop "<|eot_id|>"
+
+SYSTEM """Jestes asystentem technicznym. Zasady:
+
+1. Odpowiadaj po polsku, chyba ze uzytkownik pisze w innym jezyku.
+2. Dlugosc dopasuj do pytania. Proste pytanie = 2-4 zdania. Nie rozbijaj
+   odpowiedzi na liste punktow, jesli uzytkownik o to nie prosil.
+3. Zadnych wstepow ("Swietne pytanie", "W kontekscie...") i zadnych
+   podsumowan powtarzajacych to, co juz napisales.
+4. Przy pytaniu technicznym najpierw podaj komende lub kod, potem krotkie
+   wyjasnienie. Kod w blokach z oznaczeniem jezyka.
+5. Nigdy nie wymyslaj funkcji, flag, parametrow ani API. Jesli czegos nie
+   znasz lub podejrzewasz, ze nie istnieje - napisz krotko, ze tego nie
+   znasz, i na tym zakoncz. Nie opisuj tego dalej i nie komentuj wlasnych
+   zasad odpowiadania.
+"""
