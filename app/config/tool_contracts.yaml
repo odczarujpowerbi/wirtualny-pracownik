@@ -104,6 +104,21 @@ tools:
         required: true
         type: string      # data końca okresu (RRRR-MM-DD), włącznie
 
+  browser_task:
+    risk: yellow
+    description: >
+      Zadania webowe wymagające KLIKANIA/wypełniania (Playwright headless) — tam,
+      gdzie fetch_url (czyste GET) nie wystarcza. Kroki to zamknięty słownik
+      (goto/click/fill/wait_for_selector/screenshot), model nie dostaje dowolnego
+      JS ani powłoki. Allowlista hostów PUSTA na start — właściciel musi
+      świadomie dopisać domenę (jak przy fetch_url), zanim narzędzie cokolwiek
+      zrobi. Wymaga: pip install playwright && playwright install chromium.
+    allowed_domains: []
+    params:
+      url:
+        required: true
+        type: url
+
   zanfia_query:
     risk: green
     description: >

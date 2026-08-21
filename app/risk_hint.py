@@ -36,10 +36,14 @@ def _haystack(task):
     return " ".join(p for p in parts if p).lower()
 
 
-def hint_from_task(task):
-    """Zwraca 'green' | 'yellow' | 'red' na podstawie treści i akcji zadania."""
+def hint_from_task(task, tool=None):
+    """Zwraca 'green' | 'yellow' | 'red' na podstawie treści zadania i (opcjonalnie)
+    rozpoznanego narzędzia (executor.rozpoznaj_narzedzie(task)). Narzędzie z
+    definicji read-only daje 'green' NIEZALEŻNIE od słów w tytule — inaczej
+    "zestawienie WYSYŁEK KAMPANII" (fetch_url, czysty odczyt) wpadłoby w 'red'
+    tylko dlatego, że tytuł zawiera słowo z listy czerwonych fraz."""
     action = (task.get("action") or "").lower()
-    if action in _GREEN_ACTIONS:
+    if action in _GREEN_ACTIONS or (tool and tool in _GREEN_ACTIONS):
         return "green"
 
     text = _haystack(task)

@@ -35,6 +35,6 @@ bots:
     # Narzędzia, których efekt JEST wizualny — tylko przy nich brak zrzutu jest
     # zastrzeżeniem. Przy efekcie tekstowym (pobranie danych, walidacja pliku)
     # "brak zrzutu" to szum, który zaniża ocenę odbioru biznesowego.
-    visual_tools: [capture_screenshot, open_pbip_capture]
+    visual_tools: [capture_screenshot, open_pbip_capture, browser_task]
   bozena:
     enabled: true

@@ -27,11 +27,15 @@ google-api-python-client>=2.0  # google_workspace_client.py — Drive/Sheets/...
 # pygetwindow>=0.0.9         # window_manager — prosty backend listowania/fokus/geometrii okien
 # windows-capture            # (opcjonalnie) Windows.Graphics.Capture — najpewniejszy zrzut okna, także zminimalizowanego
 
+# --- Worker przeglądarkowy (browser_worker.py, Faza 3.1) ---
+# browser_worker.py DZIAŁA bez tego pakietu (degraduje się do available=False).
+# Po instalacji uruchom też: `playwright install chromium`.
+playwright>=1.40
+
 # Kolejne warstwy (SKRYPTY.md) — NIE instaluj, dopóki nie piszesz danego
 # workera; premature dependency bloat to ten sam problem co premature scope.
 # Odkomentuj/dodaj w miarę realnej potrzeby:
 #
-# playwright>=1.40           # meta_ads_ui_fallback.py, browser worker, renderowanie HTML maila do zrzutu — po instalacji: `playwright install chromium`
 # pandas>=2.0                # data_tidy.py, report_builder.py, source_schema_watcher.py (diff schematu)
 # openpyxl>=3.1              # silnik Excela dla pandas przy plikach .xlsx
 # Pillow>=10.0                # screenshot_diff.py, screenshot_annotate.py

@@ -89,9 +89,9 @@ Substrat gotowy: `screenshot_capture`, `window_manager`, `ui_lock` (serializacja
 
 | # | Skrypt do napisania | Odpowiedzialność | DoD |
 |---|---|---|---|
-| 3.1 | `browser_worker.py` (Playwright) | Zadania webowe: nawigacja, klik, wypełnienie, zrzut. `playwright install chromium`. | Wykonuje zdefiniowane kroki na stronie testowej, produkuje `screenshot_path`; smoke test na lokalnym HTML. |
+| 3.1 | ✅ `browser_worker.py` (Playwright) | Zadania webowe: nawigacja, klik, wypełnienie, zrzut. `playwright install chromium`. | Wykonuje zdefiniowane kroki na stronie testowej, produkuje `screenshot_path`; smoke test na lokalnym HTML — **zrobione 21.08.2026**, `browser_worker_smoke_test.py` (atrapa strony, bez realnej przeglądarki — Playwright jeszcze nie zainstalowany na maszynie, `allowed_domains` w `tool_contracts.yaml` celowo pusta do czasu wskazania realnego celu). |
 | 3.2 | `computer_use_worker.py` | Pętla zobacz → decyzja modelu → klik → zweryfikuj (zrzut + OCR), z blokadą `ui_lock` (sekwencyjnie). | Wykonuje prostą operację w aplikacji desktopowej pod nadzorem; przy niepewności eskaluje. |
-| 3.3 | Wpięcie w `executor.py` | Nowe akcje + kontrakty w `config/tool_contracts.yaml` (fail-closed, allowed_roots). | Zadanie danego typu przechodzi bramkę; test wpięcia z atrapą (jak `executor_capture_smoke_test.py`). |
+| 3.3 | ✅ Wpięcie w `executor.py` (dla 3.1) | Nowe akcje + kontrakty w `config/tool_contracts.yaml` (fail-closed, allowed_roots). | Zadanie danego typu przechodzi bramkę; test wpięcia z atrapą (jak `executor_capture_smoke_test.py`) — zrobione dla `browser_task`; dla `computer_use_worker.py` (3.2) wciąż do zrobienia. Przy okazji naprawiono aktywny bug: `runner_loop.py` wołał nieistniejące `executor.rozpoznaj_narzedzie` (AttributeError na każdym zadaniu z domyślnym hintem `yellow` z Projectly). |
 
 Zasada: computer use i przeglądarka trzymają fokus sekwencyjnie (`ui_lock`); równolegle idą tylko zadania plikowe.
 

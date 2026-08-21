@@ -18,6 +18,7 @@ from urllib.parse import urlparse
 
 import yaml
 
+import browser_worker
 import pbi_desktop_bridge
 import pbip_validate
 import screenshot_capture
@@ -40,6 +41,8 @@ def execute(task):
         return _run_screenshot_capture(task)
     if action == "open_pbip_capture":
         return _run_pbip_capture(task)
+    if action == "browser_task":
+        return _run_browser_task(task)
     if action == "fetch_url" or _url_from_task(task):
         return _run_web_fetch(task)
     obcy = _url_spoza_allowlisty(task)
@@ -53,6 +56,25 @@ def execute(task):
             f"(config/tool_contracts.yaml -> allowed_domains). Nie pobieram niczego spoza listy. "
             f"Decyzja właściciela: dopisać tę domenę do allowlisty albo wskazać inne źródło.",
             tool="fetch_url")
+    return None
+
+
+def rozpoznaj_narzedzie(task):
+    """Nazwa narzędzia, którym `execute()` obsłuży to zadanie — bez wykonywania
+    niczego (zero efektów ubocznych). Używane PRZED wykonaniem (runner_loop.py),
+    żeby risk_hint.hint_from_task wywnioskował kolor z ROZPOZNANEGO narzędzia,
+    a nie tylko ze słów w tytule."""
+    action = (task.get("action") or "").lower()
+    if _is_pbip_validation(task):
+        return "validate_pbip"
+    if action == "capture_screenshot":
+        return "capture_screenshot"
+    if action == "open_pbip_capture":
+        return "open_pbip_capture"
+    if action == "browser_task":
+        return "browser_task"
+    if action == "fetch_url" or _url_from_task(task):
+        return "fetch_url"
     return None
 
 
@@ -203,6 +225,48 @@ def _run_pbip_capture(task):
                                 "Otwarcie/zrzut raportu nie powiodły się.")
     result["tool"] = "open_pbip_capture"
     return result
+
+
+def _run_browser_task(task):
+    """Zadanie webowe wymagające KLIKANIA/wypełniania (Playwright headless) — tam,
+    gdzie fetch_url (czysty GET) nie wystarcza. Wymaga JAWNEGO action=='browser_task':
+    w przeciwieństwie do fetch_url tu agent naciska przyciski i wypełnia formularze,
+    więc zadanie musi to zamówić wprost, nie zgadujemy z adresu w tytule.
+
+    Allowlista hostów siedzi w kontrakcie `browser_task` (config/tool_contracts.yaml),
+    tak samo jak przy fetch_url — pusta na start, właściciel dopisuje domenę świadomie."""
+    url = task.get("url")
+    check = tool_registry.check_call("browser_task", {"url": url})
+    if not check["allowed"]:
+        return _refused(check["reason"], tool="browser_task")
+
+    steps = task.get("browser_steps") or task.get("kroki") or []
+    domeny = tool_registry.allowed_domains(tool_registry.get_contract("browser_task") or {})
+
+    wynik = browser_worker.run(url, steps=steps, allowed_hosts=domeny)
+    if not wynik["available"]:
+        return _refused(wynik["detail"], tool="browser_task")
+
+    return {
+        "cost_usd": 0.0,
+        "tool": "browser_task",
+        "executed": True,
+        "acceptance_notes": (
+            f"Wykonano {wynik['steps_done']}/{wynik['steps_total']} kroków na stronie "
+            f"'{wynik.get('title') or wynik['final_url']}'. Zrzut: {wynik['screenshot_path']}"),
+        "screenshot_path": wynik["screenshot_path"],
+        "output": {"final_url": wynik["final_url"], "title": wynik["title"],
+                   "steps_done": wynik["steps_done"], "steps_total": wynik["steps_total"]},
+        "functional_checks": [
+            {"name": "Zrzut po wykonaniu kroków zapisany", "type": "nonempty_file",
+             "target": wynik["screenshot_path"]},
+        ],
+        # Świadomie BEZ `rerun`: kroki mogą mieć efekty uboczne (klik "Wyślij",
+        # wypełnienie formularza) — ponowne odpalenie do kontroli determinizmu
+        # (Bartek) mogłoby powtórzyć akcję, której nie wolno powtórzyć. Kontrola
+        # determinizmu dla tego workera wymaga podejścia per-krok (Faza 3+),
+        # nie ślepego uruchomienia tej samej sekwencji drugi raz.
+    }
 
 
 def _run_web_fetch(task):
