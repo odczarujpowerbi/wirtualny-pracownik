@@ -10,15 +10,23 @@
 #
 # Użycie:
 #   .\bootstrap_install_local_model.ps1
-#   .\bootstrap_install_local_model.ps1 -VisionModel llama3.2-vision -TextModel hermes3
+#   .\bootstrap_install_local_model.ps1 -VisionModel qwen2.5vl:3b -TextModel llama3.2:3b
+#   .\bootstrap_install_local_model.ps1 -TextModel hermes3   # mocniejszy, ale 6 GB RAM
 #   .\bootstrap_install_local_model.ps1 -SkipModels   # sama instalacja Ollamy
 
 param(
     # Model wizyjny sterujący ekranem (computer use). OLLAMA_VISION_MODEL w .env.
-    [string]$VisionModel = "llama3.2-vision",
+    # qwen2.5vl:3b: 3,2 GB na dysku, 2,9 GB w RAM. llama3.2-vision to 7,8 GB na
+    # dysku i ok. 10 GB w RAM — na maszynie z 12 GB nie miesci sie obok modelu
+    # tekstowego. Test odczytu polskiego UI (faktura: numer, kontrahent, kwota,
+    # przyciski): qwen2.5vl 5/5, moondream 0/5 (mylil cyfry i nazwy pol).
+    [string]$VisionModel = "qwen2.5vl:3b",
 
     # Model tekstowy — druga opinia w validator_prompt.py. OLLAMA_TEXT_MODEL w .env.
-    [string]$TextModel = "hermes3",
+    # Domyslnie 3B: ~2 GB wag, ~3 GB RAM po zaladowaniu, ok. 8 tok/s na 3 rdzeniach CPU.
+    # hermes3 (8B) daje lepsza jakosc, ale zajmuje 6 GB RAM i ok. 5 tok/s — na maszynie
+    # bez GPU i z 12 GB RAM dlawi caly system. Zmien na hermes3 tylko przy GPU lub >16 GB RAM.
+    [string]$TextModel = "llama3.2:3b",
 
     [switch]$SkipModels
 )
