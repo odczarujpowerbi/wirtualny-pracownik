@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 import yaml
 
 import browser_worker
+import integracje_worker
 import pbi_desktop_bridge
 import pbip_validate
 import screenshot_capture
@@ -43,6 +44,13 @@ def execute(task):
         return _run_pbip_capture(task)
     if action == "browser_task" or _browser_url_from_task(task):
         return _run_browser_task(task)
+    # Konektory firmowe PRZED fetch_url: zadanie o MailerLite potrafi nieść w
+    # opisie zwykły link (np. do panelu), a wtedy trafiłoby do pobierania strony
+    # zamiast do właściwego źródła danych.
+    if action == "mailerlite_report" or integracje_worker.czy_mailerlite(task):
+        return integracje_worker.raport_mailerlite(task)
+    if action == "zanfia_query" or integracje_worker.czy_zanfia(task):
+        return integracje_worker.podsumowanie_zanfia(task)
     if action == "fetch_url" or _url_from_task(task):
         return _run_web_fetch(task)
     obcy = _url_spoza_allowlisty(task)
@@ -79,6 +87,10 @@ def rozpoznaj_narzedzie(task):
         return "open_pbip_capture"
     if action == "browser_task" or _browser_url_from_task(task):
         return "browser_task" if (task.get("browser_steps") or task.get("kroki")) else "browser_task_readonly"
+    if action == "mailerlite_report" or integracje_worker.czy_mailerlite(task):
+        return "mailerlite_report"
+    if action == "zanfia_query" or integracje_worker.czy_zanfia(task):
+        return "zanfia_query"
     if action == "fetch_url" or _url_from_task(task):
         return "fetch_url"
     return None

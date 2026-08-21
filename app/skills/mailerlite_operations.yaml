@@ -1,0 +1,52 @@
+# Skill: mailerlite_operations — WIEDZA, jak poprawnie raportować z MailerLite
+# (hydraulika: mailerlite_client.py + integracje_worker.py; tu jest "jak i czego nie").
+#
+# Konfiguracja firmy (SKALOWANIE.md sekcja 2): edytowalna bez zmiany kodu.
+# UWAGA: zdania cytujemy pojedynczym apostrofem — dwukropek w niecytowanym
+# zdaniu wywraca parsowanie YAML i skill po cichu przestaje działać.
+
+zakres:
+  wolno: >
+    Wyłącznie ODCZYT: lista wysłanych kampanii, ich statystyki (odbiorcy,
+    otwarcia, kliknięcia, rezygnacje, odbicia), lista grup i subskrybentów.
+  nie_wolno: >
+    Tworzenie, harmonogramowanie, wysyłka i anulowanie kampanii. Choć API to
+    umożliwia, wysyłka masowa jest CZERWONA w approval_policy.yaml (mass_email)
+    i wymaga decyzji człowieka — narzędzie mailerlite_report jej nie obejmuje.
+
+okres:
+  - 'Okres ZAWSZE rozwiązuj przez period_resolver.py, nigdy w pamięci. Raport za zły tydzień wygląda dokładnie tak samo wiarygodnie jak za właściwy.'
+  - '"Ostatni tydzień" to 7 pełnych dni licząc wstecz od WCZORAJ włącznie. Dziś jest dniem niepełnym — kampania wysłana dziś rano wciąż zbiera otwarcia, więc jej statystyki zaniżałyby zestawienie.'
+  - 'W materiale dla człowieka pisz konkretny zakres dat ("za okres 13-19 sierpnia 2026"), nigdy samo "za ostatni tydzień". Ten sam tekst czytany tydzień później znaczyłby co innego.'
+  - 'Gdy zadanie nie mówi, za jaki okres ma być zestawienie — poproś o doprecyzowanie. Nie przyjmuj domyślnie 7 dni.'
+
+liczby:
+  - 'Open rate i CTR licz od liczby ODBIORCÓW (sent), nie od liczby dostarczonych. Przy porównaniach między kampaniami mianownik musi być ten sam.'
+  - 'Preferuj statystyki UNIKALNE (unique_opens_count, unique_clicks_count) — jeden odbiorca, który otworzył maila pięć razy, to jedno otwarcie, a nie pięć. Jeśli używasz nieunikalnych, napisz to wprost.'
+  - 'Brak pola w odpowiedzi API to NIE jest zero. Pokazuj myślnik i pomijaj taką kampanię w sumach, mówiąc wprost, ile kampanii pominięto.'
+  - 'Nie podawaj procentów z dokładnością większą niż jedno miejsce po przecinku — MailerLite sam zaokrągla, a druga cyfra sugeruje precyzję, której nie ma.'
+  - 'Ułamki zapisuj z przecinkiem po polsku ("35,0%"), nie z kropką.'
+
+kontrakt_api:
+  uwaga: >
+    Nazwy pól w normalizuj_kampanie() NIE zostały zweryfikowane na żywo (na
+    maszynie nie było klucza w chwili pisania). Przy PIERWSZYM uruchomieniu
+    z realnym kluczem wywołaj MailerLiteClient.opisz_kontrakt() i porównaj
+    listę kluczy z założeniami, ZANIM ktokolwiek zaufa liczbom w raporcie.
+  paginacja: >
+    Endpoint /campaigns zwraca strony po 50 pozycji. Nie ma filtra "od daty" dla
+    kampanii — pierwsza wersja klienta wysyłała nieistniejący filter[since],
+    który serwer po prostu ignorował, przez co filtr nie działał wcale.
+    Zakres dat odcinamy po swojej stronie, na dacie wysyłki.
+  data_wysylki: >
+    Bierzemy finished_at (moment zakończenia wysyłki). scheduled_for to tylko
+    plan, a updated_at zmienia się przy każdej edycji — oba dałyby kampanie
+    w złym tygodniu.
+
+bledy:
+  401: 'Klucz API wygasł albo nie ma uprawnień do kampanii. Człowiek musi wygenerować nowy w MailerLite (Integrations -> API) i wpisać do secrets/.env jako MAILERLITE_API_KEY.'
+  429: 'Przekroczony limit zapytań. Nie ponawiaj w pętli — zgłoś i spróbuj później.'
+  brak_klucza: 'Nie buduj zestawienia z danych zastępczych. Raport ze zmyślonych liczb wygląda identycznie jak prawdziwy i nikt tego nie wychwyci.'
+
+zrodlo_w_materiale:
+  - 'Pochodzenie danych ("MailerLite, statystyki wysłanych kampanii") idzie w polu source_note do komentarza, NIE do materiału. Odbiorca ma dostać czysty tekst do przeklejenia, bez stopki do ręcznego kasowania.'

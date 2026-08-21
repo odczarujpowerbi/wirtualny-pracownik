@@ -101,20 +101,27 @@ skills:
       (microsoft_graph_mail_client.py), ale skill (wzorce użycia) nie jest jeszcze
       spisany. Zapis na SharePoint ma już własny skill: sharepoint_writer.
   - name: mailerlite_operations
-    version: "planned"
-    risk: żółte
+    version: "0.1.0"
+    risk: green
     description: >
-      Kampanie (pełny zapis: draft/harmonogram/wysyłka/statystyki) vs
-      automatyzacje (workflow budowany raz w UI, bot zarządza tylko danymi
-      wjeżdżającymi) — patrz integrations.yaml, wpis mailerlite.
+      Zestawienie wysłanych kampanii i ich statystyk (skills/mailerlite_operations.yaml,
+      konektor mailerlite_client.py, worker integracje_worker.py). Sam odczyt = zielone.
+      Tworzenie/wysyłka kampanii NIE wchodzi w ten skill i pozostaje czerwona
+      (mass_email w approval_policy.yaml). Nazwy pól API niezweryfikowane na żywo —
+      przy pierwszym uruchomieniu z kluczem sprawdź MailerLiteClient.opisz_kontrakt().
   - name: ads_platforms_operations
     version: "planned"
     risk: żółte/czerwone
     description: Wspólny wzorzec dla Meta Ads i TikTok Ads — odczyt kampanii, zmiana budżetu w granicach bounded red, raportowanie wydatków.
   - name: zanfia_courses_operations
-    version: "planned"
-    risk: żółte
-    description: Struktura kursów i danych sprzedażowych na zanfia.com przez MCP — do raportu sprzedażowego (sekcja 18 planu).
+    version: "0.1.0 (zablokowany — serwer MCP odrzuca autoryzację, HTTP 401)"
+    risk: green
+    description: >
+      Odczyt danych sprzedażowych kursów z zanfia.com przez MCP
+      (skills/zanfia_courses_operations.yaml, konektor zanfia_client.py). Narzędzia MCP
+      odkrywane w locie; wywoływane wyłącznie odczytowe. Lista narzędzi nieznana,
+      dopóki nie zadziała token — sekcja `narzedzia` w skillu jest pusta i do
+      uzupełnienia po pierwszym udanym tools/list.
   - name: miro_read_operations
     version: "planned"
     risk: zielone
