@@ -80,6 +80,15 @@ jobs:
   function: run_weekly_report
   interval_seconds: 604800
   enabled: false
+- name: kacper_monitor
+  description: Monitor i samo-naprawa (Kacper, docs/przeplyw.html) - czyta wspolny
+    dziennik, wykrywa prace cykliczne i skille zawodzace powtarzalnie, zaklada
+    zadanie naprawcze. Domyslnie wylaczony, bo tworzy zadania - wlacz po przejrzeniu
+    pierwszych przebiegow (python kacper_monitor.py recznie).
+  module: kacper_monitor
+  function: run_monitor_cycle
+  interval_seconds: 60
+  enabled: false
 - name: task_feedback_requester
   description: Prosi o feedback po zamknieciu zadania (komentarz, zadanie, mail).
     Domyslnie wylaczony, bo tworzy zadania i wysyla maile.

@@ -1,0 +1,16 @@
+# Progi dla kacper_monitor.py (rola "Kacper" z docs/przeplyw.html — monitor i
+# samo-naprawa). "Konfiguracja firmy" (SKALOWANIE.md sekcja 2), edytowalna bez
+# zmiany kodu.
+
+# Ile RAZY musi zawiesc TA SAMA nazwana praca cyklicznie (job_scheduler,
+# config/schedule.yaml) w ostatnich `job_failure_window` przebiegach, zeby
+# Kacper zalozyl JEDNO zadanie naprawcze (deduplikowane per dzien).
+job_failure_threshold: 3
+job_failure_window: 10
+
+# Ile RAZY musi zawiesc TEN SAM skill/narzedzie (skill_usage_logger) w ciagu
+# 24h, zeby Kacper zalozyl zadanie naprawcze (deduplikowane per dzien).
+skill_failure_threshold: 3
+
+# Komu przypisac zadania naprawcze i alarmy pilne.
+alert_assignee: pawel

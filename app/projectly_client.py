@@ -205,6 +205,15 @@ class ProjectlyClient:
         self._mcp.call_tool("update_task", {"taskId": task_id, "status": projectly_status})
         return True
 
+    def default_admin_project_id(self):
+        """project_id dla zadań bez naturalnego projektu źródłowego (alerty
+        system_health_monitor.py, naprawcze kacper_monitor.py) — config
+        default_admin_project (nazwa), rozwiązywana jak każda inna nazwa
+        projektu. None, gdy nieskonfigurowany albo nierozpoznany (wywołujący
+        wtedy nie twory zadania w Projectly, tylko loguje/publikuje status)."""
+        name = self._cfg.get("default_admin_project")
+        return self._project_id_by_name(name) if name else None
+
     def create_task(self, title, description, assigned_to, parent_task_id=None, project_id=None, relation_type="eskalacja"):
         """MCP: create_task (+ link_tasks). Tworzy zadanie w projekcie project_id,
         przypisane do assigned_to (alias lub nazwa osoby), i — jeśli podano
@@ -351,6 +360,9 @@ class MockProjectlyClient:
     def update_status(self, task_id, status):
         print(f"[MOCK Projectly] {task_id} -> status: {status}")
         return True
+
+    def default_admin_project_id(self):
+        return "MOCK-ADMIN-PROJECT"
 
     def create_task(self, title, description, assigned_to, parent_task_id=None, project_id=None, relation_type="eskalacja"):
         tasks = self._load(self._created_tasks_path, default=[])

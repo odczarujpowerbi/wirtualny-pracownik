@@ -60,8 +60,19 @@ def test_comments_rotate_and_cap():
     print(f"OK  komentarze przycięte do ostatnich {MAX_COMMENTS_PER_TASK} (bez nieograniczonego wzrostu pliku)")
 
 
+def test_mock_has_default_admin_project_id():
+    # ProjectlyClient.create_task realnego klienta wymaga project_id (żywy
+    # incydent 21.08.2026 — kacper_monitor/system_health_monitor wywalały się
+    # na tym przy zadaniach bez naturalnego projektu). Mock musi wystawiać ten
+    # sam interfejs, żeby kod wywołujący był identyczny na mocku i na żywo.
+    client = MockProjectlyClient()
+    assert client.default_admin_project_id(), "mock musi zwracac niepusty project_id"
+    print("OK  MockProjectlyClient.default_admin_project_id() zwraca stały mockowy id")
+
+
 if __name__ == "__main__":
     test_self_heal_from_corrupt_json()
     test_atomic_save_no_leftover_tmp()
     test_comments_rotate_and_cap()
+    test_mock_has_default_admin_project_id()
     print("\nWszystkie testy MockProjectlyClient przeszły.")

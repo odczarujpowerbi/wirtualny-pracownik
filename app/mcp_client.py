@@ -78,10 +78,37 @@ class MCPClient:
     def _parse_body(raw, content_type):
         text = raw.decode("utf-8", "replace")
         if "text/event-stream" in (content_type or ""):
-            text = "".join(line[5:].strip() for line in text.splitlines() if line.startswith("data:"))
+            return MCPClient._parse_sse(text)
         if not text.strip():
             return None
         return json.loads(text)
+
+    @staticmethod
+    def _parse_sse(text):
+        """SSE (text/event-stream): każda linia 'data:' to WŁASNY, kompletny
+        komunikat JSON-RPC (odpowiedź albo notyfikacja progresu) — NIE fragment
+        jednego JSON-a rozbitego na wiele linii. Poprzednia wersja łączyła
+        wszystkie linie 'data:' w jeden string przed json.loads(): gdy serwer
+        wysłał więcej niż jedno zdarzenie dla tego samego wywołania (np.
+        notyfikację progresu + finalny wynik), dawało to dwa poprawne dokumenty
+        JSON zlepione w jeden string i błąd "Extra data" (żywy incydent
+        21.08.2026 — runner_loop padał na każdym cyklu z tego powodu). Zwracamy
+        ostatnią wiadomość z 'result' albo 'error' (finalna odpowiedź JSON-RPC);
+        notyfikacje bez tych pól po drodze pomijamy."""
+        last_response = None
+        for line in text.splitlines():
+            if not line.startswith("data:"):
+                continue
+            payload = line[5:].strip()
+            if not payload:
+                continue
+            try:
+                parsed = json.loads(payload)
+            except (ValueError, TypeError):
+                continue
+            if isinstance(parsed, dict) and ("result" in parsed or "error" in parsed):
+                last_response = parsed
+        return last_response
 
     def _ensure_initialized(self):
         if self._initialized:

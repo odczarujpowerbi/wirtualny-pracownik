@@ -147,6 +147,35 @@ def get_events(task_id):
     return [{"event_type": r[0], "detail": r[1], "created_at": r[2]} for r in rows]
 
 
+_EVENT_SINCE_FIELDS = ["id", "task_id", "event_type", "detail", "created_at",
+                       "agent", "decision", "reason", "model", "cost_usd", "duration_ms"]
+
+
+def max_event_id():
+    """Najwyższe istniejące id w events (0, gdy tabela pusta) — kacper_monitor.py
+    seeduje od tego przy PIERWSZYM włączeniu, żeby monitorować od 'teraz', nie
+    retroaktywnie całą historię zdarzeń nagraną przed jego włączeniem."""
+    conn = _connect()
+    row = conn.execute("SELECT MAX(id) FROM events").fetchone()
+    conn.close()
+    return row[0] or 0
+
+
+def get_events_since(last_id=0, limit=2000):
+    """Wszystkie zdarzenia z id > last_id, najstarsze pierwsze — kursor po
+    autoincrement id (nie po czasie, żeby nic nie przeoczyć przy zdarzeniach
+    zapisanych w tej samej milisekundzie). Zasila kacper_monitor.py (M-Kacper) —
+    czyta 'wspólny dziennik' od ostatniego przebiegu, nie całą historię co cykl."""
+    conn = _connect()
+    rows = conn.execute(
+        f"""SELECT {', '.join(_EVENT_SINCE_FIELDS)} FROM events
+            WHERE id > ? ORDER BY id LIMIT ?""",
+        (last_id, limit),
+    ).fetchall()
+    conn.close()
+    return [dict(zip(_EVENT_SINCE_FIELDS, row)) for row in rows]
+
+
 _DECISION_FIELDS = ["id", "task_id", "event_type", "created_at", "agent",
                     "decision", "reason", "model", "cost_usd", "duration_ms"]
 

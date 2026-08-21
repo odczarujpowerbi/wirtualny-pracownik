@@ -47,6 +47,12 @@ live_status:
   project: "Administracyjne"
   page_title_template: "Status na żywo — {role}"
 
+# Projekt dla zadań infrastrukturalnych bez naturalnego projektu źródłowego
+# (alerty system_health_monitor.py, zadania naprawcze kacper_monitor.py) —
+# create_task w realnym Projectly wymaga project_id, a te moduły nie mają
+# zadania źródłowego, z którego by je wzięły.
+default_admin_project: "Administracyjne"
+
 # --- Mapowanie schematu Projectly -> kontrakt wewnętrzny (get_new_tasks) ---
 # risk_level_hint NIE istnieje w Projectly; brak -> runner klasyfikuje jako
 # żółte (fail-closed). goal -> expected_result, effect -> acceptance_criteria.

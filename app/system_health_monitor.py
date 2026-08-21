@@ -100,11 +100,20 @@ def run_health_check(client=None, thresholds=None):
 
     created_task_id = None
     if health["status"] == "critical":
-        created_task_id = client.create_task(
-            title="Alert: stan maszyny wymaga sprawdzenia",
-            description="Wykryte problemy:\n- " + "\n- ".join(health["issues"]),
-            assigned_to=thresholds.get("alert_assignee", "pawel"),
-        )
+        # create_task w realnym Projectly wymaga project_id; ten alert nie ma
+        # naturalnego projektu źródłowego, więc bierzemy skonfigurowany
+        # default_admin_project. Fail-closed: bez niego NIE zgadujemy projektu,
+        # zostaje przy publish_status (widoczne w dashboardzie).
+        admin_project_id = client.default_admin_project_id()
+        if admin_project_id:
+            created_task_id = client.create_task(
+                title="Alert: stan maszyny wymaga sprawdzenia",
+                description="Wykryte problemy:\n- " + "\n- ".join(health["issues"]),
+                assigned_to=thresholds.get("alert_assignee", "pawel"),
+                project_id=admin_project_id,
+            )
+        else:
+            print("[system_health_monitor] Brak default_admin_project — NIE tworzę zadania w Projectly.")
 
     return {"snapshot": snapshot, "health": health, "created_task_id": created_task_id}
 
