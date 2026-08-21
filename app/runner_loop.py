@@ -29,6 +29,7 @@ import cost_tracker
 import executor
 import heartbeat
 import kill_switch
+import poprawka_materialu
 import live_status_publisher
 import risk_classifier
 import risk_hint
@@ -90,7 +91,10 @@ def _process_task_core(task, policy, routing, client):
     # inaczej akcje czerwone (wysyłka/budżet/publikacja) nie byłyby rozpoznane.
     hint = task.get("risk_level_hint")
     if not hint or hint == "yellow":
-        hint = risk_hint.hint_from_task(task)
+        # Rozpoznanie workera PRZED klasyfikacją: gdy zadanie obsłuży narzędzie
+        # czysto odczytowe, kolor bierze się z tej wiedzy, a nie ze słów w tytule
+        # ("zestawienie WYSYŁEK KAMPANII" to odczyt, choć brzmi jak wysyłka).
+        hint = risk_hint.hint_from_task(task, executor.rozpoznaj_narzedzie(task))
     action_type = HINT_TO_ACTION.get(hint, "report_build")
     risk = risk_classifier.classify(action_type, policy)
     owner, confident = task_router.route_task(task["title"], routing)
@@ -167,9 +171,25 @@ def _process_task_core(task, policy, routing, client):
             task_id, agent="gustaw",
             decision="gate_passed" if gate["passed"] else "gate_failed",
             reason=gate["summary"], now=now_iso(), event_type="quality_gate")
+        # Zanim cokolwiek trafi do człowieka: nanieś uwagi samodzielnie. Zastrzeżenia
+        # bramki są konkretne ("brak jednostki", "miały być trzy zdania"), więc
+        # odsyłanie ich właścicielowi to przerzucanie na niego pracy agenta.
+        if not gate["passed"]:
+            gate, execution_result = _popraw_i_sprawdz_ponownie(task, execution_result, gate)
+
         if gate["passed"]:
             status, comment = "done", _comment_gate_passed(owner, gate)
             skill_usage_logger.log_usage(task_id, "quality_gate", "success", gate["summary"])
+        elif _zadanie_zle_postawione(execution_result, gate):
+            # Zadanie bez potrzebnych danych albo źle postawione. Zakładanie zadania
+            # "wymaga decyzji" nic tu nie wnosi — zamykamy z konkretnym feedbackiem,
+            # czego zabrakło, żeby właściciel mógł poprawić polecenie i wrzucić je
+            # jeszcze raz. Agent ma zdejmować pracę, nie dokładać jej.
+            reason = _gate_failure_reason(gate)
+            state_store.log_decision(task_id, agent="pawel", decision="zamkniete_z_feedbackiem",
+                                     reason=reason, now=now_iso(), event_type="escalation")
+            status, comment = "done", _comment_zamkniete_z_feedbackiem(owner, execution_result, gate)
+            skill_usage_logger.log_usage(task_id, "quality_gate", "failure", reason)
         else:
             reason = _gate_failure_reason(gate)
             escalate_to_human(task, reason, client, assignee=owner)
@@ -244,6 +264,79 @@ def _comment_gate_passed(owner, gate):
 
 def _comment_escalated(owner, reason):
     return f"⚠️ needs_approval\nWymaga decyzji: tak — {reason}\nUtworzono osobne zadanie dla: {owner}\n"
+
+
+MAX_POPRAWEK = 2
+
+# Zwroty, po których poznajemy, że problemem jest ZADANIE, a nie redakcja materiału.
+# Przy nich poprawka nic nie da, bo brakuje danych albo polecenie jest niejasne.
+_SYGNALY_ZLEGO_ZADANIA = (
+    "nie wykonano", "brak zamówionego elementu", "źródło nie zawiera",
+    "nie da się", "potrzebuję źródła", "nie odpowiada na zadanie",
+)
+
+
+def _popraw_i_sprawdz_ponownie(task, execution_result, gate):
+    """Nanosi zastrzeżenia bramki na materiał i puszcza go przez bramkę jeszcze raz.
+
+    Zwraca (gate, execution_result) — po poprawce albo bez zmian, gdy poprawka się
+    nie udała. Limit prób jest twardy: po MAX_POPRAWEK zadanie idzie dalej swoją
+    ścieżką, żeby agent nie kręcił się w kółko na materiale, którego nie umie
+    naprawić."""
+    for proba in range(1, MAX_POPRAWEK + 1):
+        uwagi = gate.get("concerns") or []
+        material = execution_result.get("acceptance_notes") or ""
+        if not uwagi or not material or _zadanie_zle_postawione(execution_result, gate):
+            return gate, execution_result
+
+        wynik = poprawka_materialu.popraw(
+            material, uwagi,
+            zadanie=" ".join(str(task.get(k) or "") for k in ("title", "description")))
+        if not wynik["available"]:
+            state_store.log_decision(task["task_id"], agent="patrycja", decision="poprawka_nieudana",
+                                     reason=wynik["powod"], now=now_iso(),
+                                     cost_usd=wynik.get("cost_usd", 0.0))
+            return gate, execution_result
+
+        execution_result = {**execution_result, "acceptance_notes": wynik["material"],
+                            "cost_usd": execution_result.get("cost_usd", 0.0) + wynik.get("cost_usd", 0.0)}
+        state_store.log_decision(
+            task["task_id"], agent="patrycja", decision=f"poprawka_{proba}",
+            reason="Naniesiono uwagi odbioru: " + "; ".join(uwagi)[:400],
+            now=now_iso(), event_type="execution", cost_usd=wynik.get("cost_usd", 0.0))
+
+        gate = bot_gustaw_bramka.run_gate(task, execution_result)
+        state_store.log_decision(
+            task["task_id"], agent="gustaw",
+            decision="gate_passed" if gate["passed"] else "gate_failed",
+            reason=f"po poprawce {proba}: {gate['summary']}", now=now_iso(), event_type="quality_gate")
+        if gate["passed"]:
+            break
+    return gate, execution_result
+
+
+def _zadanie_zle_postawione(execution_result, gate):
+    """Czy problem leży w ZADANIU (brak danych, niejasne polecenie), a nie w materiale.
+    Wtedy poprawka redakcyjna nic nie da i nie ma po co zakładać zadania dla człowieka —
+    wystarczy zamknąć z informacją, czego zabrakło."""
+    material = (execution_result.get("acceptance_notes") or "").lower()
+    if material.startswith("nie wykonano"):
+        return True
+    tekst = " ".join(str(c).lower() for c in (gate.get("concerns") or []))
+    return any(sygnal in tekst for sygnal in _SYGNALY_ZLEGO_ZADANIA)
+
+
+def _comment_zamkniete_z_feedbackiem(owner, execution_result, gate):
+    """Komentarz zamykający zadanie, którego nie da się wykonać w tej postaci.
+    Mówi wprost, czego zabrakło i co zrobić, żeby dało się je wykonać."""
+    braki = "\n".join(f"- {c}" for c in (gate.get("concerns") or [])) or "- (brak szczegółów)"
+    return (
+        "🔒 zamknięte z feedbackiem — zadania nie da się wykonać w tej postaci\n"
+        f"{execution_result.get('acceptance_notes') or ''}\n\n"
+        f"Czego zabrakło:\n{braki}\n\n"
+        "Nie zakładam osobnego zadania dla człowieka: popraw polecenie albo wskaż "
+        f"właściwe źródło i wrzuć je ponownie. Przypisane do: {owner}"
+    )
 
 
 def _gate_failure_reason(gate):
