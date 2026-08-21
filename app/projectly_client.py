@@ -33,6 +33,7 @@ CONFIG_PATH = Path(__file__).parent / "config" / "projectly.yaml"
 ROLE_CONFIG_PATH = Path(__file__).parent / "config" / "role.json"
 MOCK_TASKS_PATH = Path(__file__).parent / "mock_data" / "sample_tasks.json"
 MOCK_RUNS_DIR = Path(__file__).parent / "runs"
+MAX_COMMENTS_PER_TASK = 200  # rotacja mock_comments.json — patrz post_comment
 
 # Projectly zna tylko trzy statusy (todo|in_progress|done). Pipeline używa
 # szerszego zestawu wewnętrznego (planning, needs_approval, queued...) — tu je
@@ -337,7 +338,13 @@ class MockProjectlyClient:
     def post_comment(self, task_id, text):
         print(f"[MOCK Projectly] komentarz na {task_id}:\n{text}\n")
         comments = self._load(self._comments_path, default={})
-        comments.setdefault(task_id, []).append(text)
+        thread = comments.setdefault(task_id, [])
+        thread.append(text)
+        # Bez limitu ten plik rośnie bez końca, gdy scheduler w trybie mock
+        # zostaje włączony na dłużej (żywy incydent: sample_tasks.json wraca jako
+        # "nowe" co cykl, bo mock get_new_tasks nie znaczy zadań jako odebrane —
+        # 2263 komentarze/dzień na jedno zadanie, 6+ MB). Trzymamy tylko ostatnie N.
+        del thread[:-MAX_COMMENTS_PER_TASK]
         self._save(self._comments_path, comments)
         return True
 
@@ -394,16 +401,30 @@ class MockProjectlyClient:
 
     @staticmethod
     def _load(path, default):
+        """Wczytuje JSON, samoleczące się z uszkodzenia: dwa procesy scheduler
+        potrafią zapisywać ten sam mock_*.json równocześnie (żywy incydent
+        21.08.2026 na mock_comments.json — 'Extra data', runner_loop padał na
+        każdym cyklu). Uszkodzony plik traktujemy jak brak pliku, nie wywalamy
+        pętli agenta o zepsuty plik mocka."""
         if not path.exists():
             return default
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(path, encoding="utf-8") as f:
+                return json.load(f)
+        except json.JSONDecodeError as exc:
+            print(f"[MOCK Projectly] {path.name} uszkodzony ({exc}) — reset do wartości domyślnej.")
+            return default
 
     @staticmethod
     def _save(path, data):
+        """Zapis atomowy (tmp + os.replace) — os.replace jest atomowy na Windows
+        i POSIX, więc równoległy zapis drugiego procesu nigdy nie zastaje pliku
+        w stanie połowicznie zapisanym (przyczyna uszkodzenia opisana w _load)."""
         path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
+        tmp_path = path.with_suffix(path.suffix + f".tmp{os.getpid()}")
+        with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+        os.replace(tmp_path, path)
 
 
 def get_client():

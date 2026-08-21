@@ -10,10 +10,15 @@ Sterowanie agentem z panelu operatora (M3 / OPS-01). Trzy stany:
 STOP ma priorytet nad PAUSE. Pętle (job_scheduler, runner_loop, notebook_intake)
 pytają `should_run_new_work()` — bieżące, już trwające zadanie kończy się samo,
 nowego nie zaczynamy (bezpieczne zatrzymanie wg PLAN-WDROZENIA.md sekcja 17).
+
+`should_run_new_work()` dolicza też budżet dobowy (cost_tracker.budget_state) —
+przy 'warning' (domyślnie 92% limitu) lub 'exceeded' też nie zaczynamy nowej
+pracy, bez potrzeby ręcznego STOP/START (samo-czyszczące następnego dnia).
 """
 
 from pathlib import Path
 
+import cost_tracker
 import kill_switch
 
 PAUSE_FLAG_PATH = Path(__file__).parent / "runs" / "PAUSE.flag"
@@ -46,8 +51,13 @@ def state():
 
 
 def should_run_new_work():
-    """Czy wolno podjąć NOWĄ pracę — fałsz przy STOP albo PAUSE."""
-    return not kill_switch.is_active() and not is_paused()
+    """Czy wolno podjąć NOWĄ pracę — fałsz przy STOP, PAUSE, albo budżecie
+    dobowym w stanie 'warning'/'exceeded' (cost_tracker.budget_state — trwające
+    zadanie kończy się samo, tylko nowe nie startują; self-healing, wraca do
+    'ok' bez ręcznego 'start', gdy budżet się odnowi następnego dnia)."""
+    if kill_switch.is_active() or is_paused():
+        return False
+    return cost_tracker.budget_state()["level"] == "ok"
 
 
 def apply(action):

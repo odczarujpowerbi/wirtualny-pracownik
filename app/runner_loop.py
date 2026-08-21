@@ -352,6 +352,15 @@ def run_once(client=None):
         print(f"PAUSE ({control.pause_reason()}) — runner nie podejmuje nowej pracy.")
         return []
 
+    budget = cost_tracker.budget_state()
+    if budget["level"] != "ok":
+        print(
+            f"Budżet dobowy: {budget['level']} ({budget['percent']}%, "
+            f"{budget['total']:.2f}/{budget['limit']:.2f} USD) — runner nie podejmuje nowej pracy."
+        )
+        heartbeat.write_heartbeat(current_task_id=None, extra={"budget": budget})
+        return []
+
     policy = risk_classifier.load_policy()
     routing = task_router.load_routing()
     # client wstrzykiwany w testach (bootstrap_smoke_test wymusza mock, żeby test
@@ -367,15 +376,15 @@ def run_once(client=None):
         heartbeat.write_heartbeat(current_task_id=task["task_id"])
         results.append(process_task(task, policy, routing, client))
 
-    heartbeat.write_heartbeat(current_task_id=None)
+    budget = cost_tracker.budget_state()
+    heartbeat.write_heartbeat(current_task_id=None, extra={"budget": budget})
     live_status_publisher.publish(client, role="dev")
 
-    daily_cost = cost_tracker.check_daily_limit()
-    if daily_cost["over_limit"]:
-        kill_switch.activate(
-            f"Przekroczono dzienny limit kosztu: {daily_cost['total']} > {daily_cost['limit']} USD."
+    if budget["level"] != "ok":
+        print(
+            f"UWAGA: budżet dobowy {budget['level']} ({budget['percent']}%) — "
+            f"kolejny przebieg nie zacznie nowych zadań, dopóki się nie odnowi."
         )
-        print("UWAGA: przekroczono dzienny limit kosztu, aktywowano kill switch.")
 
     return results
 
