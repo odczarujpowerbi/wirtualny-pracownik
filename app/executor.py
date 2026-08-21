@@ -18,6 +18,7 @@ from urllib.parse import urlparse
 
 import yaml
 
+import integracje_worker
 import pbi_desktop_bridge
 import pbip_validate
 import screenshot_capture
@@ -30,6 +31,22 @@ import web_fetch_worker
 SKILL_PATH = Path(__file__).parent / "skills" / "web_research_operations.yaml"
 
 
+def rozpoznaj_narzedzie(task):
+    """Którym narzędziem TO zadanie zostanie wykonane — bez wykonywania czegokolwiek.
+    Potrzebne PRZED klasyfikacją ryzyka: risk_hint zgaduje kolor ze słów w tytule,
+    a gdy wiadomo, że zadanie obsłuży worker czysto odczytowy, ta wiedza powinna
+    wygrać nad zgadywaniem (patrz risk_hint.hint_from_task). Zwraca None, gdy
+    żaden worker się nie zgłasza — wtedy zostaje sama heurystyka."""
+    action = (task.get("action") or "").lower()
+    if action in ("mailerlite_report", "zanfia_query"):
+        return action
+    if integracje_worker.czy_mailerlite(task):
+        return "mailerlite_report"
+    if integracje_worker.czy_zanfia(task):
+        return "zanfia_query"
+    return None
+
+
 def execute(task):
     """Zwraca execution_result z REALNYM efektem, gdy typ zadania jest obsługiwany,
     albo None, gdy dla tego typu nie ma jeszcze workera."""
@@ -40,6 +57,13 @@ def execute(task):
         return _run_screenshot_capture(task)
     if action == "open_pbip_capture":
         return _run_pbip_capture(task)
+    # Konektory firmowe PRZED fetch_url: zadanie o MailerLite potrafi nieść w
+    # opisie zwykły link (np. do panelu), a wtedy trafiłoby do pobierania strony
+    # zamiast do właściwego źródła danych.
+    if action == "mailerlite_report" or integracje_worker.czy_mailerlite(task):
+        return integracje_worker.raport_mailerlite(task)
+    if action == "zanfia_query" or integracje_worker.czy_zanfia(task):
+        return integracje_worker.podsumowanie_zanfia(task)
     if action == "fetch_url" or _url_from_task(task):
         return _run_web_fetch(task)
     obcy = _url_spoza_allowlisty(task)

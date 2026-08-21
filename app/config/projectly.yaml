@@ -39,6 +39,14 @@ escalation_default_assignee: "Paweł"
 poll:
   project_statuses: ["active"]   # które projekty pollować (status z list_projects)
   task_status: "todo"
+  # DODATKOWE konta AI, których zadania bierze ta maszyna, oprócz konta własnej
+  # roli (role_to_account). Jedna maszyna obsługuje dziś kilka ról naraz — bez
+  # tego zadanie wrzucone na "AI - Marketing" wisiałoby w kolejce nietknięte,
+  # bo maszyna z rolą "dev" pytała wyłącznie o "AI - Dev".
+  # Konto wymienione tutaj, a nieistniejące w Projectly, jest zgłaszane w logu
+  # (literówka nie może wyglądać jak "brak zadań").
+  extra_accounts:
+    - "AI - Marketing"
 
 # Strona dokumentacji na "status na żywo" per rola (live_status_publisher.py).
 # publish_status znajdzie/utworzy/nadpisze stronę o tym tytule w tym projekcie.

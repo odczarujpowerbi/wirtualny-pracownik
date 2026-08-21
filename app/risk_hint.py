@@ -27,22 +27,59 @@ _GREEN_KEYWORDS = (
     "raport tylko do odczytu", "wylistuj", "policz",
 )
 # Akcje workerów, które są z definicji read-only (zielone) niezależnie od tytułu.
-_GREEN_ACTIONS = {"validate_pbip", "read_report", "capture_screenshot", "fetch_url"}
+_GREEN_ACTIONS = {"validate_pbip", "read_report", "capture_screenshot", "fetch_url",
+                  "mailerlite_report", "zanfia_query"}
+
+# Czasowniki, które opisują CZYNNOŚĆ do wykonania na zewnątrz. Ich obecność
+# trzyma zadanie na czerwonym nawet wtedy, gdy rozpoznaliśmy read-only workera —
+# bo "zrób zestawienie i wyślij je klientowi" to zadanie, którego worker wykona
+# tylko połowę, a zamknięcie go jako zrobione byłoby nieprawdą.
+_RED_CZASOWNIKI = (
+    "wyślij", "wyslij", "wyślę", "wysle", "roześlij", "rozeslij", "opublikuj", "publikuj",
+    "usuń", "usun", "skasuj", "nadpisz", "zapłać", "zaplac", "przelej", "zmień budżet",
+    "zmien budzet", "wdroż na produkcj", "wdroz na produkcj", "deploy",
+)
+
+
+def _tekst(wartosc):
+    """Pole zadania -> tekst. acceptance_criteria bywa LISTĄ kryteriów (tak
+    wygląda w mock_data/sample_tasks.json i tak potrafi przyjść z Projectly),
+    a str.join na liście wywracał całą pętlę runnera wyjątkiem TypeError —
+    zadanie nie było wtedy ani wykonane, ani eskalowane, tylko przepadało."""
+    if isinstance(wartosc, (list, tuple)):
+        return " ".join(_tekst(x) for x in wartosc)
+    return "" if wartosc is None else str(wartosc)
 
 
 def _haystack(task):
     parts = [task.get("title", ""), task.get("description", ""),
              task.get("expected_result", ""), task.get("acceptance_criteria", "")]
-    return " ".join(p for p in parts if p).lower()
+    return " ".join(_tekst(p) for p in parts if p).lower()
 
 
-def hint_from_task(task):
-    """Zwraca 'green' | 'yellow' | 'red' na podstawie treści i akcji zadania."""
+def hint_from_task(task, rozpoznane_narzedzie=None):
+    """Zwraca 'green' | 'yellow' | 'red' na podstawie treści i akcji zadania.
+
+    rozpoznane_narzedzie: nazwa narzędzia, którym worker FAKTYCZNIE wykona to
+    zadanie (executor.rozpoznaj_narzedzie). Gdy jest podana i narzędzie jest
+    z definicji tylko do odczytu, wygrywa nad heurystyką słów — bo wtedy nie
+    zgadujemy już, co się stanie, tylko to wiemy. Bez tego 'Zestawienie wysyłek
+    kampanii z MailerLite' wpadało na czerwone przez same rzeczowniki 'wysyłk'
+    i 'kampani', choć zadanie jest czystym odczytem statystyk — i takie
+    zestawienie nie mogłoby nigdy pojechać automatem."""
     action = (task.get("action") or "").lower()
     if action in _GREEN_ACTIONS:
         return "green"
 
     text = _haystack(task)
+
+    if rozpoznane_narzedzie in _GREEN_ACTIONS:
+        # Zadanie zleca też czynność na zewnątrz, której read-only worker nie
+        # wykona — zostaje czerwone, żeby nie zamknąć go jako zrobione w połowie.
+        if any(kw in text for kw in _RED_CZASOWNIKI):
+            return "red"
+        return "green"
+
     if any(kw in text for kw in _RED_KEYWORDS):
         return "red"
     if any(kw in text for kw in _GREEN_KEYWORDS):
