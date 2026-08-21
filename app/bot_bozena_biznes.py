@@ -188,7 +188,7 @@ def review(task, execution_result, config=None):
     persona = load_persona()
     prompt = build_prompt(task, execution_result, context, persona, load_ustalenia())
 
-    answer = task_thinker.ask_model(prompt)
+    answer = task_thinker.ask_model(prompt, caller="bot_bozena_biznes.review")
     if not answer["available"]:
         return verdict(
             BOT, "skipped", 0.3,

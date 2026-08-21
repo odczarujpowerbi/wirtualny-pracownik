@@ -16,6 +16,7 @@ import os
 import re
 from pathlib import Path
 
+import model_registry
 from email_client import get_email_client
 
 TEMPLATES_DIR = Path(__file__).parent / "templates" / "email"
@@ -67,7 +68,8 @@ def ai_polish(body_text):
         "i nie zmieniaj nic w nawiasach klamrowych, jeśli jakieś zostały:\n\n" + body_text
     )
     client = anthropic.Anthropic()
-    response = client.messages.create(model="claude-sonnet-4-5", max_tokens=600, messages=[{"role": "user", "content": prompt}])
+    _, model = model_registry.resolve("email_draft_generator.generate")
+    response = client.messages.create(model=model, max_tokens=600, messages=[{"role": "user", "content": prompt}])
     return response.content[0].text.strip()
 
 

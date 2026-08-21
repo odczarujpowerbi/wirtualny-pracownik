@@ -15,6 +15,7 @@ się cicho. Brak dowodu to sygnał do eskalacji, nie automatyczna zgoda.
 import os
 
 import env_bootstrap  # noqa: F401  # wczytuje .env / secrets/.env przed odczytem ANTHROPIC_API_KEY
+import model_registry
 
 
 def validator_technical(task, execution_result):
@@ -136,8 +137,11 @@ def _call_vision_model(task, screenshot_path):
 
     try:
         client = anthropic.Anthropic()
+        # Ocena zrzutu ekranu to osad (podobny profil ryzyka do Bożeny), więc
+        # config/model_tiers.yaml przypisuje temu callerowi wysoki poziom.
+        _, model = model_registry.resolve("validators.visual_review")
         response = client.messages.create(
-            model="claude-sonnet-4-5",
+            model=model,
             max_tokens=300,
             messages=[
                 {

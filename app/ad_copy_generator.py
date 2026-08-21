@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 
 import env_bootstrap  # noqa: F401  # wczytuje .env / secrets/.env przed odczytem ANTHROPIC_API_KEY
+import model_registry
 
 PERSONY_DIR = Path(__file__).parent.parent.parent / "persony-sprzedaz"
 
@@ -56,8 +57,9 @@ def generate_variants(brief, persona_file="persony-odczaruj.md", n_variants=3):
     )
 
     client = anthropic.Anthropic()
+    _, model = model_registry.resolve("ad_copy_generator.generate")
     response = client.messages.create(
-        model="claude-sonnet-4-5",
+        model=model,
         max_tokens=1500,
         messages=[{"role": "user", "content": prompt}],
     )

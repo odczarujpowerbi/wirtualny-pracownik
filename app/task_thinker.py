@@ -23,6 +23,7 @@ from pathlib import Path
 
 import env_bootstrap  # noqa: F401  # wczytuje .env / secrets/.env (ANTHROPIC_API_KEY fallback)
 import cost_estimator
+import model_registry
 import task_brief_builder
 
 THINK_TIMEOUT_SECONDS = 120
@@ -71,13 +72,16 @@ def _safe_cwd(task):
     return tempfile.gettempdir()
 
 
-def _think_via_claude_code(claude_exe, prompt, cwd=None):
-    """Wywołuje Claude Code headless. cwd = repo zadania (kontekst) albo temp.
-    Koszt subskrypcji szacowany proxy (cost_estimator), żeby kill switch liczył
-    wolumen wywołań (wcześniej 0.0 -> bezpiecznik nie działał)."""
+def _think_via_claude_code(claude_exe, prompt, caller, cwd=None):
+    """Wywołuje Claude Code headless. `caller` identyfikuje wywołanie w tabeli
+    config/model_tiers.yaml (np. "task_thinker.think", "web_answer.answer") —
+    stąd bierzemy poziom (high/low) i konkretny model (model_registry.resolve).
+    cwd = repo zadania (kontekst) albo temp. Koszt subskrypcji szacowany proxy
+    (cost_estimator), żeby kill switch liczył wolumen wywołań."""
+    role, model = model_registry.resolve(caller)
     cost = cost_estimator.estimate_call("claude_code")
     result = subprocess.run(
-        [claude_exe, "-p", prompt],
+        [claude_exe, "-p", "--model", model, prompt],
         cwd=cwd or tempfile.gettempdir(),
         capture_output=True,
         text=True,
@@ -87,27 +91,29 @@ def _think_via_claude_code(claude_exe, prompt, cwd=None):
     if result.returncode != 0:
         return {"available": True, "ok": False, "reasoning": None,
                 "detail": f"claude -p zwrócił kod {result.returncode}: {(result.stderr or '').strip()[:300]}",
-                "cost_usd": cost, "source": "claude_code"}
+                "cost_usd": cost, "source": "claude_code", "model": model}
     return {"available": True, "ok": True, "reasoning": (result.stdout or "").strip(),
-            "detail": "OK", "cost_usd": cost, "source": "claude_code"}
+            "detail": "OK", "cost_usd": cost, "source": "claude_code", "model": model}
 
 
-def _think_via_sdk(prompt):
-    """Fallback: SDK anthropic z ANTHROPIC_API_KEY (gdy brak Claude Code)."""
+def _think_via_sdk(prompt, caller):
+    """Fallback: SDK anthropic z ANTHROPIC_API_KEY (gdy brak Claude Code).
+    `caller` -> model przez model_registry.resolve, tak jak w ścieżce CLI."""
     try:
         import anthropic
     except ImportError:
         return None
+    role, model = model_registry.resolve(caller)
     client = anthropic.Anthropic()
     message = client.messages.create(
-        model="claude-opus-4-8",
+        model=model,
         max_tokens=600,
         messages=[{"role": "user", "content": prompt}],
     )
     text = "".join(block.text for block in message.content if getattr(block, "type", None) == "text")
-    cost = cost_estimator.estimate_call("anthropic_sdk", input_chars=len(prompt), output_chars=len(text))
+    cost = cost_estimator.estimate_call("anthropic_sdk", input_chars=len(prompt), output_chars=len(text), role=role)
     return {"available": True, "ok": True, "reasoning": text.strip(), "detail": "OK (SDK)",
-            "cost_usd": cost, "source": "anthropic_sdk"}
+            "cost_usd": cost, "source": "anthropic_sdk", "model": model}
 
 
 def _ask_ollama_text(prompt):
@@ -126,16 +132,22 @@ def _ask_ollama_text(prompt):
     return text or None
 
 
-def ask_model(prompt):
+def ask_model(prompt, caller="task_thinker.ask_model"):
     """Generyczne wołanie modelu dowolnym promptem (nie tylko analiza zadania).
+    `caller` identyfikuje wywołanie w config/model_tiers.yaml — decyduje, jaki
+    model użyć (np. Bożena/odbiór biznesowy woła z caller="bot_bozena_biznes.review",
+    co daje wysoki poziom; web_answer/poprawka_materialu wołają z niskim).
+    Nieznany caller -> tier "high" (fail-closed, patrz model_registry.py), więc
+    domyślny caller="task_thinker.ask_model" (nieobecny w tabeli) też ląduje na
+    wysokim poziomie — bezpieczny domyślny wybór, gdy wywołujący nic nie poda.
+
     Ta sama hierarchia co think(): Claude Code (claude login) -> SDK anthropic
     (ANTHROPIC_API_KEY) -> lokalny model tekstowy (Ollama). Nigdy nie rzuca.
-    Zwraca {available, text, source, detail}. Używane przez boty walidujące,
-    które potrzebują oceny modelu (np. Bożena — odbiór biznesowy)."""
+    Zwraca {available, text, source, detail}."""
     claude_exe = _find_claude()
     if claude_exe:
         try:
-            r = _think_via_claude_code(claude_exe, prompt)
+            r = _think_via_claude_code(claude_exe, prompt, caller)
             if r.get("ok"):
                 return {"available": True, "text": r["reasoning"], "source": "claude_code", "detail": "OK"}
         except (subprocess.TimeoutExpired, OSError):
@@ -143,7 +155,7 @@ def ask_model(prompt):
 
     if os.environ.get("ANTHROPIC_API_KEY"):
         try:
-            r = _think_via_sdk(prompt)
+            r = _think_via_sdk(prompt, caller)
             if r and r.get("ok"):
                 return {"available": True, "text": r["reasoning"], "source": "anthropic_sdk", "detail": "OK"}
         except Exception:  # noqa: BLE001 — fallback nie może wywalić wołającego
@@ -157,22 +169,25 @@ def ask_model(prompt):
             "detail": "Brak modelu (Claude Code / ANTHROPIC_API_KEY / Ollama) — nie mogę ocenić."}
 
 
-def think(task):
+def think(task, caller="task_thinker.think"):
     """Zwraca {available, ok, reasoning, detail, cost_usd, source}. Nigdy nie
     rzuca — błąd/timeout/brak modelu degraduje się do available/ok=False, żeby
-    runner mógł dokończyć zadanie na samej klasyfikacji."""
+    runner mógł dokończyć zadanie na samej klasyfikacji.
+
+    `caller` -> poziom modelu przez config/model_tiers.yaml (domyślnie wysoki:
+    analiza zadania to rozumowanie, nie mechaniczne wykonanie)."""
     prompt = build_prompt(task)
     claude_exe = _find_claude()
     if claude_exe:
         try:
-            return _think_via_claude_code(claude_exe, prompt, cwd=_safe_cwd(task))
+            return _think_via_claude_code(claude_exe, prompt, caller, cwd=_safe_cwd(task))
         except (subprocess.TimeoutExpired, OSError) as exc:
             return {"available": True, "ok": False, "reasoning": None,
                     "detail": f"Claude Code niedostępny/timeout: {exc}", "cost_usd": 0.0, "source": "claude_code"}
 
     if os.environ.get("ANTHROPIC_API_KEY"):
         try:
-            sdk_result = _think_via_sdk(prompt)
+            sdk_result = _think_via_sdk(prompt, caller)
             if sdk_result:
                 return sdk_result
         except Exception as exc:  # noqa: BLE001  # fallback nie może wywalić runnera

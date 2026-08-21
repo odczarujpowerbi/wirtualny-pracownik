@@ -1,0 +1,37 @@
+# Ktory "caller" (identyfikator wywolania modelu w kodzie) uzywa ktorego
+# poziomu, i ktory model odpowiada kazdemu poziomowi. To jest konfiguracja
+# firmy (SKALOWANIE.md sekcja 2) — zmiana przypisania = zmiana TU, nie w
+# kodzie. Czytane przez model_registry.py.
+#
+# high = rozumowanie, ocena/osad, przetwarzanie zadania — subtelny blad tu
+#        jest kosztowny (np. przepuszczenie wymyslonej cechy oferty przez
+#        odbior biznesowy).
+# low  = mechaniczne wykonanie DOBRZE OPISANEGO zadania z jasnym rezultatem —
+#        malo przestrzeni na interpretacje, blad malo prawdopodobny.
+#
+# Nieznany caller w tabeli "tiers" -> tier "high" (fail-closed: lepiej
+# przeplacic niz przepuscic bledny material na slabszym modelu).
+# Nieznany tier w "poziomy" -> rola "opus_5" (ten sam fail-closed, jeden
+# poziom nizej w kodzie — patrz model_registry.role_for_tier).
+
+poziomy:
+  high: opus_5
+  low: sonnet_4_6
+
+tiers:
+  # --- mechanizm agenta (task_thinker.py) ---
+  task_thinker.think: high              # analiza zadania (co rozumiem/plan/ryzyka) - runner_loop
+  bot_bozena_biznes.review: high         # odbior biznesowy - bramka jakosci, obowiazkowa
+  web_answer.answer: low                 # pisanie tresci z pobranych danych wg scisle opisanych regul
+  poprawka_materialu.popraw: low         # naniesienie konkretnej listy zastrzezen na material
+
+  # --- ocena wizualna: osad, ten sam profil ryzyka co Bozena ---
+  bot_oskar_wizja.review: high           # ocena zrzutu ekranu w bramce jakosci
+  validators.visual_review: high         # ocena zrzutu wzgledem oczekiwanego rezultatu
+
+  # --- generatory tresci: wykonawca, dobrze opisane zadanie ---
+  ad_copy_generator.generate: low
+  email_draft_generator.generate: low
+  mailerlite_report_analyzer.analyze: low
+  ocr_extract.extract: low
+  weekly_team_report.generate: low

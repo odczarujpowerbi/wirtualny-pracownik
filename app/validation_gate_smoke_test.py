@@ -20,7 +20,9 @@ import task_thinker
 
 
 def _fake_model(answer_text, available=True):
-    def _ask(prompt):
+    # **kw łapie caller= — review() woła ask_model z caller="bot_bozena_biznes.review"
+    # (model_registry, tabela tier), atrapa nie musi go rozróżniać, tylko przyjąć.
+    def _ask(prompt, **kw):
         return {"available": available, "text": answer_text, "source": "atrapa", "detail": "test"}
     return _ask
 

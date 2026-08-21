@@ -43,7 +43,9 @@ SUGESTIE:
 
 
 def _ask(tekst):
-    return lambda prompt: {"available": True, "text": tekst, "source": "atrapa", "detail": "OK"}
+    # **kw łapie caller= — review() woła ask_model z caller="bot_bozena_biznes.review"
+    # (model_registry, tabela tier), atrapa nie musi go rozróżniać, tylko przyjąć.
+    return lambda prompt, **kw: {"available": True, "text": tekst, "source": "atrapa", "detail": "OK"}
 
 
 def run():
@@ -78,8 +80,8 @@ def run():
         checks.append(("Czysta akceptacja -> approved bez uwag",
                        wynik["verdict"] == "approved" and wynik["concerns"] == []))
 
-        bozena.task_thinker.ask_model = lambda prompt: {"available": False, "text": None,
-                                                        "source": None, "detail": "Brak modelu."}
+        bozena.task_thinker.ask_model = lambda prompt, **kw: {"available": False, "text": None,
+                                                              "source": None, "detail": "Brak modelu."}
         wynik = bozena.review(zadanie, efekt)
         checks.append(("Brak modelu -> skipped (fail-closed, bramka eskaluje)", wynik["verdict"] == "skipped"))
     finally:

@@ -163,7 +163,10 @@ def answer(question, content, url="", zrodlo_opis=None, ask=None):
     zrodlo_opis: czytelny opis do promptu ("Narodowy Bank Polski, tabela A"); gdy brak,
         model widzi sam adres.
     ask: wstrzykiwane wołanie modelu (test dymny nie rusza modelu ani sieci)."""
-    ask = ask or task_thinker.ask_model
+    # Domyślne "ask" chowa poziom modelu (low — wykonawca dostał dane + jasne
+    # reguły formatu), zamiast wymagać go w publicznej sygnaturze answer() —
+    # tak nikt przez pomyłkę nie wywoła "wykonawcy" z wysokim poziomem.
+    ask = ask or (lambda p: task_thinker.ask_model(p, caller="web_answer.answer"))
     content = (content or "").strip()
     if not content:
         return {"available": False, "answer": "", "cost_usd": 0.0, "source": None,

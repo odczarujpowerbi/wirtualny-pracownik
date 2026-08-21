@@ -32,6 +32,7 @@ import urllib.request
 from pathlib import Path
 
 import env_bootstrap  # noqa: F401  # wczytuje .env / secrets/.env przed odczytem kluczy
+import model_registry
 import ocr_extract
 from bot_common import verdict
 
@@ -83,8 +84,11 @@ def _ask_anthropic_vision(prompt, image_b64, media_type):
         return None
     try:
         client = anthropic.Anthropic()
+        # Ocena zrzutu ekranu to osad (podobny profil ryzyka do Bożeny), więc
+        # config/model_tiers.yaml przypisuje temu callerowi wysoki poziom.
+        _, model = model_registry.resolve("bot_oskar_wizja.review")
         response = client.messages.create(
-            model="claude-sonnet-4-5",
+            model=model,
             max_tokens=300,
             messages=[{
                 "role": "user",
