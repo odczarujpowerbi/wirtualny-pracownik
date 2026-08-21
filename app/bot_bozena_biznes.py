@@ -106,6 +106,7 @@ def build_prompt(task, execution_result, context, persona, ustalenia=None):
         f"Oczekiwany rezultat: {task.get('expected_result')}\n"
         f"Kryteria akceptacji: {task.get('acceptance_criteria')}\n\n"
         f"{_dopisek_o_zrodlach(execution_result)}"
+        f"{_dopisek_o_personie(execution_result)}"
         "--- CO BOT WYKONAŁ (efekt do oceny — oceniasz WYŁĄCZNIE to, co jest między znacznikami) ---\n"
         "[POCZĄTEK MATERIAŁU]\n"
         f"{execution_result.get('acceptance_notes') or execution_result.get('output') or '(brak opisu efektu)'}\n"
@@ -138,6 +139,39 @@ def _dopisek_o_zrodlach(execution_result):
     return ("INFORMACJA DLA CIEBIE (to NIE jest część materiału — system dokleja pochodzenie danych\n"
             "do zadania osobno; nie oczekuj tego w treści i nie oceniaj tego):\n"
             f"{wciete}\n\n")
+
+
+def _dopisek_o_personie(execution_result):
+    """Gdy material celuje w konkretną buyer personę (execution_result niesie
+    target_persona + persona_brand — dwie marki mają persony o TYM SAMYM imieniu,
+    np. "Tomek", więc marka jest wymagana do bezpiecznego dopasowania), dołączamy
+    PRAWDZIWY profil tej osoby: cele, obiekcje, czego unika, co ją przekonuje.
+
+    Bez tego Bożena oceniała material generycznie ("czy JA bym to wzięła"), a nie
+    względem konkretnego adresata, dla którego material realnie jest pisany —
+    a to jest sedno odbioru biznesowego dla treści marketingowych, nie ogólna
+    poprawność (realna uwaga właściciela 21.08.2026)."""
+    target = execution_result.get("target_persona")
+    brand = execution_result.get("persona_brand") or execution_result.get("brand")
+    if not target:
+        return ""
+    plik = kontekst_firmy.dopasuj_persone(target, brand)
+    if not plik:
+        return ""
+    try:
+        profil = plik.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+    return (
+        f"--- BUYER PERSONA, DO KTÓREJ TEN MATERIAŁ MA TRAFIĆ: {target} ---\n"
+        f"{profil}\n\n"
+        "Oceń material WZGLĘDEM TEJ KONKRETNEJ OSOBY, nie ogólnie: czy ton, argumenty i "
+        "obietnice odpowiadają jej celom, obiekcjom i temu, czego unika (sekcje \"Czego "
+        "unika\", \"Obiekcje i bariery\", \"Co ją przekonuje\" powyżej). Niezgodność z tą "
+        "personą (zły ton, argumenty dla kogoś innego, ignorowanie jej realnej obiekcji) "
+        "jest ZASTRZEŻENIEM BLOKUJĄCYM — opisz WPROST, czego ta persona realnie potrzebuje "
+        "zamiast tego, żeby dało się to nanieść jako poprawkę.\n\n"
+    )
 
 
 def _parse_acceptance(text):

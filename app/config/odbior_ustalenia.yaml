@@ -20,6 +20,7 @@ blokujace:
   - 'Treść robocza w materiale: komentarze do zlecającego, pytania, "mogę dodatkowo", placeholdery.'
   - 'Zły język materiału (angielskie wstawki albo kod tam, gdzie ma być tekst po polsku).'
   - 'Naruszenie formatu wprost zamówionego w zadaniu (np. poproszono o trzy zdania, jest pięć).'
+  - 'Materiał adresowany do konkretnej buyer persony nie trafia w jej ton, argumenty ani obiekcje (patrz profil persony, gdy jest dołączony) — nie jest to ocena stylu, tylko czy dotrze do zamierzonego odbiorcy.'
 
 # Uwagi, które są WARTOŚCIOWE, ale nie wstrzymują zadania — trafiają do komentarza
 # jako sugestie i do rozwoju skilla. Bez tego podziału każdy drobiazg redakcyjny

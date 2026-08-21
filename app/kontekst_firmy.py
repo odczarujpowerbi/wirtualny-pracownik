@@ -108,6 +108,27 @@ def dopasuj_projekt(tekst, katalog=KONTEKST_DIR):
     return najlepszy
 
 
+def dopasuj_persone(target_persona, brand=None, katalog=KONTEKST_DIR):
+    """Plik buyer persony pasujący do target_persona (np. "Kasia" — pole, które
+    ad_copy_generator.py zwraca w execution_result). Wymaga `brand` ("odczaruj"
+    albo "clickless") — dwie marki mają persony o TYM SAMYM imieniu ("Tomek":
+    inny profil u Odczaruj, inny u Clickless), więc bez znanej marki dopasowanie
+    mogłoby trafić w złą osobę. Nieznana marka -> None, nie zgadujemy (ten sam
+    fail-closed co przy doborze pliku marki w wybierz_pliki)."""
+    if not target_persona or not brand:
+        return None
+    folder = Path(katalog) / "persony" / brand
+    if not folder.is_dir():
+        return None
+    nisko = target_persona.strip().lower()
+    for plik in sorted(folder.glob("*.md")):
+        czesci = plik.stem.split("-")
+        imie = czesci[1] if len(czesci) > 1 else czesci[0]
+        if imie and imie in nisko:
+            return plik
+    return None
+
+
 def zbuduj(tekst, katalog=KONTEKST_DIR, max_znakow=MAX_ZNAKOW):
     """Gotowy blok kontekstu do wklejenia w prompt. Pusty tekst, gdy nie ma plików —
     brak kontekstu nie może wywrócić zadania, po prostu agent pracuje bez osadzenia."""

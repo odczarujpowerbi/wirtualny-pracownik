@@ -100,6 +100,36 @@ def run():
     checks.append(("Brak pliku ustaleń nie wywraca oceny (prompt bez sekcji zasad)",
                    "WSTRZYMUJE ZADANIE" not in bez_ustalen))
 
+    # --- ocena względem buyer persony (nie generyczne "czy JA bym to wzięła") ---
+    # Realna uwaga właściciela: Bożena ma sprawdzać, czy material trafia w
+    # DEKLAROWANĄ personę, nie oceniać materiał w oderwaniu od odbiorcy.
+    dopisek_kasia = bozena._dopisek_o_personie({"target_persona": "Kasia", "persona_brand": "odczaruj"})
+    checks.append(("Persona: profil trafia do promptu, gdy execution_result go niesie",
+                   "BUYER PERSONA" in dopisek_kasia and "Kasia" in dopisek_kasia))
+    checks.append(("Persona: prompt niesie realną treść profilu (obiekcje/cele), nie samo imię",
+                   "Obiekcje i bariery" in dopisek_kasia))
+    checks.append(("Persona: niezgodność z personą jest nazwana ZASTRZEŻENIEM BLOKUJĄCYM",
+                   "BLOKUJĄCYM" in dopisek_kasia))
+
+    # Dwie marki mają personę o imieniu "Tomek" — bez marki dopasowanie byłoby
+    # niebezpieczne (mogłoby ocenić względem profilu z DRUGIEJ marki).
+    tomek_odczaruj = bozena._dopisek_o_personie({"target_persona": "Tomek", "persona_brand": "odczaruj"})
+    tomek_clickless = bozena._dopisek_o_personie({"target_persona": "Tomek", "persona_brand": "clickless"})
+    checks.append(("Persona: 'Tomek' z Odczaruj i z Clickless to DWA różne profile",
+                   tomek_odczaruj != tomek_clickless
+                   and "analityk" in tomek_odczaruj.lower() and "sceptyk" in tomek_clickless.lower()))
+    checks.append(("Persona: bez znanej marki -> brak dopisku (fail-closed, nie zgadujemy)",
+                   bozena._dopisek_o_personie({"target_persona": "Tomek"}) == ""))
+    checks.append(("Persona: brak target_persona w execution_result -> brak dopisku",
+                   bozena._dopisek_o_personie({}) == ""))
+    checks.append(("Persona: nieznane imię -> brak dopisku, nie wyjątek",
+                   bozena._dopisek_o_personie({"target_persona": "Zenobia", "persona_brand": "odczaruj"}) == ""))
+
+    prompt_z_persona = bozena.build_prompt(
+        {"title": "Reklama kursu"}, {"acceptance_notes": "tekst", "target_persona": "Kasia", "persona_brand": "odczaruj"},
+        {"oczekiwania": "", "na_co_uwaga": []}, "", {})
+    checks.append(("Persona: dopisek trafia do finalnego promptu build_prompt", "BUYER PERSONA" in prompt_z_persona))
+
     print("\n--- Wynik testu dymnego odbioru biznesowego ---")
     all_passed = True
     for name, passed in checks:
