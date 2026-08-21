@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wirtualny Pracownik AI — architektura</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <p class="kicker">Dokumentacja projektu</p>
+  <h1>Architektura</h1>
+  <p>Rdzeń w Pythonie, stan w lokalnym SQLite, wszystko chodzi na jednej maszynie. Model AI planuje i ocenia; skrypty wykonują powtarzalne czynności.</p>
+</header>
+<div class="wrap">
+  <div class="sitenav">
+    <a href="index.html">Start</a><span class="sep">·</span>
+    <a href="architektura.html" class="current">Architektura</a><span class="sep">·</span>
+    <a href="przeplyw-zadania.html">Przepływ zadania</a><span class="sep">·</span>
+    <a href="boty-i-persony.html">Boty i persony</a><span class="sep">·</span>
+    <a href="buyer-persony.html">Buyer persony</a><span class="sep">·</span>
+    <a href="kontekst-firmy.html">Kontekst firmy</a><span class="sep">·</span>
+    <a href="modele-i-koszty.html">Modele i koszty</a><span class="sep">·</span>
+    <a href="bezpieczenstwo.html">Bezpieczeństwo</a><span class="sep">·</span>
+    <a href="panel-operatora.html">Panel operatora</a><span class="sep">·</span>
+    <a href="zadania-i-zrodla.html">Skąd zadania</a><span class="sep">·</span>
+    <a href="instalacja.html">Instalacja</a><span class="sep">·</span>
+    <a href="mapa-plikow.html">Mapa plików</a><span class="sep">·</span>
+    <a href="stan-i-roadmapa.html">Stan i roadmapa</a>
+  </div>
+
+  <h2><span class="n">1</span> Cel</h2>
+  <div class="card">
+    <p>Wirtualny pracownik działający niezależnie od laptopów zespołu: cyklicznie pobiera zadania, uruchamia skrypty i narzędzia, obsługuje aplikacje (Power BI, Office, przeglądarka, internet), <b>waliduje wyniki</b> i zostawia <b>pełny ślad audytowy</b> każdej decyzji.</p>
+    <p><b>Zasada nadrzędna:</b> najpierw udowodnić na małym (pobranie zadania, poprawne wykonanie, samodzielna walidacja, audyt, bezpieczne zatrzymanie), a dopiero potem rozszerzać uprawnienia i zakres.</p>
+  </div>
+
+  <h2><span class="n">2</span> Warstwy</h2>
+  <table>
+    <thead><tr><th style="width:24%">Warstwa</th><th>Co robi</th><th style="width:26%">Pliki</th></tr></thead>
+    <tbody>
+      <tr><td><b>Pętla / scheduler</b></td><td>Centralny harmonogram skryptów cyklicznych (runner co 30 s, monitoring, samo-weryfikacja).</td><td><code>job_scheduler.py</code>, <code>config/schedule.yaml</code></td></tr>
+      <tr><td><b>Runner</b></td><td>Pobiera zadanie → kontrola treści → klasyfikacja ryzyka → routing → wykonanie → poprawka (jeśli trzeba) → bramka jakości → eskalacja/zamknięcie. Loguje każdą decyzję.</td><td><code>runner_loop.py</code></td></tr>
+      <tr><td><b>Wykonawca (worker)</b></td><td>Realna praca: walidacja PBIP, pobieranie i pisanie treści z internetu, MailerLite/Zanfia, generatory treści. Przechodzi przez kontrakt uprawnień.</td><td><code>executor.py</code>, <code>web_fetch_worker.py</code>, <code>web_answer.py</code>, <code>integracje_worker.py</code></td></tr>
+      <tr><td><b>Pętla poprawek</b></td><td>Zanim zadanie trafi do człowieka: nanoszenie uwag bramki na materiał i ponowna ocena (limit 2 próby). Zadania bez potrzebnych danych zamykane z konkretnym feedbackiem, nie eskalowane.</td><td><code>poprawka_materialu.py</code></td></tr>
+      <tr><td><b>Kontrakt uprawnień</b></td><td>Rejestr narzędzi: co wolno, gdzie (allowed_roots/allowed_domains), z jakimi parametrami. Narzędzie spoza rejestru = odmowa.</td><td><code>tool_registry.py</code>, <code>config/tool_contracts.yaml</code></td></tr>
+      <tr><td><b>Rejestr modeli</b></td><td>Który model dla którego wywołania (wysoki poziom = osąd, niski = mechaniczne wykonanie), cennik. Patrz <a href="modele-i-koszty.html">Modele i koszty</a>.</td><td><code>model_registry.py</code>, <code>config/models.yaml</code>, <code>config/model_tiers.yaml</code></td></tr>
+      <tr><td><b>Kontekst firmy</b></td><td>Wiedza o markach, projektach klientów i buyer personach, dokładana do promptu zależnie od treści zadania. Patrz <a href="kontekst-firmy.html">Kontekst firmy</a>.</td><td><code>kontekst_firmy.py</code>, <code>app/kontekst/</code></td></tr>
+      <tr><td><b>Stan i audyt</b></td><td>Zadania + dziennik decyzji (kto/co/dlaczego/model/koszt) w SQLite. Przeżywa restart.</td><td><code>state_store.py</code> → <code>runs/state.db</code></td></tr>
+      <tr><td><b>Bramka jakości</b></td><td>5 botów ocenia efekt zanim trafi do człowieka.</td><td><code>bot_gustaw_bramka.py</code> + Bartek/Franek/Oskar/Bożena</td></tr>
+      <tr><td><b>Model AI</b></td><td>Claude przez <code>claude</code> login (headless) albo SDK. Poziom modelu per wywołanie z rejestru.</td><td><code>task_thinker.py</code></td></tr>
+      <tr><td><b>Kolejka zadań</b></td><td>Projectly (API + MCP) jako źródło prawdy — <b>realnie podłączone i działające</b>; tryb mock lokalnie bez kluczy.</td><td><code>projectly_client.py</code></td></tr>
+      <tr><td><b>Podgląd / sterowanie</b></td><td>Dashboard na localhoście: zadania, przepływy, panel operatora, kondycja/limity.</td><td><code>dashboard.py</code>, <code>dashboard.html</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="n">3</span> Trzy filary jednym zdaniem</h2>
+  <div class="cards">
+    <div class="card"><h3>Fail-closed</h3><p>Nieznane narzędzie, nieznana ścieżka, nieznany caller modelu — wszystko domyślnie odmawia albo idzie na bezpieczny/droższy wariant. Nigdy "prawdopodobnie OK".</p></div>
+    <div class="card"><h3>Konfiguracja, nie kod</h3><p>Decyzje biznesowe (co blokuje odbiór, jaki model dla jakiego wywołania, jakie domeny wolno pobrać) leżą w plikach YAML w <code>config/</code>, nie w warunkach w kodzie. Zmiana decyzji = edycja pliku.</p></div>
+    <div class="card"><h3>Realny efekt, nie zaślepka</h3><p>Każdy worker zostawia dowód (zapisany plik, zrzut, komentarz w Projectly) i przechodzi przez bramkę jakości, zanim ktoś uzna zadanie za zrobione.</p></div>
+  </div>
+
+  <div class="foot">Wirtualny Pracownik AI — dokumentacja. <a href="jak-edytowac.html">Jak edytować tę dokumentację</a> · <a href="przeplyw-zadania.html">Przepływ zadania →</a></div>
+</div>
+</body>
+</html>

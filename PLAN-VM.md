@@ -17,7 +17,7 @@ Repo: `https://github.com/odczarujpowerbi/wirtualny-pracownik.git` (branch `main
 7. Multi-agent tylko gdy zadania są niezależne (różne pliki, brak zależności sekwencyjnych). Research/czytanie: Haiku. Implementacja: Sonnet. Planowanie: Opus.
 8. Nie modyfikuj istniejących testów, żeby przeszły. Nie osłabiaj asercji. Failujący test = napraw kod. To reguły z coding-rules, egzekwuj je na sobie.
 
-Stan wyjściowy kodu: `app/README.md` (co działa / czego brak). Pokrycie celu i statusy: `docs/przeplyw.html`. Warstwa agenta lokalnego (wizja/OCR/okna/kontekst/koszt) jest już zbudowana i przetestowana logicznie (`self_check` 20/20), ale warstwa GUI nie była uruchamiana na prawdziwym Windows z Power BI.
+Stan wyjściowy kodu: `app/README.md` (co działa / czego brak). Pokrycie celu i statusy: `docs/stan-i-roadmapa.html` (dokumentacja startuje od `docs/index.html`). Warstwa agenta lokalnego (wizja/OCR/okna/kontekst/koszt) jest już zbudowana i przetestowana logicznie (`self_check` 20/20), ale warstwa GUI nie była uruchamiana na prawdziwym Windows z Power BI.
 
 ---
 
@@ -155,7 +155,7 @@ Nie rób kroku N+1, dopóki N nie ma zielonego `self_check` i (dla zmian kodu) o
 
 ## 8. Kickoff — prompt startowy dla właściciela do wklejenia agentowi na VM
 
-> Jesteś agentem tego repo. Przeczytaj `CLAUDE.md`, `~/.claude/rules/*`, `app/README.md`, `docs/przeplyw.html` i `PLAN-VM.md`. Potwierdź stan: uruchom `python app/self_check.py` i podaj wynik. Następnie realizuj `PLAN-VM.md` od pierwszej niezrobionej pozycji backlogu (sekcja 7). Dla każdej pozycji: plan mode → mój akceptacja → implementacja na branchu → testy (`self_check` zielony) → PR z numerowanym commitem. Trzymaj guardrails z sekcji 6. Przy niejasności PYTAJ, nie zgaduj. Raportuj po każdej ukończonej pozycji: co zrobione, wynik testów, co następne.
+> Jesteś agentem tego repo. Przeczytaj `CLAUDE.md`, `~/.claude/rules/*`, `app/README.md`, `docs/index.html` (i strony docs/ do niej linkowane) i `PLAN-VM.md`. Potwierdź stan: uruchom `python app/self_check.py` i podaj wynik. Następnie realizuj `PLAN-VM.md` od pierwszej niezrobionej pozycji backlogu (sekcja 7). Dla każdej pozycji: plan mode → mój akceptacja → implementacja na branchu → testy (`self_check` zielony) → PR z numerowanym commitem. Trzymaj guardrails z sekcji 6. Przy niejasności PYTAJ, nie zgaduj. Raportuj po każdej ukończonej pozycji: co zrobione, wynik testów, co następne.
 
 ---
 

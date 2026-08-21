@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wirtualny Pracownik AI — kontekst firmy</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <p class="kicker">Dokumentacja projektu</p>
+  <h1>Kontekst firmy</h1>
+  <p>Wiedza, której nie da się wyczytać z treści zadania ani z kodu: kto jest kim, jak mają się do siebie dwie marki, na czym stoi dany projekt klienta. Bez tego agent wykonuje zadania poprawnie technicznie, ale obok realiów.</p>
+</header>
+<div class="wrap">
+  <div class="sitenav">
+    <a href="index.html">Start</a><span class="sep">·</span>
+    <a href="architektura.html">Architektura</a><span class="sep">·</span>
+    <a href="przeplyw-zadania.html">Przepływ zadania</a><span class="sep">·</span>
+    <a href="boty-i-persony.html">Boty i persony</a><span class="sep">·</span>
+    <a href="buyer-persony.html">Buyer persony</a><span class="sep">·</span>
+    <a href="kontekst-firmy.html" class="current">Kontekst firmy</a><span class="sep">·</span>
+    <a href="modele-i-koszty.html">Modele i koszty</a><span class="sep">·</span>
+    <a href="bezpieczenstwo.html">Bezpieczeństwo</a><span class="sep">·</span>
+    <a href="panel-operatora.html">Panel operatora</a><span class="sep">·</span>
+    <a href="zadania-i-zrodla.html">Skąd zadania</a><span class="sep">·</span>
+    <a href="instalacja.html">Instalacja</a><span class="sep">·</span>
+    <a href="mapa-plikow.html">Mapa plików</a><span class="sep">·</span>
+    <a href="stan-i-roadmapa.html">Stan i roadmapa</a>
+  </div>
+
+  <h2><span class="n">1</span> Dwie marki, jeden właściciel</h2>
+  <table>
+    <thead><tr><th></th><th>Odczaruj Power BI</th><th>Clickless</th></tr></thead>
+    <tbody>
+      <tr><td><b>Co sprzedaje</b></td><td>Wiedzę (kursy, szkolenia, społeczność)</td><td>Wdrożenia (raporty, aplikacje, automatyzacje)</td></tr>
+      <tr><td><b>Kto kupuje</b></td><td>Osoba, która chce SAMA umieć</td><td>Firma, która chce MIEĆ zrobione</td></tr>
+      <tr><td><b>Wynik dla klienta</b></td><td>Umiem zbudować raport</td><td>Mam raport, który sam się aktualizuje</td></tr>
+      <tr><td><b>Cena</b></td><td>od kilkuset zł</td><td>audyt 2000 zł, wdrożenie od 6000 zł netto</td></tr>
+      <tr><td><b>Podmiot</b></td><td>działalność szkoleniowa</td><td>Clickless Sp. z o.o. (Poznań)</td></tr>
+    </tbody>
+  </table>
+  <div class="callout">Ta sama osoba może być odbiorcą obu marek w różnym momencie: najpierw uczy się na kursie, potem zleca wdrożenie, albo odwrotnie. <b>Nie mieszamy tych dwóch komunikatów w jednym materiale.</b></div>
+
+  <h2><span class="n">2</span> Czego agent nigdy nie robi</h2>
+  <div class="cards">
+    <div class="card"><h3>Nie podaje ceny z pamięci</h3><p>Ceny w plikach kontekstu są punktem odniesienia dla agenta, nie ofertą dla klienta — do materiału idą tylko po sprawdzeniu aktualnej na stronie.</p></div>
+    <div class="card"><h3>Nie obiecuje efektu w liczbach</h3><p>Nie zmyśla oszczędności/zwrotu, jeśli nie pochodzi z materiałów firmy. Kalkulator Clickless liczy ostrożnie — tak samo mówimy o oszczędnościach.</p></div>
+    <div class="card"><h3>Nie ujawnia nazw klientów</h3><p>Realizacje są publikowane anonimowo (branża + efekt); nazwy na zrzutach są demonstracyjne.</p></div>
+    <div class="card"><h3>Nie doradza podatkowo/prawnie</h3><p>Nawet gdy wydaje się to oczywiste — to obszar, w którym drobna nadinterpretacja jest błędem merytorycznym.</p></div>
+  </div>
+
+  <h2><span class="n">3</span> Jak to trafia do agenta — <code>kontekst_firmy.py</code></h2>
+  <div class="card">
+    <p>Katalog <code>app/kontekst/</code> zawiera krótkie pliki <code>.md</code>: <code>firma-podstawy.md</code> (zawsze), <code>marka-odczaruj-power-bi.md</code> / <code>marka-clickless.md</code> / <code>wydarzenie-power-bi-day.md</code> (dobierane po treści zadania), i <code>projekty/*.md</code> (jeden plik per klient/projekt). <code>zbuduj(tekst_zadania)</code> składa właściwy blok i dokleja go do promptu w trzech miejscach: analiza zadania, pisanie treści, odbiór biznesowy.</p>
+    <p><b>Dobór marki nigdy nie jest zgadywany.</b> Zadanie musi zawierać jednoznaczną frazę ("odczaruj", "clickless", "wdrożenie"...); samo słowo "kurs" NIE wystarcza — "kurs EUR" to notowanie waluty, nie szkolenie (realny błąd złapany własnym testem przy pierwszym uruchomieniu).</p>
+  </div>
+
+  <h2><span class="n">4</span> Kontekst projektów</h2>
+  <div class="card">
+    <p><code>app/kontekst/projekty/*.md</code> — jeden plik na projekt klienta z Projectly, z sekcjami <code>[do uzupełnienia]</code> tam, gdzie potrzebna jest wiedza właściciela (kto jest po drugiej stronie, jakie systemy, na czym stanęło). <code>kontekst_projektow_seed.py</code> generuje szkice z danych, które już są w Projectly (nazwa, marka, tematy zadań) — <b>nigdy nie nadpisuje</b> pliku już uzupełnionego, i pomija projekty prywatne.</p>
+    <p>Plik projektu jest dobierany po nazwie z jego nagłówka, gdy pada w treści zadania ("popraw raport dla Magnapharm" → <code>dev-magnapharm.md</code>), i jest dokładany na końcu bloku kontekstu (najbardziej szczegółowy, więc bije ogólne zasady marki). Szkic z samymi znacznikami <code>[do uzupełnienia]</code> nie trafia do promptu — nie zajmuje miejsca bez treści.</p>
+  </div>
+
+  <h2><span class="n">5</span> Gdzie co zmieniać</h2>
+  <table>
+    <thead><tr><th style="width:30%">Chcę...</th><th>Edytuj</th></tr></thead>
+    <tbody>
+      <tr><td>Zmienić fakty o marce (ceny, oferta, proces)</td><td><code>app/kontekst/marka-*.md</code></td></tr>
+      <tr><td>Dopisać zasadę obowiązującą obie marki</td><td><code>app/kontekst/firma-podstawy.md</code></td></tr>
+      <tr><td>Uzupełnić wiedzę o kliencie/projekcie</td><td><code>app/kontekst/projekty/&lt;projekt&gt;.md</code></td></tr>
+      <tr><td>Dopisać słowo-wyzwalacz doboru marki</td><td><code>kontekst_firmy.py</code> — słownik <code>MARKI</code></td></tr>
+      <tr><td>Wygenerować szkice nowych projektów</td><td><code>python kontekst_projektow_seed.py --yes</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="foot">Wirtualny Pracownik AI — dokumentacja. <a href="jak-edytowac.html">Jak edytować tę dokumentację</a> · <a href="buyer-persony.html">Buyer persony</a></div>
+</div>
+</body>
+</html>

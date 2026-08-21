@@ -4,11 +4,15 @@ Wirtualny pracownik działający niezależnie od laptopów zespołu: cyklicznie 
 
 ## Od czego zacząć
 
+Pełna dokumentacja (wiele małych, samodzielnych stron, wspólny wygląd, każda linkuje do innych): **[`docs/index.html`](./docs/index.html)**.
+
 | Chcę... | Otwórz |
 |---|---|
-| **Zainstalować i uruchomić** (krok po kroku, po ludzku) | [`docs/instrukcja.html`](./docs/instrukcja.html) |
-| **Zrozumieć cały projekt** (architektura, komponenty, przepływ) | [`docs/dokumentacja.html`](./docs/dokumentacja.html) |
-| **Zobaczyć pokrycie celu i statusy** | [`docs/przeplyw.html`](./docs/przeplyw.html) |
+| **Zainstalować i uruchomić** (krok po kroku, po ludzku) | [`docs/instalacja.html`](./docs/instalacja.html) |
+| **Zrozumieć architekturę** (warstwy, komponenty) | [`docs/architektura.html`](./docs/architektura.html) |
+| **Zobaczyć przepływ zadania krok po kroku** | [`docs/przeplyw-zadania.html`](./docs/przeplyw-zadania.html) |
+| **Zrozumieć buyer persony i kontekst marek** | [`docs/buyer-persony.html`](./docs/buyer-persony.html), [`docs/kontekst-firmy.html`](./docs/kontekst-firmy.html) |
+| **Zobaczyć stan projektu i roadmapę** | [`docs/stan-i-roadmapa.html`](./docs/stan-i-roadmapa.html) |
 
 ## Szybki start (skrót instrukcji)
 

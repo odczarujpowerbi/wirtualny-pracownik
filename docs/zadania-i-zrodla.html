@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wirtualny Pracownik AI — skąd biorą się zadania</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <p class="kicker">Dokumentacja projektu</p>
+  <h1>Skąd biorą się zadania</h1>
+  <p>Trzy źródła, jeden pipeline. Niezależnie skąd zadanie przyszło, przechodzi przez ten sam <code>runner_loop.process_task</code>.</p>
+</header>
+<div class="wrap">
+  <div class="sitenav">
+    <a href="index.html">Start</a><span class="sep">·</span>
+    <a href="architektura.html">Architektura</a><span class="sep">·</span>
+    <a href="przeplyw-zadania.html">Przepływ zadania</a><span class="sep">·</span>
+    <a href="boty-i-persony.html">Boty i persony</a><span class="sep">·</span>
+    <a href="buyer-persony.html">Buyer persony</a><span class="sep">·</span>
+    <a href="kontekst-firmy.html">Kontekst firmy</a><span class="sep">·</span>
+    <a href="modele-i-koszty.html">Modele i koszty</a><span class="sep">·</span>
+    <a href="bezpieczenstwo.html">Bezpieczeństwo</a><span class="sep">·</span>
+    <a href="panel-operatora.html">Panel operatora</a><span class="sep">·</span>
+    <a href="zadania-i-zrodla.html" class="current">Skąd zadania</a><span class="sep">·</span>
+    <a href="instalacja.html">Instalacja</a><span class="sep">·</span>
+    <a href="mapa-plikow.html">Mapa plików</a><span class="sep">·</span>
+    <a href="stan-i-roadmapa.html">Stan i roadmapa</a>
+  </div>
+
+  <table>
+    <thead><tr><th style="width:22%">Źródło</th><th>Opis</th></tr></thead>
+    <tbody>
+      <tr><td><b>Projectly</b></td><td>Główna kolejka (API + MCP) — <b>realnie podłączona</b>. Agent pobiera zadania przypisane do konta AI swojej roli, komentuje i zamyka status. <code>projectly_client.py</code>.</td></tr>
+      <tr><td><b>Notatnik</b></td><td><code>app/inbox/zadania.txt</code> — jedna linia = jedno zadanie, dobre do testów lokalnych. Adres źródła po znaku <code>@</code>; tag ryzyka <code>!yellow</code>/<code>!red</code>.</td></tr>
+      <tr><td><b>Dashboard</b></td><td>Formularz „Dodaj zadanie" — pisze do notatnika i od razu przetwarza.</td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="n">1</span> Jak agent wyłuskuje adres/projekt/personę z treści zadania</h2>
+  <div class="card">
+    <p>Zadania z Projectly nie mają dedykowanego pola "url" — adres źródła siedzi w tytule albo opisie. <code>executor._urls_from_task</code> wyłuskuje go regexem, ale bierze <b>tylko</b> adresy z allowlisty (<code>tool_contracts.yaml</code>) — zwykły link w opisie (np. do SharePointa) nie uruchamia pobierania. Zadanie może wskazać kilka źródeł naraz ("porównaj kurs EUR i USD") — worker pobiera każde.</p>
+    <p>Projekt klienta i marka są dobierane analogicznie: <code>kontekst_firmy.dopasuj_projekt</code> szuka nazwy projektu w treści zadania, <code>wybierz_pliki</code> szuka jednoznacznej frazy marki. Zawsze fail-closed — brak jednoznacznego sygnału = brak dopasowania, nigdy zgadywanie.</p>
+  </div>
+
+  <h2><span class="n">2</span> Co się dzieje, gdy źródło jest złe albo niedostępne</h2>
+  <table>
+    <thead><tr><th style="width:30%">Sytuacja</th><th>Reakcja</th></tr></thead>
+    <tbody>
+      <tr><td>Adres spoza allowlisty</td><td>Odmowa z konkretnym powodem — eskalacja z pytaniem, czy dopisać domenę, NIE ciche „done".</td></tr>
+      <tr><td>Źródło nie zawiera odpowiedzi (np. zła waluta)</td><td><code>web_source_fixer.py</code> próbuje RAZ poprawić adres wg reguły ze skilla (np. inna waluta w tej samej tabeli NBP).</td></tr>
+      <tr><td>Źródło zwraca błąd (404 w dzień wolny)</td><td>Fallback na zakres dat kończący się zamówionym dniem — nigdy "najnowsze dostępne", bo to dałoby dane z innego dnia niż zamówiony.</td></tr>
+      <tr><td>Błąd nie da się naprawić samą redakcją</td><td>Zadanie zamykane z konkretnym feedbackiem, czego zabrakło — bez tworzenia zadania dla człowieka.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="foot">Wirtualny Pracownik AI — dokumentacja. <a href="jak-edytowac.html">Jak edytować tę dokumentację</a> · <a href="instalacja.html">Instalacja →</a></div>
+</div>
+</body>
+</html>

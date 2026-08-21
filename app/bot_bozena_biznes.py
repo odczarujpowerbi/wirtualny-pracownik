@@ -9,7 +9,10 @@ dalej jako gotowe (Bożena jest botem obowiązkowym w bramce — patrz
 config/validation_gate.yaml).
 
 Skąd bierze wiedzę (składane od ogólnej do szczegółowej):
-- persona biznesowa (personas/bozena_biznes.md) — ton i pryzmat oceny,
+- persona biznesowa (persony_botow/bozena_biznes.md) — ton i pryzmat oceny.
+  UWAGA: to persona BOTA (jak ma oceniać), nie buyer persona klienta — te są
+  w app/kontekst/persony/ (patrz docs/buyer-persony.html). Nazwy rozdzielone
+  celowo po realnej kolizji (dwa różne "personas"/"persony" w repo).
 - kontekst biznesowy (config/business_context.yaml) — default -> typ zadania -> klient,
 - kryteria akceptacji z samego zadania.
 
@@ -33,7 +36,7 @@ BOT = "bozena"
 
 CONTEXT_PATH = Path(__file__).parent / "config" / "business_context.yaml"
 USTALENIA_PATH = Path(__file__).parent / "config" / "odbior_ustalenia.yaml"
-PERSONA_PATH = Path(__file__).parent / "personas" / "bozena_biznes.md"
+PERSONA_PATH = Path(__file__).parent / "persony_botow" / "bozena_biznes.md"
 
 
 def load_ustalenia(path=USTALENIA_PATH):

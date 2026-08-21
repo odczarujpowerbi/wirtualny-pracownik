@@ -17,7 +17,7 @@ google-api-python-client>=2.0  # google_workspace_client.py — Drive/Sheets/...
 # DZIAŁAJĄ bez tych pakietów (degradują się do available=False). Na DOCELOWEJ
 # maszynie (Windows Server 2022/2025) zainstaluj je, żeby agent realnie widział
 # ekran, kafelkował ~16 okien, robił zrzuty i klikał. OCR wymaga też binarki
-# Tesseract (poza pip: instalator Windows + pakiety pol/eng) — patrz docs/instrukcja.html.
+# Tesseract (poza pip: instalator Windows + pakiety pol/eng) — patrz docs/instalacja.html.
 #
 # pywin32>=306               # screenshot_capture (PrintWindow/DWM — zrzut okna odporny na odłączenie RDP) + backend win32
 # pywinauto>=0.6.8           # window_manager / ui_actions — UI Automation (klik/wpisywanie w Power BI, VS Code, Chromium)

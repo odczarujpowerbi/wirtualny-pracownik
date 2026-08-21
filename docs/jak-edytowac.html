@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wirtualny Pracownik AI — jak edytować tę dokumentację</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <p class="kicker">Dokumentacja projektu — meta</p>
+  <h1>Jak edytować tę dokumentację</h1>
+  <p>Dla człowieka (i dla agenta), który wchodzi do tego projektu i chce dopisać albo poprawić dokumentację.</p>
+</header>
+<div class="wrap">
+  <div class="sitenav">
+    <a href="index.html">Start</a><span class="sep">·</span>
+    <a href="architektura.html">Architektura</a><span class="sep">·</span>
+    <a href="przeplyw-zadania.html">Przepływ zadania</a><span class="sep">·</span>
+    <a href="boty-i-persony.html">Boty i persony</a><span class="sep">·</span>
+    <a href="buyer-persony.html">Buyer persony</a><span class="sep">·</span>
+    <a href="kontekst-firmy.html">Kontekst firmy</a><span class="sep">·</span>
+    <a href="modele-i-koszty.html">Modele i koszty</a><span class="sep">·</span>
+    <a href="bezpieczenstwo.html">Bezpieczeństwo</a><span class="sep">·</span>
+    <a href="panel-operatora.html">Panel operatora</a><span class="sep">·</span>
+    <a href="zadania-i-zrodla.html">Skąd zadania</a><span class="sep">·</span>
+    <a href="instalacja.html">Instalacja</a><span class="sep">·</span>
+    <a href="mapa-plikow.html">Mapa plików</a><span class="sep">·</span>
+    <a href="stan-i-roadmapa.html">Stan i roadmapa</a>
+  </div>
+
+  <h2><span class="n">1</span> Zasada: małe, samodzielne strony</h2>
+  <div class="card">
+    <p>Ta dokumentacja to <b>zestaw niezależnych plików HTML</b> w <code>docs/</code>, nie jeden wielki plik. Każdy plik da się otworzyć osobno (dwuklik, bez serwera), każdy ma tę samą nawigację na górze i ten sam wygląd (jeden arkusz stylów: <code>docs/assets/style.css</code>). Dzięki temu:</p>
+    <ul>
+      <li>Poprawka jednego tematu = edycja jednego, małego pliku — nie trzeba przeglądać całości.</li>
+      <li>Zmiana wyglądu (kolor, odstępy, karty) = edycja <code>assets/style.css</code> — działa na wszystkich stronach naraz.</li>
+      <li>Dodanie nowej strony nie wymaga przepisywania istniejących — tylko dopisania linku w nawigacji.</li>
+    </ul>
+  </div>
+
+  <h2><span class="n">2</span> Jak dopisać nową stronę</h2>
+  <ol class="steps">
+    <li><h3>Skopiuj strukturę z istniejącej strony</h3><p>Weź plik podobny tematycznie (np. <code>modele-i-koszty.html</code>) jako szablon: <code>&lt;head&gt;</code> z linkiem do <code>assets/style.css</code>, <code>&lt;header&gt;</code>, <code>.sitenav</code>, sekcje <code>&lt;h2&gt;&lt;span class="n"&gt;N&lt;/span&gt; Tytuł&lt;/h2&gt;</code>.</p></li>
+    <li><h3>Dopisz się do nawigacji WSZĘDZIE</h3><p>Blok <code>.sitenav</code> jest identyczny na każdej stronie (to jedyna część, która się <b>powtarza</b>, celowo — żeby strony zostały samodzielne, nawet bez wspólnego JS-a do budowania menu). Dodaj swój link do <code>.sitenav</code> we WSZYSTKICH plikach <code>docs/*.html</code>, i dodaj kartę w <code>index.html</code> sekcja „Mapa dokumentacji".</p></li>
+    <li><h3>Oznacz stronę, na której jesteś</h3><p>W <code>.sitenav</code> swojej nowej strony dodaj <code>class="current"</code> do własnego linku (patrz jak to wygląda na tej stronie — link "Jak edytować" nie jest w głównym pasku nawigacji, jest linkowany ze stopki każdej strony, żeby nie zaśmiecać głównego menu).</p></li>
+    <li><h3>Zakończ stopką</h3><p><code>&lt;div class="foot"&gt;...&lt;/div&gt;</code> z linkiem do tej strony (jak edytować) i do logicznie następnej strony.</p></li>
+  </ol>
+
+  <h2><span class="n">3</span> Komponenty do powtórnego użycia</h2>
+  <table>
+    <thead><tr><th style="width:22%">Klasa CSS</th><th>Do czego</th></tr></thead>
+    <tbody>
+      <tr><td><code>.card</code> / <code>.cards</code></td><td>Pojedyncza karta / siatka kart.</td></tr>
+      <tr><td><code>.callout</code> / <code>.warnc</code> / <code>.errc</code></td><td>Wyróżniona uwaga (neutralna/ostrzeżenie/błąd).</td></tr>
+      <tr><td><code>.tag.ok/.warn/.err/.info</code></td><td>Mała etykieta statusu (działa/częściowe/plan/informacja).</td></tr>
+      <tr><td><code>.persona</code></td><td>Karta osoby — buyer persony i persony botów, jeden wzorzec dla obu (patrz <code>buyer-persony.html</code>).</td></tr>
+      <tr><td><code>ol.steps</code></td><td>Numerowana lista kroków (instalacja, procedury).</td></tr>
+      <tr><td><code>table</code></td><td>Zwykła tabela — nagłówek <code>th</code> dostaje styl automatycznie.</td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="n">4</span> Skąd ta dokumentacja pochodzi</h2>
+  <div class="card">
+    <p>Zbudowana z rozproszonych plików projektu: starszych <code>docs/dokumentacja.html</code>, <code>docs/instrukcja.html</code>, <code>docs/przeplyw.html</code> (rozdzielone na tematyczne strony), <code>PLAN-VM.md</code>, <code>app/README.md</code>, oraz z pracy wykonanej w bieżącej sesji (model tiering, pętla poprawek, kontekst firmy, buyer persony), która wcześniej nie miała żadnej dokumentacji. Stare pliki zostały zastąpione (treść przeniesiona, linki przekierowane) — patrz <a href="mapa-plikow.html">Mapa plików</a>.</p>
+  </div>
+
+  <h2><span class="n">5</span> Kiedy NIE dodawać nowej strony</h2>
+  <div class="callout">Jeśli temat to 2-3 zdania i pasuje logicznie do istniejącej strony — dopisz sekcję tam, nie twórz nowego pliku. Nowa strona ma sens, gdy temat jest samodzielny i będzie rozbudowywany (jak np. pojedyncza buyer persona mogłaby dostać kiedyś własną stronę, gdy profili przybędzie na tyle, że jedna strona zbiorcza przestanie się skalować).</div>
+
+  <div class="foot">Wirtualny Pracownik AI — dokumentacja. <a href="index.html">Powrót do startu</a></div>
+</div>
+</body>
+</html>

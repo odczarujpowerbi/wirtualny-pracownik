@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wirtualny Pracownik AI — stan i roadmapa</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <p class="kicker">Dokumentacja projektu</p>
+  <h1>Stan i dalszy rozwój</h1>
+  <p>Co realnie działa dziś (zweryfikowane na żywo, nie tylko w testach), co jest w budowie, co jest planem.</p>
+</header>
+<div class="wrap">
+  <div class="sitenav">
+    <a href="index.html">Start</a><span class="sep">·</span>
+    <a href="architektura.html">Architektura</a><span class="sep">·</span>
+    <a href="przeplyw-zadania.html">Przepływ zadania</a><span class="sep">·</span>
+    <a href="boty-i-persony.html">Boty i persony</a><span class="sep">·</span>
+    <a href="buyer-persony.html">Buyer persony</a><span class="sep">·</span>
+    <a href="kontekst-firmy.html">Kontekst firmy</a><span class="sep">·</span>
+    <a href="modele-i-koszty.html">Modele i koszty</a><span class="sep">·</span>
+    <a href="bezpieczenstwo.html">Bezpieczeństwo</a><span class="sep">·</span>
+    <a href="panel-operatora.html">Panel operatora</a><span class="sep">·</span>
+    <a href="zadania-i-zrodla.html">Skąd zadania</a><span class="sep">·</span>
+    <a href="instalacja.html">Instalacja</a><span class="sep">·</span>
+    <a href="mapa-plikow.html">Mapa plików</a><span class="sep">·</span>
+    <a href="stan-i-roadmapa.html" class="current">Stan i roadmapa</a>
+  </div>
+
+  <h2><span class="n">1</span> Działa i zweryfikowane na żywo</h2>
+  <table>
+    <thead><tr><th style="width:30%">Obszar</th><th style="width:14%">Stan</th><th>Uwaga</th></tr></thead>
+    <tbody>
+      <tr><td>Pętla + klasyfikacja + routing + audyt</td><td><span class="tag ok">działa</span></td><td>Pełny cykl, każda decyzja w <code>state.db</code> z uzasadnieniem.</td></tr>
+      <tr><td>Realny Projectly (kolejka zadań)</td><td><span class="tag ok">działa</span></td><td>Agent pobiera i komentuje prawdziwe zadania na koncie AI Dev.</td></tr>
+      <tr><td>Bramka jakości (5 botów)</td><td><span class="tag ok">działa</span></td><td>Powtarzalna: to samo zadanie daje ten sam werdykt (rozdział blokujące/sugestie).</td></tr>
+      <tr><td>Kontrakt uprawnień (pliki + domeny)</td><td><span class="tag ok">działa</span></td><td>Egzekwowany w ścieżce wykonania, fail-closed.</td></tr>
+      <tr><td>Rejestr modeli i poziomy (high/low)</td><td><span class="tag ok">działa</span></td><td>11 miejsc zmigrowanych, cennik naprawiony (był 3× zawyżony dla Opusa).</td></tr>
+      <tr><td>Worker: pobranie i pisanie treści z internetu</td><td><span class="tag ok">działa</span></td><td>Web fetch + odpowiedź na zadanie + samodzielna korekta/fallback źródła.</td></tr>
+      <tr><td>Pętla poprawek (bez eskalacji za drobiazgi)</td><td><span class="tag ok">działa</span></td><td>Zweryfikowane: zadanie odrzucane 3× z rzędu przeszło po automatycznych poprawkach.</td></tr>
+      <tr><td>Kontekst firmy (marki, projekty)</td><td><span class="tag ok">działa</span></td><td>Dobór po treści zadania, fail-closed przy niejednoznaczności.</td></tr>
+      <tr><td>Buyer persony (ocena trafności treści marketingowej)</td><td><span class="tag ok">działa</span></td><td>12 realnych profili, rozróżnianie kolizji imion między markami.</td></tr>
+      <tr><td>Dashboard + panel operatora</td><td><span class="tag ok">działa</span></td><td>Zadania, przepływy, PAUSE/STOP, limity.</td></tr>
+      <tr><td>Instalator + autostart</td><td><span class="tag ok">działa</span></td><td>Bezobsługowy.</td></tr>
+      <tr><td>Realny worker PBIP</td><td><span class="tag ok">działa</span></td><td>Walidacja struktury (read-only).</td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="n">2</span> W budowie / częściowe</h2>
+  <table>
+    <thead><tr><th style="width:30%">Obszar</th><th style="width:14%">Stan</th><th>Uwaga</th></tr></thead>
+    <tbody>
+      <tr><td>Integracje MailerLite / Zanfia</td><td><span class="tag warn">częściowe</span></td><td>Konektory istnieją, w trakcie dopracowywania (równoległa praca).</td></tr>
+      <tr><td>Zrzuty stron Power BI Desktop</td><td><span class="tag warn">częściowe</span></td><td>Otwarcie i walidacja struktury działa; zrzut realnego renderu do dopilnowania.</td></tr>
+      <tr><td>Generatory treści jako realne akcje zadania</td><td><span class="tag warn">częściowe</span></td><td><code>ad_copy_generator.py</code> ma naprawioną ścieżkę do person i działa samodzielnie, ale nie jest jeszcze wpięty w <code>executor.py</code> jako akcja zadania — brak workera end-to-end.</td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="n">3</span> Plan (jeszcze nie zbudowane)</h2>
+  <table>
+    <thead><tr><th style="width:30%">Obszar</th><th>Uwaga</th></tr></thead>
+    <tbody>
+      <tr><td>Przeglądarka (Playwright) — <code>browser_worker.py</code></td><td>Zadania webowe wymagające klikania (nawigacja, formularz, zrzut).</td></tr>
+      <tr><td>Computer use — <code>computer_use_worker.py</code></td><td>Klikanie po ekranie desktopowym. Substrat (zrzuty, okna, OCR, blokada UI) już zbudowany i przetestowany logicznie.</td></tr>
+      <tr><td>Persony Aldona / Asia / Michał / Kacper</td><td>Przeglądarka / klikanie / podgląd wielu okien / monitor i samo-naprawa — patrz <a href="boty-i-persony.html">Boty i persony</a>.</td></tr>
+      <tr><td>OpenRouter (obraz, głos, transkrypcja)</td><td>Zadeklarowany w rejestrze modeli, bez działającego klienta.</td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="n">4</span> Fazy autonomii</h2>
+  <p class="lead">Uprawnienia rozszerzamy dopiero, gdy poprzednia faza jest udowodniona.</p>
+  <table>
+    <thead><tr><th style="width:22%">Faza</th><th style="width:38%">Zakres</th><th>Stan</th></tr></thead>
+    <tbody>
+      <tr><td><b>A. Obserwator</b></td><td>Odczyt i raportowanie: walidacja PBIP, pobranie danych, analiza.</td><td><span class="tag ok">osiągnięte</span></td></tr>
+      <tr><td><b>B. Producent</b></td><td>Drafty i zmiany na gałęzi: poprawki treści, raporty, teksty — z samodzielną poprawką przed eskalacją.</td><td><span class="tag ok">osiągnięte</span></td></tr>
+      <tr><td><b>C. Wykonawca z akceptacją</b></td><td>Operacje zewnętrzne po approval: publikacja testowa, e-mail, CRM.</td><td><span class="tag warn">częściowe</span></td></tr>
+      <tr><td><b>D. Ograniczona autonomia</b></td><td>Wybrane działania w limitach (bounded red) — dziś pusta lista, celowo.</td><td><span class="tag err">plan</span></td></tr>
+      <tr><td><b>E. Platforma zespołowa</b></td><td>Wiele agentów i workerów, control plane, RBAC.</td><td><span class="tag err">plan</span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="foot">Wirtualny Pracownik AI — dokumentacja. <a href="jak-edytowac.html">Jak edytować tę dokumentację</a> · <a href="index.html">Powrót do startu</a></div>
+</div>
+</body>
+</html>
