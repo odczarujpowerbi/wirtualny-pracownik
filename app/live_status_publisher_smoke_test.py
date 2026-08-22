@@ -60,6 +60,43 @@ def test_map_status_payload_unknown_shape_still_preserved_in_details():
     print("OK  kacper_monitor-kształt (bez health/status) -> domyślne ok/idle, details kompletne")
 
 
+def test_real_live_status_publisher_payload_maps_cleanly():
+    # Nie ręcznie sklejony fixture - PRAWDZIWY build_status() tego repo, żeby
+    # test łapał drift, jeśli ktoś zmieni kształt payloadu w przyszłości.
+    import live_status_publisher
+
+    payload = live_status_publisher.build_status(role="dev")
+    mapped = _map_status_payload(payload)
+    assert mapped["details"] == payload
+    assert mapped["health"] in ("ok", "alert")
+    assert mapped["status"] == "idle", "build_status() nie ustawia 'status' w sensie working/idle/... -> fallback idle"
+    print(f"OK  live_status_publisher.build_status() realny -> map_status_payload bez wyjątku (health={mapped['health']})")
+
+
+def test_real_machine_status_payload_maps_cleanly():
+    import machine_status_reporter
+
+    payload = machine_status_reporter.build_machine_status()
+    mapped = _map_status_payload(payload)
+    assert mapped["details"] == payload
+    assert mapped["health"] == "ok", "brak pola health/status w build_machine_status() -> domyślnie ok"
+    assert mapped["status"] == "idle"
+    print("OK  machine_status_reporter.build_machine_status() realny -> map_status_payload bez wyjątku")
+
+
+def test_real_system_health_payload_maps_cleanly():
+    import system_health_monitor
+
+    thresholds = system_health_monitor.load_thresholds()
+    snapshot = system_health_monitor.get_system_snapshot()
+    health = system_health_monitor.evaluate_health(snapshot, thresholds)
+    payload = {**snapshot, "status": health["status"], "issues": health["issues"]}
+    mapped = _map_status_payload(payload)
+    assert mapped["details"] == payload
+    assert mapped["health"] in ("ok", "alert")
+    print(f"OK  system_health_monitor (status={health['status']}) realny -> map_status_payload bez wyjątku (health={mapped['health']})")
+
+
 class _FakeMCPClient:
     def __init__(self):
         self.calls = []
@@ -101,6 +138,9 @@ if __name__ == "__main__":
     test_map_status_payload_keeps_known_fields_and_full_details()
     test_map_status_payload_infers_alert_from_critical_health_status()
     test_map_status_payload_unknown_shape_still_preserved_in_details()
+    test_real_live_status_publisher_payload_maps_cleanly()
+    test_real_machine_status_payload_maps_cleanly()
+    test_real_system_health_payload_maps_cleanly()
     test_publish_status_calls_post_agent_status_when_transport_is_agent_status_tool()
     test_publish_status_falls_back_to_documentation_by_default()
     print("\nWszystkie testy statusu na żywo przeszły.")
