@@ -47,17 +47,50 @@ def test_map_status_payload_infers_alert_from_critical_health_status():
 
 
 def test_map_status_payload_unknown_shape_still_preserved_in_details():
-    # Kształt jak kacper_monitor.py: brak health/status w ogóle.
+    # Kształt jak kacper_monitor.py, BEZ zadań naprawczych (dzień bez problemów).
     payload = {
         "events_scanned": 7,
-        "repair_tasks_created": [{"kind": "job", "task_id": "KAC-001"}],
+        "repair_tasks_created": [],
         "checked_at": "2026-08-22T10:00:00Z",
     }
     mapped = _map_status_payload(payload)
-    assert mapped["health"] == "ok", "brak sygnału health/status -> domyślnie ok"
+    assert mapped["health"] == "ok", "brak zadań naprawczych -> ok"
     assert mapped["status"] == "idle"
+    assert "Przeskanowano 7 zdarzeń" in mapped["message"]
     assert mapped["details"] == payload
-    print("OK  kacper_monitor-kształt (bez health/status) -> domyślne ok/idle, details kompletne")
+    print("OK  kacper_monitor-kształt (bez zadań naprawczych) -> health ok, message z podsumowaniem, details kompletne")
+
+
+def test_map_status_payload_kacper_repairs_created_forces_alert_and_message():
+    # Produkcyjny post_agent_status (stan 2026-08-22) NIE ma pola 'details' — bez syntezy
+    # message ten wiersz w dashboardzie mastera byłby PUSTY. Health=alert, bo powstało
+    # zadanie naprawcze - to samo w sobie jest sygnałem wymagającym uwagi.
+    payload = {
+        "events_scanned": 12,
+        "repair_tasks_created": [{"kind": "job", "name": "runner_loop", "task_id": "KAC-001"}],
+        "checked_at": "2026-08-22T10:00:00Z",
+    }
+    mapped = _map_status_payload(payload)
+    assert mapped["health"] == "alert", "zadanie naprawcze powstało -> health musi być alert, nie ok"
+    assert "1 zadań naprawczych" in mapped["message"]
+    print("OK  kacper_monitor-kształt (z zadaniem naprawczym) -> health=alert + message, mimo braku 'details' w schemacie")
+
+
+def test_map_status_payload_machine_status_synthesizes_readable_message():
+    # Produkcyjny post_agent_status NIE ma pól tool_versions/ram_available_percent/
+    # running_scripts — bez syntezy message ten wiersz byłby równie pusty jak kacper-monitor.
+    payload = {
+        "timestamp": "2026-08-22T12:00:00Z",
+        "tool_versions": {"git": "2.44", "python": "3.11", "claude_code": None},
+        "ram_available_percent": 55.0,
+        "running_scripts": ["runner_loop.py"],
+        "last_bootstrap": None,
+    }
+    mapped = _map_status_payload(payload)
+    assert "git: 2.44" in mapped["message"]
+    assert "RAM wolne: 55.0%" in mapped["message"]
+    assert mapped["health"] == "ok", "machine_status_reporter nie niesie sygnału zdrowia -> domyślnie ok"
+    print("OK  machine_status_reporter-kształt -> message z wersjami narzędzi + RAM, mimo braku 'details' w schemacie")
 
 
 def test_real_live_status_publisher_payload_maps_cleanly():
@@ -81,7 +114,8 @@ def test_real_machine_status_payload_maps_cleanly():
     assert mapped["details"] == payload
     assert mapped["health"] == "ok", "brak pola health/status w build_machine_status() -> domyślnie ok"
     assert mapped["status"] == "idle"
-    print("OK  machine_status_reporter.build_machine_status() realny -> map_status_payload bez wyjątku")
+    assert mapped.get("message"), "wersje narzędzi (tool_versions) muszą trafić do message (produkcja nie ma 'details')"
+    print(f"OK  machine_status_reporter.build_machine_status() realny -> map_status_payload bez wyjątku (message={mapped['message']!r})")
 
 
 def test_real_system_health_payload_maps_cleanly():
@@ -138,6 +172,8 @@ if __name__ == "__main__":
     test_map_status_payload_keeps_known_fields_and_full_details()
     test_map_status_payload_infers_alert_from_critical_health_status()
     test_map_status_payload_unknown_shape_still_preserved_in_details()
+    test_map_status_payload_kacper_repairs_created_forces_alert_and_message()
+    test_map_status_payload_machine_status_synthesizes_readable_message()
     test_real_live_status_publisher_payload_maps_cleanly()
     test_real_machine_status_payload_maps_cleanly()
     test_real_system_health_payload_maps_cleanly()

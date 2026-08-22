@@ -55,7 +55,9 @@ poll:
 #     ustabilizowaniu: usuń transport i project/page_title_template razem z
 #     kodem legacy w projectly_client.py._publish_status_via_documentation.
 live_status:
-  transport: "documentation"
+  # Potwierdzone na żywo 22.08.2026: post_agent_status działa na produkcji
+  # (4 kształty payloadu, patrz PLAN-MONITOROWANIE-AGENTOW-WIRTUALNY-PRACOWNIK.md).
+  transport: "agent_status_tool"
   project: "Administracyjne"
   page_title_template: "Status na żywo — {role}"
 

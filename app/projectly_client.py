@@ -122,6 +122,31 @@ def _map_status_payload(payload):
     # "idle", bo ich wlasne 'status'/'health' znaczy cos innego (patrz wyzej).
     mapped["status"] = raw_status_field if raw_status_field in _STATUS_ENUM else "idle"
 
+    # 'message' i 'health' nie zawsze da się wywnioskować generycznie (wyżej). Dla dwóch
+    # znanych kształtów bez własnego pola message/health (machine_status_reporter.py,
+    # kacper_monitor.py) budujemy krótkie, czytelne podsumowanie — narzędzie MCP
+    # post_agent_status na produkcji (stan na 2026-08-22) NIE ma pola 'details' (worek na
+    # resztę danych, zakładany w PLAN-MONITOROWANIE-AGENTOW-PROJECTLY.md), więc bez tego te
+    # dwie role trafiałyby do dashboardu jako puste wiersze.
+    if "message" not in mapped and "tool_versions" in payload:
+        versions = payload.get("tool_versions") or {}
+        parts = [f"{name}: {value or '?'}" for name, value in versions.items()]
+        ram = payload.get("ram_available_percent")
+        if ram is not None:
+            parts.append(f"RAM wolne: {ram}%")
+        if parts:
+            mapped["message"] = " | ".join(parts)
+
+    if "message" not in mapped and "repair_tasks_created" in payload:
+        repairs = payload.get("repair_tasks_created") or []
+        scanned = payload.get("events_scanned")
+        mapped["message"] = f"Przeskanowano {scanned} zdarzeń, utworzono {len(repairs)} zadań naprawczych"
+        if repairs:
+            mapped["health"] = "alert"
+
+    # 'details' wysyłamy mimo braku pola w dzisiejszym schemacie produkcyjnym: zod domyślnie
+    # ignoruje nierozpoznane klucze (potwierdzone testem na żywo), więc to nieszkodliwe —
+    # a gdy Projectly doda pole 'details', zacznie działać bez zmiany tego kodu.
     mapped["details"] = payload
     return mapped
 
