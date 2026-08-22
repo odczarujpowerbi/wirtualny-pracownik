@@ -214,11 +214,18 @@ class ProjectlyClient:
         name = self._cfg.get("default_admin_project")
         return self._project_id_by_name(name) if name else None
 
-    def create_task(self, title, description, assigned_to, parent_task_id=None, project_id=None, relation_type="eskalacja"):
+    def create_task(self, title, description, assigned_to, parent_task_id=None, project_id=None,
+                    relation_type="eskalacja", expected_result=None, acceptance_criteria=None):
         """MCP: create_task (+ link_tasks). Tworzy zadanie w projekcie project_id,
         przypisane do assigned_to (alias lub nazwa osoby), i — jeśli podano
         parent_task_id — łączy je z rodzicem relacją relation_type (buduje ciąg
-        oryginał->eskalacja->kontynuacja, PLAN-WDROZENIA.md sekcja 4)."""
+        oryginał->eskalacja->kontynuacja, PLAN-WDROZENIA.md sekcja 4).
+
+        expected_result/acceptance_criteria (pola Projectly: goal/effect, patrz
+        field_mapping w config/projectly.yaml) — BEZ NICH bramka jakości (Oskar,
+        Bożena) ocenia efekt względem pustego oczekiwania, co daje niespójne,
+        czasem fałszywie negatywne werdykty (realnie napotkane: zadanie testowe
+        bez 'goal' dostało odrzucenie wizualne na poprawnym zrzucie)."""
         if not project_id:
             raise MCPError(
                 "create_task wymaga project_id (Projectly tworzy zadanie w konkretnym projekcie). "
@@ -231,6 +238,10 @@ class ProjectlyClient:
             "description": description,
             "assigneeIds": [assignee_id] if assignee_id else [],
         }
+        if expected_result is not None:
+            args["goal"] = expected_result
+        if acceptance_criteria is not None:
+            args["effect"] = acceptance_criteria
         result = self._mcp.call_tool("create_task", args)
         new_id = result.get("id") if isinstance(result, dict) else None
         if not new_id and isinstance(result, dict):
@@ -364,7 +375,8 @@ class MockProjectlyClient:
     def default_admin_project_id(self):
         return "MOCK-ADMIN-PROJECT"
 
-    def create_task(self, title, description, assigned_to, parent_task_id=None, project_id=None, relation_type="eskalacja"):
+    def create_task(self, title, description, assigned_to, parent_task_id=None, project_id=None,
+                    relation_type="eskalacja", expected_result=None, acceptance_criteria=None):
         tasks = self._load(self._created_tasks_path, default=[])
         new_id = f"PRJ-ESC-{len(tasks) + 1:04d}"
         record = {
@@ -375,6 +387,8 @@ class MockProjectlyClient:
             "parent_task_id": parent_task_id,
             "project_id": project_id,
             "relation_type": relation_type if parent_task_id else None,
+            "expected_result": expected_result,
+            "acceptance_criteria": acceptance_criteria,
         }
         tasks.append(record)
         self._save(self._created_tasks_path, tasks)
