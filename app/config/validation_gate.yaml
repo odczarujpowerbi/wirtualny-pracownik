@@ -11,12 +11,16 @@
 
 gate:
   enabled: true
-  order: [bartek, franek, oskar, bozena]
-  required_approvals: 2
-  # Boty, które MUSZĄ zatwierdzić (weto). Bożena = odbiór biznesowy: bez jej
-  # "tak" nic nie idzie do człowieka jako gotowe. Gdy Bożena nie może ocenić
-  # (brak modelu), zadanie eskaluje — fail-closed, nie cicha zgoda.
-  mandatory: [bozena]
+  order: [bartek, franek, oskar]
+  # 1 z 3 — obniżone z 2 (na 4 boty) po usunięciu Bożeny (odbiór biznesowy).
+  # Bartek/Oskar często `skipped` dla zadań bez rerun/zrzutu (np. browser_task
+  # bez kroków) — przy required_approvals: 2 realnie NIE dało się osiągnąć progu
+  # samym Frankiem, więc każde takie zadanie i tak szłoby do eskalacji.
+  required_approvals: 1
+  # Boty, które MUSZĄ zatwierdzić (weto) — pusta lista: żaden bot nie jest dziś
+  # obowiązkowy. Świadoma decyzja właściciela (usunięcie Bożeny) — gdyby ktoś
+  # chciał przywrócić twardy warunek, wpisz tu nazwę bota.
+  mandatory: []
 
 bots:
   bartek:
@@ -36,5 +40,3 @@ bots:
     # zastrzeżeniem. Przy efekcie tekstowym (pobranie danych, walidacja pliku)
     # "brak zrzutu" to szum, który zaniża ocenę odbioru biznesowego.
     visual_tools: [capture_screenshot, open_pbip_capture, browser_task]
-  bozena:
-    enabled: true

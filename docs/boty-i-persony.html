@@ -33,19 +33,15 @@
   <div class="cards">
     <div class="card"><h3><span>Paweł</span><span class="tag ok">działa</span></h3><p>Dyspozytor — klasyfikuje ryzyko, decyduje o metodzie, eskaluje. W większości deterministyczny (drzewo decyzji), model tylko przy analizie zadania (<code>task_thinker.think</code>, poziom <b>wysoki</b>).</p></div>
     <div class="card"><h3><span>Patrycja</span><span class="tag ok">działa</span></h3><p>Wykonawczyni — realna praca: walidacja PBIP, pobieranie/pisanie treści z internetu, MailerLite/Zanfia. Poziom modelu <b>niski</b> (dobrze opisane zadanie, jasny rezultat).</p></div>
-    <div class="card"><h3><span>Gustaw</span><span class="tag ok">działa</span></h3><p>Bramka jakości — orkiestruje 4 walidatorów (Bartek/Franek/Oskar/Bożena) i wydaje werdykt. Konfiguracja: <code>config/validation_gate.yaml</code>.</p></div>
+    <div class="card"><h3><span>Gustaw</span><span class="tag ok">działa</span></h3><p>Bramka jakości — orkiestruje 3 walidatorów (Bartek/Franek/Oskar) i wydaje werdykt. Konfiguracja: <code>config/validation_gate.yaml</code>.</p></div>
     <div class="card"><h3><span>Bartek — dubler</span><span class="tag ok">działa</span></h3><p>Powtarza zadanie i porównuje sygnatury dwóch przebiegów — wychwytuje niedeterminizm. Bez sposobu na powtórkę (brak <code>rerun</code>) uczciwie zwraca "pominięto", nie zgaduje.</p></div>
     <div class="card"><h3><span>Franek — funkcjonalny</span><span class="tag ok">działa</span></h3><p>Twarde testy na realnym efekcie (plik istnieje, JSON się parsuje, struktura PBIP poprawna). Czysty kod, nie woła modelu.</p></div>
-    <div class="card"><h3><span>Oskar — wizja</span><span class="tag ok">działa</span></h3><p>Ocena zrzutu ekranu modelem wizyjnym. Poziom <b>wysoki</b> (osąd, świadomie podniesiony z Sonnet 4.5 — ten sam profil ryzyka co Bożena). Brak zrzutu = pominięcie, nie blokuje, gdy efekt nie jest z natury wizualny.</p></div>
-    <div class="card"><h3><span>Bożena — odbiór biznesowy</span><span class="tag ok">działa</span></h3><p>Ostatni głos przed człowiekiem — obowiązkowa w bramce. Ocenia, czy materiał jest tym, czego oczekiwał użytkownik biznesowy, WZGLĘDEM realiów firmy (<a href="kontekst-firmy.html">kontekst</a>) i deklarowanej buyer persony (<a href="buyer-persony.html">buyer persony</a>), jeśli zadanie ją niesie. Poziom <b>wysoki</b>. Persona bota: <code>app/persony_botow/bozena_biznes.md</code>.</p></div>
+    <div class="card"><h3><span>Oskar — wizja</span><span class="tag ok">działa</span></h3><p>Ocena zrzutu ekranu modelem wizyjnym. Poziom <b>wysoki</b> (osąd, świadomie podniesiony z Sonnet 4.5 — wymaga pewności na cyfrach/detalach). Brak zrzutu = pominięcie, nie blokuje, gdy efekt nie jest z natury wizualny.</p></div>
   </div>
 
-  <h2><span class="n">2</span> Jak Bożena odróżnia „blokujące" od „sugestii"</h2>
-  <div class="card">
-    <p>Wcześniej ten sam materiał bywał raz przyjmowany, raz odrzucany — każdy drobiazg stylistyczny blokował zadanie tak samo jak błąd w liczbie. Dziś <code>config/odbior_ustalenia.yaml</code> rozstrzyga to raz: lista <b>blokujących</b> wad (błąd merytoryczny, wymyślona cecha oferty, treść robocza, złamany format, niezgodność z buyer personą...) i lista rzeczy, które są tylko <b>sugestią</b> (styl, propozycje rozszerzeń). O werdykcie decyduje <b>brak</b> zastrzeżeń blokujących, nie samo słowo "nie".</p>
-  </div>
+  <p class="lead"><b>Uwaga (22.08.2026):</b> bot odbioru biznesowego (Bożena) został usunięty z bramki na decyzję właściciela — zbyt często eskalował poprawnie wykonane zadania. Bramka dalej działa fail-closed przez pozostałe 3 boty; <code>gate.mandatory</code> jest dziś puste (żaden bot nie ma twardego weta), <code>required_approvals: 1</code>.</p>
 
-  <h2><span class="n">3</span> Zaplanowane, jeszcze nie zbudowane</h2>
+  <h2><span class="n">2</span> Zaplanowane, jeszcze nie zbudowane</h2>
   <table>
     <thead><tr><th style="width:16%">Persona</th><th>Rola</th></tr></thead>
     <tbody>
@@ -56,14 +52,11 @@
     </tbody>
   </table>
 
-  <h2><span class="n">4</span> Gdzie co zmieniać</h2>
+  <h2><span class="n">3</span> Gdzie co zmieniać</h2>
   <table>
     <thead><tr><th style="width:30%">Chcę...</th><th>Edytuj</th></tr></thead>
     <tbody>
-      <tr><td>Zmienić ton/pryzmat oceny Bożeny</td><td><code>app/persony_botow/bozena_biznes.md</code></td></tr>
-      <tr><td>Dodać nową wadę blokującą/sugestię</td><td><code>app/config/odbior_ustalenia.yaml</code></td></tr>
       <tr><td>Zmienić kolejność/obowiązkowość botów w bramce</td><td><code>app/config/validation_gate.yaml</code></td></tr>
-      <tr><td>Dopisać kontekst biznesowy per typ zadania/klient</td><td><code>app/config/business_context.yaml</code></td></tr>
     </tbody>
   </table>
 

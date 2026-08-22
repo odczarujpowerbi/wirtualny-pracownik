@@ -35,7 +35,7 @@ APP_DIR = Path(__file__).parent
 _SAFE_CWD_ROOTS = [(APP_DIR / r).resolve() for r in ("workspace", "mock_data")]
 
 # Lokalny model tekstowy (Ollama) jako ostatni fallback wołania modelu —
-# używany przez ask_model() (np. Bożena, gdy nie ma ani Claude Code, ani klucza).
+# używany przez ask_model(), gdy nie ma ani Claude Code, ani klucza API.
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 OLLAMA_TEXT_MODEL = os.environ.get("OLLAMA_TEXT_MODEL", "llama3.2:3b")
 OLLAMA_TIMEOUT_SECONDS = 20
@@ -135,7 +135,7 @@ def _ask_ollama_text(prompt):
 def ask_model(prompt, caller="task_thinker.ask_model"):
     """Generyczne wołanie modelu dowolnym promptem (nie tylko analiza zadania).
     `caller` identyfikuje wywołanie w config/model_tiers.yaml — decyduje, jaki
-    model użyć (np. Bożena/odbiór biznesowy woła z caller="bot_bozena_biznes.review",
+    model użyć (np. Oskar/ocena wizualna woła z caller="bot_oskar_wizja.review",
     co daje wysoki poziom; web_answer/poprawka_materialu wołają z niskim).
     Nieznany caller -> tier "high" (fail-closed, patrz model_registry.py), więc
     domyślny caller="task_thinker.ask_model" (nieobecny w tabeli) też ląduje na

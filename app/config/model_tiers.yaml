@@ -21,11 +21,10 @@ poziomy:
 tiers:
   # --- mechanizm agenta (task_thinker.py) ---
   task_thinker.think: high              # analiza zadania (co rozumiem/plan/ryzyka) - runner_loop
-  bot_bozena_biznes.review: high         # odbior biznesowy - bramka jakosci, obowiazkowa
   web_answer.answer: low                 # pisanie tresci z pobranych danych wg scisle opisanych regul
   poprawka_materialu.popraw: low         # naniesienie konkretnej listy zastrzezen na material
 
-  # --- ocena wizualna: osad, ten sam profil ryzyka co Bozena ---
+  # --- ocena wizualna: osad, wysoki poziom (pewnosc na cyfrach/detalach) ---
   bot_oskar_wizja.review: high           # ocena zrzutu ekranu w bramce jakosci
   validators.visual_review: high         # ocena zrzutu wzgledem oczekiwanego rezultatu
 

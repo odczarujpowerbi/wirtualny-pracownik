@@ -48,8 +48,6 @@ def run():
 
     checks.append(("resolve() dla wykonawcy daje (sonnet_4_6, claude-sonnet-4-6)",
                    model_registry.resolve("poprawka_materialu.popraw") == ("sonnet_4_6", "claude-sonnet-4-6")))
-    checks.append(("resolve() dla odbioru biznesowego daje (opus_5, claude-opus-5)",
-                   model_registry.resolve("bot_bozena_biznes.review") == ("opus_5", "claude-opus-5")))
     checks.append(("resolve() dla oceny wizualnej (Oskar) daje wysoki poziom",
                    model_registry.resolve("bot_oskar_wizja.review")[0] == "opus_5"))
 

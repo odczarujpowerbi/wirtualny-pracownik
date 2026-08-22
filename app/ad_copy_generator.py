@@ -46,9 +46,9 @@ def generate_variants(brief, brand="odczaruj", n_variants=3):
 
     `brand` w wyniku jest tu specjalnie, nie do zgadnięcia później: dwie marki
     mają persony o tym samym imieniu ("Tomek" — inny profil u Odczaruj, inny
-    u Clickless), więc odbiór biznesowy (Bożena) MUSI wiedzieć, z którego
-    zestawu brać profil person do oceny trafności, żeby nie ocenił materiału
-    względem złej osoby."""
+    u Clickless), więc ktokolwiek ocenia trafność materiału względem persony
+    MUSI wiedzieć, z którego zestawu brać profil, żeby nie ocenić go względem
+    złej osoby."""
     persona_context = load_persona_context(brand)
     if persona_context is None:
         return {"error": f"Brak person marki '{brand}' w {PERSONY_DIR / brand} — nie mogę dopasować tekstu do odbiorcy."}

@@ -10,7 +10,7 @@
 <header>
   <p class="kicker">Dokumentacja projektu</p>
   <h1>Buyer persony — dla kogo piszemy</h1>
-  <p>Realne profile odbiorców treści marketingowych obu marek. Agent (bot Bożena) używa ich, żeby ocenić nie „czy tekst jest dobry", ale <b>czy trafia w konkretną osobę</b>, dla której go piszemy.</p>
+  <p>Realne profile odbiorców treści marketingowych obu marek. <code>ad_copy_generator.py</code> używa ich, żeby pisać nie „dobry tekst w ogóle", ale tekst, który <b>trafia w konkretną osobę</b>, dla której go piszemy.</p>
 </header>
 <div class="wrap">
   <div class="sitenav">
@@ -31,8 +31,8 @@
 
   <h2><span class="n">1</span> Co to jest buyer persona i po co ona agentowi</h2>
   <div class="card">
-    <p>Buyer persona to <b>opis konkretnego typu klienta</b>: kim jest, czego się boi, co go przekonuje, jakim językiem mówi. To NIE jest persona bota (jak Bożena czy Paweł — te opisano w <a href="boty-i-persony.html">Boty i persony</a>) — to profil <b>odbiorcy po stronie klienta</b>, dla którego piszemy reklamę, post czy maila.</p>
-    <p>Bez tego agent oceniał treść marketingową generycznie — „czy ja bym to wzięła". Realny problem: post mógł być poprawny technicznie i stylistycznie, a mimo to mówić do złej osoby (np. argumenty dla dyrektora finansowego zamiast dla właściciela małej firmy). Teraz <b>bot Bożena</b> dostaje prawdziwy profil persony i ocenia względem NIEJ — jej celów, obiekcji i tego, czego unika.</p>
+    <p>Buyer persona to <b>opis konkretnego typu klienta</b>: kim jest, czego się boi, co go przekonuje, jakim językiem mówi. To NIE jest persona bota (jak Paweł czy Gustaw — te opisano w <a href="boty-i-persony.html">Boty i persony</a>) — to profil <b>odbiorcy po stronie klienta</b>, dla którego piszemy reklamę, post czy maila.</p>
+    <p>Bez tego agent pisałby treść marketingową generycznie — „dobry tekst w ogóle". Realny problem: post mógł być poprawny technicznie i stylistycznie, a mimo to mówić do złej osoby (np. argumenty dla dyrektora finansowego zamiast dla właściciela małej firmy). <code>ad_copy_generator.py</code> dostaje prawdziwy profil persony i pisze względem NIEJ — jej celów, obiekcji i tego, czego unika.</p>
   </div>
 
   <div class="callout warnc">
@@ -154,8 +154,8 @@
 
   <h2><span class="n">5</span> Jak to działa technicznie</h2>
   <div class="card">
-    <p><code>ad_copy_generator.py</code> generuje tekst reklamowy z pełnym kontekstem person danej marki i sam wybiera, do której z nich pisze (<code>target_persona</code> w wyniku). Bot <b>Bożena</b> (<code>bot_bozena_biznes.py</code>), gdy dostanie <code>target_persona</code> + <code>persona_brand</code> w wyniku zadania, dokłada do swojej oceny <b>prawdziwy profil</b> tej osoby i ocenia treść względem jej celów, obiekcji i tego, czego unika — niezgodność jest zastrzeżeniem <b>blokującym</b>, z konkretnym opisem, czego persona potrzebuje zamiast tego. Mechanizm i dopasowanie: <code>kontekst_firmy.dopasuj_persone(target_persona, brand)</code>.</p>
-    <div class="callout"><b>Zweryfikowane na żywo:</b> podstawiono celowo złą treść (materiał dla eksperta podpisany jako „dla Kasi") — Bożena odrzuciła, odwołując się wprost do realnego bólu Kasi z jej profilu: „dla Kasi to komunikat, że znowu za mało umie".</div>
+    <p><code>ad_copy_generator.py</code> generuje tekst reklamowy z pełnym kontekstem person danej marki i sam wybiera, do której z nich pisze (<code>target_persona</code> w wyniku). Mechanizm dopasowania: <code>kontekst_firmy.dopasuj_persone(target_persona, brand)</code> — fail-closed, bez znanej marki nie zgaduje.</p>
+    <div class="callout"><b>Uwaga (22.08.2026):</b> wcześniej ocena trafności gotowego materiału względem persony (nie tylko jej dobór przy generowaniu) należała do bota odbioru biznesowego (Bożena), usuniętego z bramki na decyzję właściciela. Dziś dobór persony przy generowaniu treści działa jak opisano wyżej; nikt w bramce jakości nie weryfikuje już GOTOWEGO materiału względem profilu persony.</div>
   </div>
 
   <div class="foot">Wirtualny Pracownik AI — dokumentacja. <a href="jak-edytowac.html">Jak edytować tę dokumentację</a> · <a href="boty-i-persony.html">Boty i persony (wewnętrzne)</a></div>

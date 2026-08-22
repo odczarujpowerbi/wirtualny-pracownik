@@ -268,7 +268,7 @@ def run(url, steps=None, allowed_hosts=(), timeout_ms=DEFAULT_TIMEOUT_MS, out_di
             page.screenshot(path=str(shot_path), full_page=True)
             try:
                 # Tekst widoczny na stronie — bez tego executor nie ma z czego
-                # zbudować odpowiedzi na pytanie zadania (Bożena słusznie
+                # zbudować odpowiedzi na pytanie zadania (bramka jakości słusznie
                 # odrzucała "log techniczny": zrzut ekranu + licznik kroków,
                 # zero materiału). To samo pole 'text', z którego web_answer.py
                 # buduje odpowiedź dla fetch_url — ten sam mechanizm, inne źródło.

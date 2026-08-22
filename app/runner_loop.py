@@ -108,8 +108,8 @@ def _process_task_core(task, policy, routing, client):
     # Krok myślenia: model analizuje zadanie (Claude Code headless przez
     # `claude login`, albo SDK z ANTHROPIC_API_KEY jako fallback). Degraduje się
     # bez wywalania pętli, gdy model niedostępny (task_thinker.think).
-    # action_type trafia do zadania, żeby Bożena (odbiór biznesowy) dobrała
-    # właściwą warstwę kontekstu biznesowego per typ zadania.
+    # action_type trafia do zadania — task_brief_builder go czyta przy budowaniu
+    # briefu dla kroku myślenia.
     task["action_type"] = action_type
 
     thinking = task_thinker.think(task)
@@ -164,7 +164,7 @@ def _process_task_core(task, policy, routing, client):
 
     else:
         # Żółte ORAZ zielone z efektem (zrzut/plik/testy) przechodzą pełną bramkę
-        # jakości (Gustaw): Bartek, Franek, Oskar, Bożena — zanim człowiek dostanie
+        # jakości (Gustaw): Bartek, Franek, Oskar — zanim człowiek dostanie
         # odpowiedź jako gotową.
         gate = bot_gustaw_bramka.run_gate(task, execution_result)
         state_store.log_decision(

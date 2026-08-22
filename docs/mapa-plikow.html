@@ -45,9 +45,9 @@
   <table>
     <thead><tr><th style="width:22%">Folder/plik</th><th>Co jest</th></tr></thead>
     <tbody>
-      <tr><td><code>config/</code></td><td>Konfiguracja firmy — edytowalna bez zmiany kodu. <code>approval_policy.yaml</code> (klasy ryzyka), <code>tool_contracts.yaml</code> (allowlisty), <code>models.yaml</code>/<code>model_tiers.yaml</code> (rejestr modeli), <code>odbior_ustalenia.yaml</code> (co blokuje odbiór), <code>business_context.yaml</code>, <code>validation_gate.yaml</code>, <code>schedule.yaml</code>.</td></tr>
+      <tr><td><code>config/</code></td><td>Konfiguracja firmy — edytowalna bez zmiany kodu. <code>approval_policy.yaml</code> (klasy ryzyka), <code>tool_contracts.yaml</code> (allowlisty), <code>models.yaml</code>/<code>model_tiers.yaml</code> (rejestr modeli), <code>validation_gate.yaml</code>, <code>schedule.yaml</code>.</td></tr>
       <tr><td><code>kontekst/</code></td><td>Wiedza o firmie: <code>firma-podstawy.md</code>, <code>marka-*.md</code>, <code>projekty/*.md</code>, <code>persony/&lt;marka&gt;/*.md</code> (buyer persony). Patrz <a href="kontekst-firmy.html">Kontekst firmy</a>, <a href="buyer-persony.html">Buyer persony</a>.</td></tr>
-      <tr><td><code>persony_botow/</code></td><td>Persony BOTÓW (jak mają oceniać), np. <code>bozena_biznes.md</code>. Nie mylić z <code>kontekst/persony/</code> (buyer persony klientów) — nazwy rozdzielone po realnej kolizji.</td></tr>
+      <tr><td><code>persony_botow/</code></td><td>Persony BOTÓW (jak mają oceniać) — dziś pusty (jedyna persona, odbioru biznesowego, usunięta razem z tym botem 22.08.2026). Miejsce na przyszłe persony botów. Nie mylić z <code>kontekst/persony/</code> (buyer persony klientów) — nazwy rozdzielone po realnej kolizji.</td></tr>
       <tr><td><code>skills/</code></td><td>Wiedza "jak dobrze użyć" danego źródła/integracji, np. <code>web_research_operations.yaml</code> (per-hosta wskazówki dla web_answer).</td></tr>
       <tr><td><code>inbox/zadania.txt</code></td><td>Notatnik zadań (lokalna ścieżka, patrz <a href="zadania-i-zrodla.html">Skąd zadania</a>).</td></tr>
       <tr><td><code>mock_data/</code></td><td>Dane testowe (przykładowy PBIP, przykładowe zadania) do pracy bez żywych kluczy.</td></tr>
@@ -88,7 +88,7 @@
   <table>
     <tbody>
       <tr><td style="width:26%"><code>bot_gustaw_bramka.py</code></td><td>Orkiestrator — zbiera werdykty i wydaje decyzję bramki.</td></tr>
-      <tr><td><code>bot_bartek_dubler.py</code> / <code>bot_franek_funkcjonalny.py</code> / <code>bot_oskar_wizja.py</code> / <code>bot_bozena_biznes.py</code></td><td>Regresja / testy funkcjonalne / ocena wizualna / odbiór biznesowy.</td></tr>
+      <tr><td><code>bot_bartek_dubler.py</code> / <code>bot_franek_funkcjonalny.py</code> / <code>bot_oskar_wizja.py</code></td><td>Regresja / testy funkcjonalne / ocena wizualna.</td></tr>
     </tbody>
   </table>
 

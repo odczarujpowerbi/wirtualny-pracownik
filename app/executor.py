@@ -489,7 +489,7 @@ def _web_signature(result):
     a nie co dokładnie było w treści. Żywe strony zmieniają w każdej odpowiedzi
     identyfikatory i znaczniki czasu (np. pole `tid` w API Wikipedii), więc
     porównywanie pełnej treści dawałoby stały fałszywy alarm 'niedeterminizm'.
-    Merytoryczną zawartość ocenia Franek (plik) i Bożena (odbiór)."""
+    Merytoryczną zawartość ocenia Franek (plik)."""
     if not result.get("available"):
         return {"available": False, "url": result.get("url"), "detail": result.get("detail")}
     return {

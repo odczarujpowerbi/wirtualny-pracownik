@@ -14,7 +14,6 @@ import sys
 import tempfile
 from pathlib import Path
 
-import bot_bozena_biznes
 import kontekst_firmy
 import task_brief_builder
 
@@ -61,12 +60,6 @@ def run():
     prompt = task_brief_builder.build_thinking_prompt(
         {"title": "Napisz opis kursu dla Odczaruj Power BI", "description": ""})
     checks.append(("Kontekst trafia do analizy zadania", "KONTEKST FIRMY" in prompt))
-
-    ocena = bot_bozena_biznes.build_prompt(
-        {"title": "Oferta wdrożenia dla Clickless"}, {"acceptance_notes": "x"},
-        {"oczekiwania": "", "na_co_uwaga": []}, "", {})
-    checks.append(("Kontekst trafia do odbioru biznesowego", "KONTEKST FIRMY" in ocena))
-    checks.append(("Odbiór dostaje właściwą markę", "Clickless — marka wdrożeniowa" in ocena))
 
     # --- kontekst projektu ---
     projekt = kontekst_firmy.dopasuj_projekt("Popraw raport dla Magnapharm")

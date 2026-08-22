@@ -2,9 +2,8 @@
 
 Kopia realnych profili buyer person z OneDrive ("Buyer persony Odczaruj PBI",
 "Buyer persony clickless/personas"), po jednym pliku na osobę. Używane przez
-`ad_copy_generator.py` (do pisania treści pod konkretną personę) i przez
-`bot_bozena_biznes.py` (do oceny, czy gotowy materiał w tę personę trafia —
-nie generycznie "czy dobry", ale "czy dotrze do TEJ konkretnej osoby").
+`ad_copy_generator.py` do pisania treści pod konkretną personę (nie
+generycznie "napisz dobry tekst", tylko pod profil TEJ konkretnej osoby).
 
 ## Struktura
 
@@ -26,14 +25,13 @@ Dlatego dopasowanie **wymaga** znanej marki (`brand="odczaruj"` albo
 `"clickless"`) — bez niej `dopasuj_persone` zwraca `None` (fail-closed:
 lepiej brak profilu niż profil złej osoby).
 
-## Skąd biorą się `target_persona` / `persona_brand` w zadaniu
+## Skąd bierze się `target_persona` w wyniku generatora
 
 `ad_copy_generator.generate_variants(brief, brand=...)` zwraca
 `{"brand": ..., "variants": [{"target_persona": "Kasia", ...}, ...]}` — model
-sam mówi, do której z załadowanych person pisze. Worker, który przekazuje
-wynik do bramki jakości, ma skopiować `brand` do `execution_result["persona_brand"]`
-i wybrany wariant do `execution_result["target_persona"]` — Bożena czyta te
-dwa pola i dokłada prawdziwy profil do swojej oceny.
+sam mówi, do której z załadowanych person pisze. (Wcześniej te pola czytała
+też bramka jakości przy ocenie trafności persony — ten bot został usunięty,
+pola zostają tylko jako metadana generatora.)
 
 ## Aktualizacja
 

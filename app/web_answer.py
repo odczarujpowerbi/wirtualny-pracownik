@@ -2,11 +2,11 @@
 Odpowiedź na pytanie z zadania na podstawie POBRANEJ treści — krok, którego
 brakowało między "pobrałem stronę" a "dostarczyłem efekt".
 
-Wychwyciła to bramka na pierwszym realnym przebiegu zadań internetowych: Bożena
-(odbiór biznesowy) odrzuciła wynik słowami "same śmieci techniczne zamiast
-informacji, nie wypisano żadnych kluczowych faktów, JSON zamiast polskiego
-tekstu". Miała rację — pobranie danych to nie jest wykonanie zadania
-"wypisz kluczowe fakty". Ten moduł domyka pętlę: treść + pytanie -> odpowiedź.
+Wychwyciła to bramka jakości na pierwszym realnym przebiegu zadań internetowych:
+odrzuciła wynik słowami "same śmieci techniczne zamiast informacji, nie
+wypisano żadnych kluczowych faktów, JSON zamiast polskiego tekstu". Miała
+rację — pobranie danych to nie jest wykonanie zadania "wypisz kluczowe fakty".
+Ten moduł domyka pętlę: treść + pytanie -> odpowiedź.
 
 Bezpieczeństwo: treść z internetu jest NIEZAUFANA. Trafia do promptu jawnie
 oznaczona jako DANE (nie polecenia), z instrukcją ignorowania wszelkich zawartych

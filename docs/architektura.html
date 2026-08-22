@@ -47,7 +47,7 @@
       <tr><td><b>Rejestr modeli</b></td><td>Który model dla którego wywołania (wysoki poziom = osąd, niski = mechaniczne wykonanie), cennik. Patrz <a href="modele-i-koszty.html">Modele i koszty</a>.</td><td><code>model_registry.py</code>, <code>config/models.yaml</code>, <code>config/model_tiers.yaml</code></td></tr>
       <tr><td><b>Kontekst firmy</b></td><td>Wiedza o markach, projektach klientów i buyer personach, dokładana do promptu zależnie od treści zadania. Patrz <a href="kontekst-firmy.html">Kontekst firmy</a>.</td><td><code>kontekst_firmy.py</code>, <code>app/kontekst/</code></td></tr>
       <tr><td><b>Stan i audyt</b></td><td>Zadania + dziennik decyzji (kto/co/dlaczego/model/koszt) w SQLite. Przeżywa restart.</td><td><code>state_store.py</code> → <code>runs/state.db</code></td></tr>
-      <tr><td><b>Bramka jakości</b></td><td>5 botów ocenia efekt zanim trafi do człowieka.</td><td><code>bot_gustaw_bramka.py</code> + Bartek/Franek/Oskar/Bożena</td></tr>
+      <tr><td><b>Bramka jakości</b></td><td>4 boty oceniają efekt zanim trafi do człowieka.</td><td><code>bot_gustaw_bramka.py</code> + Bartek/Franek/Oskar</td></tr>
       <tr><td><b>Model AI</b></td><td>Claude przez <code>claude</code> login (headless) albo SDK. Poziom modelu per wywołanie z rejestru.</td><td><code>task_thinker.py</code></td></tr>
       <tr><td><b>Kolejka zadań</b></td><td>Projectly (API + MCP) jako źródło prawdy — <b>realnie podłączone i działające</b>; tryb mock lokalnie bez kluczy.</td><td><code>projectly_client.py</code></td></tr>
       <tr><td><b>Podgląd / sterowanie</b></td><td>Dashboard na localhoście: zadania, przepływy, panel operatora, kondycja/limity.</td><td><code>dashboard.py</code>, <code>dashboard.html</code></td></tr>

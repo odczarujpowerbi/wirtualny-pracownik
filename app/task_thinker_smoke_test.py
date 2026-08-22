@@ -43,7 +43,7 @@ def run():
         checks.append(("CLI: wykonawca (low) dostaje --model claude-sonnet-4-6",
                        "--model" in captured["cmd"] and "claude-sonnet-4-6" in captured["cmd"]))
 
-        task_thinker._think_via_claude_code("claude", "prompt", "bot_bozena_biznes.review")
+        task_thinker._think_via_claude_code("claude", "prompt", "bot_oskar_wizja.review")
         checks.append(("CLI: osąd (high) dostaje --model claude-opus-5",
                        "--model" in captured["cmd"] and "claude-opus-5" in captured["cmd"]))
 

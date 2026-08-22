@@ -222,8 +222,8 @@ class ProjectlyClient:
         oryginał->eskalacja->kontynuacja, PLAN-WDROZENIA.md sekcja 4).
 
         expected_result/acceptance_criteria (pola Projectly: goal/effect, patrz
-        field_mapping w config/projectly.yaml) — BEZ NICH bramka jakości (Oskar,
-        Bożena) ocenia efekt względem pustego oczekiwania, co daje niespójne,
+        field_mapping w config/projectly.yaml) — BEZ NICH bramka jakości (Oskar)
+        ocenia efekt względem pustego oczekiwania, co daje niespójne,
         czasem fałszywie negatywne werdykty (realnie napotkane: zadanie testowe
         bez 'goal' dostało odrzucenie wizualne na poprawnym zrzucie)."""
         if not project_id:
