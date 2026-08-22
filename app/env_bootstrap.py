@@ -13,13 +13,32 @@ do wielokrotnego wywołania).
 Kolejność: najpierw zwykły `.env` w tym folderze (zgodność wstecz z
 wcześniejszymi wdrożeniami/testami), potem `secrets/.env` z
 `override=True` — nowe, scentralizowane miejsce zawsze wygrywa, jeśli
-istnieje.
+istnieje. Na końcu (też `override=True`, więc wygrywa nad wszystkim
+powyższym) `secrets/agents/<rola>/.env` — sekrety WŁAŚCIWE DLA ROLI tej
+maszyny (`config/role.json`), np. osobny token Projectly per bot-rola
+(dev/marketing/...), gdy jedna maszyna/instancja repo ma obsługiwać
+konkretną rolę spośród wielu. Brak takiego folderu = brak zmiany
+zachowania (fail-soft, jak `_load_role()` w `projectly_client.py`).
 """
 
+import json
 import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+
+def _current_role(role_path=None):
+    """Kopia logiki _load_role() z projectly_client.py — nie importujemy
+    stamtąd, żeby uniknąć zależności cyklicznej (projectly_client importuje
+    ten moduł, nie na odwrót). role_path wstrzykiwalny (testowalność)."""
+    role_path = role_path or Path(__file__).parent / "config" / "role.json"
+    if role_path.exists():
+        try:
+            return json.loads(role_path.read_text(encoding="utf-8")).get("role", "dev")
+        except (ValueError, OSError):
+            return "dev"
+    return "dev"
 
 # Konsola Windows domyślnie NIE jest UTF-8 (tu: cp1250) i wywala się na emoji
 # w komentarzach/statusach (np. ✅ ✅ → UnicodeEncodeError, ubija runner).
@@ -34,3 +53,4 @@ for _stream in (sys.stdout, sys.stderr):
 
 load_dotenv()
 load_dotenv(Path(__file__).parent / "secrets" / ".env", override=True)
+load_dotenv(Path(__file__).parent / "secrets" / "agents" / _current_role() / ".env", override=True)
