@@ -19,8 +19,18 @@ czytelnym powodem (pip install playwright && playwright install chromium),
 nigdy wyjątek — ten sam wzorzec co screenshot_capture.py/ui_actions.py dla
 brakujących backendów.
 
+Sesje logowania (profile): część stron (panel MailerLite, Meta Ads Manager)
+wymaga zalogowania. `run(..., profile="nazwa")` używa TRWAŁEGO profilu
+przeglądarki zapisanego w secrets/browser_profiles/<profil> (nigdy w repo —
+to odpowiednik poświadczenia). Profil trzeba najpierw zalogować RĘCZNIE,
+jednorazowo: `python browser_worker.py --login <profil> <adres_logowania>`
+(otwiera prawdziwe okno przeglądarki, człowiek loguje się sam — agent nigdy
+nie wpisuje danych logowania). Dozwolone nazwy profili i domeny per profil
+pilnuje `executor.py` przez `config/tool_contracts.yaml`.
+
 Użycie:
     python browser_worker.py https://przyklad.example przyklad.example
+    python browser_worker.py --login mailerlite https://dashboard.mailerlite.com/dashboard
 """
 
 import json
@@ -32,6 +42,7 @@ from urllib.parse import urlparse
 from web_fetch_worker import host_allowed
 
 OUT_DIR = Path(__file__).parent / "runs" / "browser"
+PROFILES_DIR = Path(__file__).parent / "secrets" / "browser_profiles"
 DEFAULT_TIMEOUT_MS = 15_000
 _ALLOWED_STEP_ACTIONS = {"goto", "click", "fill", "wait_for_selector", "screenshot"}
 
@@ -71,7 +82,8 @@ def _validate_steps(steps):
 
 
 def _real_page_factory():
-    """Prawdziwa przeglądarka (Chromium headless). Zwraca (page, close)."""
+    """Prawdziwa przeglądarka (Chromium headless, BEZ zapisanej sesji — czysty
+    profil za każdym razem). Zwraca (page, close)."""
     from playwright.sync_api import sync_playwright  # lazy: opcjonalna zależność
 
     ctx = sync_playwright().start()
@@ -87,14 +99,77 @@ def _real_page_factory():
     return page, _close
 
 
+def _profile_dir(profile):
+    return PROFILES_DIR / profile
+
+
+def _persistent_page_factory(profile, headless=True):
+    """Przeglądarka z TRWAŁYM profilem (ciasteczka/sesja logowania zapisane na
+    dysku w secrets/browser_profiles/<profile> — NIGDY w repo, to odpowiednik
+    poświadczenia). Do zadań wymagających zalogowanej sesji (np. panel
+    MailerLite, Meta Ads Manager), której zwykły `_real_page_factory` nie ma.
+
+    Profil trzeba najpierw ZALOGOWAĆ RĘCZNIE (funkcja `login()` poniżej,
+    niegłoheadless) — sam browser_worker nigdy nie wpisuje danych logowania."""
+    from playwright.sync_api import sync_playwright  # lazy: opcjonalna zależność
+
+    ctx = sync_playwright().start()
+    context = ctx.chromium.launch_persistent_context(str(_profile_dir(profile)), headless=headless)
+    page = context.pages[0] if context.pages else context.new_page()
+
+    def _close():
+        try:
+            context.close()
+        finally:
+            ctx.stop()
+
+    return page, _close
+
+
+def login(profile, url, out=print):
+    """Otwiera profil NIEGŁOHEADLESS na `url`, żeby CZŁOWIEK zalogował się
+    ręcznie — jednorazowo, przed pierwszym użyciem `run(..., profile=...)`.
+    Agent NIGDY nie wpisuje tu danych logowania (login/hasło/2FA to sprawa
+    człowieka). Sesja zapisuje się do secrets/browser_profiles/<profile> przy
+    zamknięciu kontekstu.
+
+    Wymaga prawdziwego ekranu (RDP na maszynie) — okno przeglądarki się otwiera
+    naprawdę. Zamknij je (albo wciśnij Enter w konsoli), żeby zapisać sesję."""
+    if not available():
+        out("Playwright niedostępny (pip install playwright && playwright install chromium).")
+        return False
+
+    from playwright.sync_api import sync_playwright
+
+    profile_dir = _profile_dir(profile)
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    with sync_playwright() as p:
+        context = p.chromium.launch_persistent_context(str(profile_dir), headless=False)
+        page = context.pages[0] if context.pages else context.new_page()
+        page.goto(url)
+        out(f"Zaloguj się ręcznie w otwartym oknie przeglądarki (profil '{profile}').")
+        out("Po zalogowaniu zamknij okno przeglądarki albo wciśnij Enter tutaj, żeby zapisać sesję.")
+        try:
+            input()
+        except EOFError:
+            pass
+        context.close()
+    out(f"Sesja zapisana: {profile_dir}")
+    return True
+
+
 def run(url, steps=None, allowed_hosts=(), timeout_ms=DEFAULT_TIMEOUT_MS, out_dir=None,
-        _page_factory=None):
+        profile=None, _page_factory=None):
     """Otwiera `url` w przeglądarce i wykonuje `steps` po kolei. Nigdy nie rzuca —
     zwraca zawsze dict: {available, url, final_url, title, screenshot_path,
     steps_done, steps_total, detail}.
 
     allowed_hosts: allowlista hostów z kontraktu narzędzia (jak przy fetch_url),
     sprawdzana dla adresu startowego I dla każdego kroku 'goto'. Pusta = odmowa.
+    profile: nazwa TRWAŁEGO profilu (secrets/browser_profiles/<profile>) do
+    zadań wymagających zalogowanej sesji — musi być wcześniej zalogowany
+    funkcją `login()`. Bez tego (domyślnie None) — świeża, niezalogowana
+    przeglądarka, jak dotąd.
     _page_factory: wstrzykiwane w testach (atrapa strony — bez realnego Playwright,
     tak jak `opener` we web_fetch_worker.fetch)."""
     steps = steps or []
@@ -112,7 +187,14 @@ def run(url, steps=None, allowed_hosts=(), timeout_ms=DEFAULT_TIMEOUT_MS, out_di
         if not available():
             return _unavailable(
                 "Playwright niedostępny (pip install playwright && playwright install chromium).", url)
-        _page_factory = _real_page_factory
+        if profile:
+            if not _profile_dir(profile).exists():
+                return _unavailable(
+                    f"Profil '{profile}' nie jest jeszcze zalogowany — uruchom najpierw "
+                    f"`python browser_worker.py --login {profile} <adres_logowania>` ręcznie na maszynie.", url)
+            _page_factory = lambda: _persistent_page_factory(profile, headless=True)  # noqa: E731
+        else:
+            _page_factory = _real_page_factory
 
     out_path = Path(out_dir) if out_dir else OUT_DIR
     out_path.mkdir(parents=True, exist_ok=True)
@@ -164,8 +246,15 @@ def run(url, steps=None, allowed_hosts=(), timeout_ms=DEFAULT_TIMEOUT_MS, out_di
 
 
 def main():
+    if len(sys.argv) >= 2 and sys.argv[1] == "--login":
+        if len(sys.argv) < 4:
+            print("Użycie: python browser_worker.py --login <profil> <https://adres_logowania>")
+            return 1
+        return 0 if login(sys.argv[2], sys.argv[3]) else 1
+
     if len(sys.argv) < 2:
         print("Użycie: python browser_worker.py <https://adres> [host1,host2]")
+        print("        python browser_worker.py --login <profil> <https://adres_logowania>")
         return 1
     url = sys.argv[1]
     hosts = sys.argv[2].split(",") if len(sys.argv) > 2 else [urlparse(url).hostname]

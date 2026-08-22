@@ -236,14 +236,22 @@ def _run_browser_task(task):
     Allowlista hostów siedzi w kontrakcie `browser_task` (config/tool_contracts.yaml),
     tak samo jak przy fetch_url — pusta na start, właściciel dopisuje domenę świadomie."""
     url = task.get("url")
-    check = tool_registry.check_call("browser_task", {"url": url})
+    profile = task.get("browser_profile")
+    check = tool_registry.check_call("browser_task", {"url": url, "browser_profile": profile})
     if not check["allowed"]:
         return _refused(check["reason"], tool="browser_task")
 
-    steps = task.get("browser_steps") or task.get("kroki") or []
-    domeny = tool_registry.allowed_domains(tool_registry.get_contract("browser_task") or {})
+    contract = tool_registry.get_contract("browser_task") or {}
+    if profile and profile not in (contract.get("allowed_profiles") or []):
+        return _refused(
+            f"Profil logowania '{profile}' nie jest na allowliście narzędzia browser_task "
+            f"(config/tool_contracts.yaml -> allowed_profiles) — odmowa (fail-closed).",
+            tool="browser_task")
 
-    wynik = browser_worker.run(url, steps=steps, allowed_hosts=domeny)
+    steps = task.get("browser_steps") or task.get("kroki") or []
+    domeny = tool_registry.allowed_domains(contract)
+
+    wynik = browser_worker.run(url, steps=steps, allowed_hosts=domeny, profile=profile)
     if not wynik["available"]:
         return _refused(wynik["detail"], tool="browser_task")
 

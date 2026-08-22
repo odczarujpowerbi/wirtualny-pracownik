@@ -110,14 +110,26 @@ tools:
       Zadania webowe wymagające KLIKANIA/wypełniania (Playwright headless) — tam,
       gdzie fetch_url (czyste GET) nie wystarcza. Kroki to zamknięty słownik
       (goto/click/fill/wait_for_selector/screenshot), model nie dostaje dowolnego
-      JS ani powłoki. Allowlista hostów PUSTA na start — właściciel musi
-      świadomie dopisać domenę (jak przy fetch_url), zanim narzędzie cokolwiek
-      zrobi. Wymaga: pip install playwright && playwright install chromium.
-    allowed_domains: []
+      JS ani powłoki. Wymaga: pip install playwright && playwright install chromium.
+      Zadania z profilem logowania (browser_profile) muszą TYLKO PRZEGLĄDAĆ —
+      żadnego klikania "wyślij/zapisz/opublikuj/usuń" na cudzym koncie (Meta Ads,
+      MailerLite) — rola workera to odczyt i zestawienie, nie edycja.
+    allowed_domains:
+      - dashboard.mailerlite.com   # panel MailerLite (rzeczy niedostepne przez API/MCP) — profil: mailerlite
+      - business.facebook.com      # Meta Ads Manager — WYLACZNIE przegladanie kampanii, bez edycji — profil: meta_ads
+      - adsmanager.facebook.com    # alternatywny adres Meta Ads Manager — profil: meta_ads
+      - podatki.gov.pl             # publiczna strona rzadowa (obejmuje www.podatki.gov.pl), bez logowania — test bezpiecznej nawigacji
+    # Nazwy profili logowania dozwolone dla browser_profile (executor.py
+    # odmawia nieznanej nazwy — nie tworzy cicho nowego, pustego profilu).
+    # Profil trzeba zalogowac RECZNIE: python browser_worker.py --login <profil> <adres>.
+    allowed_profiles: [mailerlite, meta_ads]
     params:
       url:
         required: true
         type: url
+      browser_profile:
+        required: false
+        type: string
 
   zanfia_query:
     risk: green

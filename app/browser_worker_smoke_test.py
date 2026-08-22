@@ -136,18 +136,50 @@ def run():
                        awaria["available"] is False and awaria["steps_done"] == 1))
         checks.append(("Powód błędu wskazuje numer i typ kroku", "Krok 2 (fill)" in awaria["detail"]))
 
-    # --- kontrakt narzędzia (tool_registry) — allowed_domains puste na start ---
-    brak_allowlisty = tool_registry.check_call("browser_task", {"url": "https://cokolwiek.example/x"})
-    checks.append(("Kontrakt: pusta allowlista na start -> odmowa (fail-closed)",
-                   brak_allowlisty["allowed"] is False and "allowed_domains" in brak_allowlisty["reason"]))
+        # --- profil logowania: niezalogowany -> odmowa BEZ próby odpalenia przeglądarki ---
+        niezalogowany = browser_worker.run("https://przyklad.example/start", allowed_hosts=ALLOWED,
+                                           out_dir=tmp, profile="nieistniejacy_profil_xyz")
+        checks.append(("Profil niezalogowany -> odmowa z instrukcją --login",
+                       niezalogowany["available"] is False and "--login" in niezalogowany["detail"]))
+
+        # --- profil logowania: zalogowany (atrapa) -> używa _persistent_page_factory ---
+        zalogowany_dir = Path(tmp) / "profil_test"
+        zalogowany_dir.mkdir()
+        original_profiles_dir, original_persistent = browser_worker.PROFILES_DIR, browser_worker._persistent_page_factory
+        try:
+            browser_worker.PROFILES_DIR = Path(tmp)
+            wolania = []
+            browser_worker._persistent_page_factory = lambda profile, headless=True: (
+                wolania.append((profile, headless)) or _factory()())
+            res_profil = browser_worker.run("https://przyklad.example/start", allowed_hosts=ALLOWED,
+                                            out_dir=tmp, profile="profil_test")
+            checks.append(("Profil zalogowany -> wykonuje zadanie przez trwały kontekst",
+                           res_profil["available"] is True and wolania == [("profil_test", True)]))
+        finally:
+            browser_worker.PROFILES_DIR, browser_worker._persistent_page_factory = original_profiles_dir, original_persistent
+
+    # --- kontrakt narzędzia (tool_registry) ---
+    dozwolony = tool_registry.check_call("browser_task", {"url": "https://dashboard.mailerlite.com/dashboard"})
+    checks.append(("Kontrakt: domena z allowlisty (MailerLite) przechodzi",
+                   dozwolony["allowed"] is True and dozwolony["risk"] == "yellow"))
+
+    spoza_listy = tool_registry.check_call("browser_task", {"url": "https://cokolwiek.example/x"})
+    checks.append(("Kontrakt: host spoza allowed_domains -> odmowa (fail-closed)",
+                   spoza_listy["allowed"] is False and "allowed_domains" in spoza_listy["reason"]))
 
     brak_url = tool_registry.check_call("browser_task", {})
     checks.append(("Kontrakt: brak adresu -> odmowa", brak_url["allowed"] is False))
 
     # --- wpięcie w executor (bez sieci: kontrakt odmawia, zanim browser_worker w ogóle ruszy) ---
     odmowa = executor.execute({"action": "browser_task", "url": "https://cokolwiek.example/x"})
-    checks.append(("Executor: brak allowlisty -> executed=False (fail-closed)",
+    checks.append(("Executor: host spoza allowlisty -> executed=False (fail-closed)",
                    odmowa is not None and odmowa["executed"] is False and odmowa["tool"] == "browser_task"))
+
+    odmowa_profilu = executor.execute({"action": "browser_task", "url": "https://dashboard.mailerlite.com/x",
+                                       "browser_profile": "nieznany_profil"})
+    checks.append(("Executor: nieznany profil (spoza allowed_profiles) -> executed=False",
+                   odmowa_profilu is not None and odmowa_profilu["executed"] is False
+                   and "allowed_profiles" in odmowa_profilu["acceptance_notes"]))
 
     nieznane = executor.execute({"action": "cos_czego_nie_ma"})
     checks.append(("Executor: nieobsługiwana akcja -> None (nic nie udaje)", nieznane is None))
