@@ -27,7 +27,13 @@ _GREEN_KEYWORDS = (
     "raport tylko do odczytu", "wylistuj", "policz",
 )
 # Akcje workerów, które są z definicji read-only (zielone) niezależnie od tytułu.
-_GREEN_ACTIONS = {"validate_pbip", "read_report", "capture_screenshot", "fetch_url"}
+# browser_task_readonly = executor.rozpoznaj_narzedzie zwraca to TYLKO gdy
+# zadanie nie niesie żadnych browser_steps — bez kroków worker mechanicznie
+# nie może kliknąć/wypełnić niczego (sam navigate+screenshot+odczyt tekstu),
+# więc słowo "kampania" w treści (żywy przypadek: "sprawdź WYNIKI KAMPANII")
+# nie powinno podnosić koloru do red — to ten sam odczyt co fetch_url, inne
+# źródło. Zadanie Z krokami (klikanie) zostaje pod zwykłą klasyfikację słów.
+_GREEN_ACTIONS = {"validate_pbip", "read_report", "capture_screenshot", "fetch_url", "browser_task_readonly"}
 
 
 def _haystack(task):

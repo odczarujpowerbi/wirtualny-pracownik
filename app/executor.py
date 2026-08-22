@@ -63,7 +63,13 @@ def rozpoznaj_narzedzie(task):
     """Nazwa narzędzia, którym `execute()` obsłuży to zadanie — bez wykonywania
     niczego (zero efektów ubocznych). Używane PRZED wykonaniem (runner_loop.py),
     żeby risk_hint.hint_from_task wywnioskował kolor z ROZPOZNANEGO narzędzia,
-    a nie tylko ze słów w tytule."""
+    a nie tylko ze słów w tytule.
+
+    browser_task BEZ browser_steps zwraca 'browser_task_readonly' — bez kroków
+    worker mechanicznie może tylko nawigować, zrobić zrzut i odczytać tekst
+    (jak fetch_url), więc słowo typu "kampania" w treści nie powinno podnosić
+    ryzyka do red. Zadanie Z krokami (klikanie) zostaje jako zwykłe 'browser_task',
+    pod normalną klasyfikację słów kluczowych — tam ryzyko jest realne."""
     action = (task.get("action") or "").lower()
     if _is_pbip_validation(task):
         return "validate_pbip"
@@ -72,7 +78,7 @@ def rozpoznaj_narzedzie(task):
     if action == "open_pbip_capture":
         return "open_pbip_capture"
     if action == "browser_task" or _browser_url_from_task(task):
-        return "browser_task"
+        return "browser_task" if (task.get("browser_steps") or task.get("kroki")) else "browser_task_readonly"
     if action == "fetch_url" or _url_from_task(task):
         return "fetch_url"
     return None

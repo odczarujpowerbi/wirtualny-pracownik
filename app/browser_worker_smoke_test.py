@@ -21,6 +21,7 @@ from pathlib import Path
 
 import browser_worker
 import executor
+import risk_hint
 import tool_registry
 
 ALLOWED = ["przyklad.example"]
@@ -193,13 +194,29 @@ def run():
     # więc adres wyłuskany z treści musi jednoznacznie trafić do właściwego narzędzia ---
     z_tresci_browser = executor.rozpoznaj_narzedzie(
         {"title": "Sprawdź kampanie", "description": "Zobacz https://dashboard.mailerlite.com/dashboard"})
-    checks.append(("Adres MailerLite w treści (bez action) -> rozpoznany jako browser_task",
-                   z_tresci_browser == "browser_task"))
+    checks.append(("Adres MailerLite w treści (bez action, bez kroków) -> browser_task_readonly",
+                   z_tresci_browser == "browser_task_readonly"))
 
     z_tresci_fetch = executor.rozpoznaj_narzedzie(
         {"title": "Podaj kurs EUR", "description": "https://api.nbp.pl/api/exchangerates/rates/a/eur/"})
     checks.append(("Adres NBP w treści -> nadal rozpoznany jako fetch_url (brak konfliktu domen)",
                    z_tresci_fetch == "fetch_url"))
+
+    z_krokami = executor.rozpoznaj_narzedzie(
+        {"title": "Kliknij coś na kampanii", "description": "https://dashboard.mailerlite.com/dashboard",
+         "browser_steps": [{"action": "click", "selector": "#a"}]})
+    checks.append(("Adres MailerLite Z krokami klikania -> zwykłe browser_task (nie readonly)",
+                   z_krokami == "browser_task"))
+
+    hint_readonly = risk_hint.hint_from_task(
+        {"title": "Sprawdź wyniki kampanii reklamowej"}, tool="browser_task_readonly")
+    checks.append(("Słowo 'kampania' + browser_task_readonly -> mimo to 'green' (bez kroków klikania)",
+                   hint_readonly == "green"))
+
+    hint_z_krokami = risk_hint.hint_from_task(
+        {"title": "Sprawdź wyniki kampanii reklamowej"}, tool="browser_task")
+    checks.append(("Słowo 'kampania' + browser_task (Z krokami) -> nadal 'red' (realne klikanie)",
+                   hint_z_krokami == "red"))
 
     profil_z_domeny = executor._profile_for_url(
         "https://dashboard.mailerlite.com/x", tool_registry.get_contract("browser_task"))
