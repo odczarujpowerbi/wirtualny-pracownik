@@ -123,6 +123,13 @@ tools:
     # odmawia nieznanej nazwy — nie tworzy cicho nowego, pustego profilu).
     # Profil trzeba zalogowac RECZNIE: python browser_worker.py --login <profil> <adres>.
     allowed_profiles: [mailerlite, meta_ads]
+    # Auto-dobor profilu logowania po hoscie adresu — zadania z Projectly nie
+    # maja pola na jawne ustawienie browser_profile (nie ma go w schemacie
+    # Projectly), wiec domena z tresci zadania jednoznacznie wskazuje profil.
+    profile_by_domain:
+      dashboard.mailerlite.com: mailerlite
+      business.facebook.com: meta_ads
+      adsmanager.facebook.com: meta_ads
     params:
       url:
         required: true

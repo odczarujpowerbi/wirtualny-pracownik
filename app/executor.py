@@ -41,7 +41,7 @@ def execute(task):
         return _run_screenshot_capture(task)
     if action == "open_pbip_capture":
         return _run_pbip_capture(task)
-    if action == "browser_task":
+    if action == "browser_task" or _browser_url_from_task(task):
         return _run_browser_task(task)
     if action == "fetch_url" or _url_from_task(task):
         return _run_web_fetch(task)
@@ -71,22 +71,57 @@ def rozpoznaj_narzedzie(task):
         return "capture_screenshot"
     if action == "open_pbip_capture":
         return "open_pbip_capture"
-    if action == "browser_task":
+    if action == "browser_task" or _browser_url_from_task(task):
         return "browser_task"
     if action == "fetch_url" or _url_from_task(task):
         return "fetch_url"
     return None
 
 
-def _url_spoza_allowlisty(task):
-    """Pierwszy adres https w treści zadania, którego nie ma na allowliście —
-    sygnał, że zadanie wymaga źródła, na które nie mamy zgody."""
+def _browser_url_from_task(task):
+    """Adres wymagający KLIKANIA (nie tylko GET) wyłuskany z treści zadania.
+    Domeny browser_task i fetch_url się NIE POKRYWAJĄ (świadomie), więc sam
+    host jednoznacznie wskazuje właściwe narzędzie — bez zgadywania z treści,
+    które z nich użyć. Zadania z Projectly nie mają pola 'action', więc to
+    JEDYNY sposób, żeby zadanie tekstowe trafiło do browser_task."""
+    contract = tool_registry.get_contract("browser_task") or {}
+    domeny = tool_registry.allowed_domains(contract)
+    wskazany = task.get("url")
+    if wskazany and web_fetch_worker.host_allowed(wskazany, domeny):
+        return wskazany
     tekst = " ".join(str(task.get(p) or "") for p in ("title", "description", "expected_result",
                                                       "acceptance_criteria", "source_file_link"))
-    domeny = tool_registry.allowed_domains(tool_registry.get_contract("fetch_url") or {})
     for kandydat in re.findall(r"https://\S+", tekst):
         kandydat = kandydat.rstrip(".,;:!?)\"']")
-        if not web_fetch_worker.host_allowed(kandydat, domeny):
+        if web_fetch_worker.host_allowed(kandydat, domeny):
+            return kandydat
+    return None
+
+
+def _profile_for_url(url, contract):
+    """Auto-dobór profilu logowania po hoście adresu (profile_by_domain w
+    kontrakcie) — zadanie z Projectly nie ma jak jawnie ustawić browser_profile
+    (brak takiego pola w schemacie Projectly), więc profil wynika z domeny."""
+    mapping = contract.get("profile_by_domain") or {}
+    host = (urlparse(url).hostname or "").lower()
+    for domena, profil in mapping.items():
+        if host == domena.lower() or host.endswith("." + domena.lower()):
+            return profil
+    return None
+
+
+def _url_spoza_allowlisty(task):
+    """Pierwszy adres https w treści zadania, którego nie ma na ŻADNEJ znanej
+    allowliście (ani fetch_url, ani browser_task) — sygnał, że zadanie wymaga
+    źródła, na które nie mamy zgody."""
+    tekst = " ".join(str(task.get(p) or "") for p in ("title", "description", "expected_result",
+                                                      "acceptance_criteria", "source_file_link"))
+    domeny_fetch = tool_registry.allowed_domains(tool_registry.get_contract("fetch_url") or {})
+    domeny_browser = tool_registry.allowed_domains(tool_registry.get_contract("browser_task") or {})
+    for kandydat in re.findall(r"https://\S+", tekst):
+        kandydat = kandydat.rstrip(".,;:!?)\"']")
+        if (not web_fetch_worker.host_allowed(kandydat, domeny_fetch)
+                and not web_fetch_worker.host_allowed(kandydat, domeny_browser)):
             return kandydat
     return None
 
@@ -229,19 +264,26 @@ def _run_pbip_capture(task):
 
 def _run_browser_task(task):
     """Zadanie webowe wymagające KLIKANIA/wypełniania (Playwright headless) — tam,
-    gdzie fetch_url (czysty GET) nie wystarcza. Wymaga JAWNEGO action=='browser_task':
-    w przeciwieństwie do fetch_url tu agent naciska przyciski i wypełnia formularze,
-    więc zadanie musi to zamówić wprost, nie zgadujemy z adresu w tytule.
+    gdzie fetch_url (czysty GET) nie wystarcza. Adres rozpoznawany przez
+    _browser_url_from_task (jawne action=='browser_task' ALBO domena z treści
+    zadania pasująca do allowlisty browser_task — domeny fetch_url/browser_task
+    się nie pokrywają, więc host jednoznacznie wskazuje właściwe narzędzie).
 
     Allowlista hostów siedzi w kontrakcie `browser_task` (config/tool_contracts.yaml),
-    tak samo jak przy fetch_url — pusta na start, właściciel dopisuje domenę świadomie."""
-    url = task.get("url")
-    profile = task.get("browser_profile")
+    tak samo jak przy fetch_url — właściciel dopisuje domenę świadomie. Profil
+    logowania (browser_profile) dobiera się automatycznie po domenie
+    (profile_by_domain), bo Projectly nie ma pola na jawne ustawienie profilu."""
+    contract = tool_registry.get_contract("browser_task") or {}
+    url = _browser_url_from_task(task)
+    if not url:
+        return _refused("Zadanie nie wskazuje adresu z allowlisty browser_task "
+                        "(config/tool_contracts.yaml -> browser_task.allowed_domains).", tool="browser_task")
+
+    profile = task.get("browser_profile") or _profile_for_url(url, contract)
     check = tool_registry.check_call("browser_task", {"url": url, "browser_profile": profile})
     if not check["allowed"]:
         return _refused(check["reason"], tool="browser_task")
 
-    contract = tool_registry.get_contract("browser_task") or {}
     if profile and profile not in (contract.get("allowed_profiles") or []):
         return _refused(
             f"Profil logowania '{profile}' nie jest na allowliście narzędzia browser_task "

@@ -184,6 +184,31 @@ def run():
     nieznane = executor.execute({"action": "cos_czego_nie_ma"})
     checks.append(("Executor: nieobsługiwana akcja -> None (nic nie udaje)", nieznane is None))
 
+    # --- routing po domenie: zadania z Projectly nie mają pola 'action' ani 'url',
+    # więc adres wyłuskany z treści musi jednoznacznie trafić do właściwego narzędzia ---
+    z_tresci_browser = executor.rozpoznaj_narzedzie(
+        {"title": "Sprawdź kampanie", "description": "Zobacz https://dashboard.mailerlite.com/dashboard"})
+    checks.append(("Adres MailerLite w treści (bez action) -> rozpoznany jako browser_task",
+                   z_tresci_browser == "browser_task"))
+
+    z_tresci_fetch = executor.rozpoznaj_narzedzie(
+        {"title": "Podaj kurs EUR", "description": "https://api.nbp.pl/api/exchangerates/rates/a/eur/"})
+    checks.append(("Adres NBP w treści -> nadal rozpoznany jako fetch_url (brak konfliktu domen)",
+                   z_tresci_fetch == "fetch_url"))
+
+    profil_z_domeny = executor._profile_for_url(
+        "https://dashboard.mailerlite.com/x", tool_registry.get_contract("browser_task"))
+    checks.append(("Auto-dobór profilu po domenie MailerLite -> 'mailerlite'",
+                   profil_z_domeny == "mailerlite"))
+
+    profil_meta = executor._profile_for_url(
+        "https://business.facebook.com/adsmanager", tool_registry.get_contract("browser_task"))
+    checks.append(("Auto-dobór profilu po domenie Meta -> 'meta_ads'", profil_meta == "meta_ads"))
+
+    profil_gov = executor._profile_for_url(
+        "https://www.podatki.gov.pl/x", tool_registry.get_contract("browser_task"))
+    checks.append(("Domena bez logowania (gov.pl) -> brak profilu (None)", profil_gov is None))
+
     # --- wpięcie w executor: happy path z podmienionym kontraktem i browser_worker.run ---
     original_get_contract, original_run = tool_registry.get_contract, browser_worker.run
     try:
