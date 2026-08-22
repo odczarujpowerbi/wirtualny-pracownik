@@ -16,7 +16,8 @@ Które narzędzie MCP do czego (zaszyta wiedza, spójna z config/projectly.yaml)
     get_comments    -> get_task_comments         (odczyt decyzji człowieka)
     create_task     -> create_task + link_tasks  (powiązanie z zadaniem-rodzicem)
     set_feedback    -> update_task (feedback + actualHours + completedAt)
-    publish_status  -> create/update_documentation (strona statusu per rola)
+    publish_status  -> post_agent_status (dedykowany wiersz statusu per rola —
+                       PLAN-MONITOROWANIE-AGENTOW-*.md; config: live_status.transport)
     list_tasks      -> get_project_tasks
 """
 
@@ -62,6 +63,67 @@ def _load_role():
         except (ValueError, OSError):
             return "dev"
     return "dev"
+
+
+_STATUS_ENUM = {"working", "idle", "alert", "paused", "stopped"}
+# snake_case (jak build_status() i inni wywolujacy publish_status) -> kontrakt
+# post_agent_status (camelCase, PLAN-MONITOROWANIE-AGENTOW-*.md sekcja 1).
+_STATUS_KEY_RENAME = {
+    "current_task_id": "currentTaskId",
+    "current_task_title": "currentTaskTitle",
+    "progress_label": "progressLabel",
+    "queue_depth": "queueDepth",
+    "needs_approval_count": "needsApprovalCount",
+    "cost_today_usd": "costTodayUsd",
+    "cost_limit_usd": "costLimitUsd",
+    "machine": "machine",
+    "message": "message",
+}
+
+
+def _map_status_payload(payload):
+    """Normalizuje DOWOLNY payload przekazany do publish_status(role, payload)
+    do kontraktu narzędzia MCP post_agent_status (PLAN-MONITOROWANIE-AGENTOW-*.md
+    sekcja 1). Cztery wywołujące (live_status_publisher, machine_status_reporter,
+    kacper_monitor, system_health_monitor) budują dziś CZTERY różne kształty
+    słownika — ta funkcja jest jedynym miejscem, które je pojednuje, więc żaden
+    z nich nie wymaga zmiany kodu.
+
+    Zasada: rozpoznane pola trafiają na wierzch (UI renderuje je specjalnie),
+    ale 'details' zawsze niesie CAŁY oryginalny payload bez strat — nic, czego
+    ta funkcja nie rozpozna, nie ginie."""
+    mapped = {}
+    for src_key, dst_key in _STATUS_KEY_RENAME.items():
+        if src_key in payload and payload[src_key] is not None:
+            mapped[dst_key] = payload[src_key]
+
+    # health: "ok"/"alert" wprost jeśli już w tym kształcie (live_status_publisher).
+    # Inaczej wnioskujemy z 'status' o znaczeniu health (system_health_monitor:
+    # ok/warning/critical) — fail-closed: niepewne/nierozpoznane traktujemy jako
+    # alert, nie ukrywamy problemu za zielonym statusem.
+    raw_health = payload.get("health")
+    raw_status_field = payload.get("status")
+    if raw_health in ("ok", "alert"):
+        mapped["health"] = raw_health
+    elif raw_status_field in ("critical", "warning", "error", "alert"):
+        mapped["health"] = "alert"
+    elif raw_status_field == "ok":
+        mapped["health"] = "ok"
+    else:
+        mapped["health"] = "ok"
+
+    issues = payload.get("issues")
+    if issues:
+        mapped["healthDetail"] = "; ".join(str(i) for i in issues) if isinstance(issues, list) else str(issues)
+
+    # status (aktywnosc bota: working/idle/alert/paused/stopped) - NIE to samo co
+    # health powyzej. Tylko live_status_publisher uzywa tego pola w tym sensie;
+    # role pomocnicze (machine-status/kacper-monitor/system-health) dostaja domyslnie
+    # "idle", bo ich wlasne 'status'/'health' znaczy cos innego (patrz wyzej).
+    mapped["status"] = raw_status_field if raw_status_field in _STATUS_ENUM else "idle"
+
+    mapped["details"] = payload
+    return mapped
 
 
 class ProjectlyClient:
@@ -274,11 +336,34 @@ class ProjectlyClient:
         return self._mcp.call_tool("get_task_relations", {"taskId": task_id})
 
     def publish_status(self, role, payload):
-        """MCP: create/update_documentation. Jeden, stały, nadpisywany wpis
-        'status na żywo' per rola jako strona dokumentacji (PLAN-WDROZENIA.md
-        sekcja 2). Degraduje się miękko: gdy live_status.project pusty lub
-        niedostępny, tylko loguje i nie wywala runnera."""
+        """Status na żywo per rola-w-koncie (PLAN-MONITOROWANIE-AGENTOW-*.md).
+        Transport wybierany przez config/projectly.yaml -> live_status.transport:
+        - "agent_status_tool" (docelowy): MCP post_agent_status — jeden nadpisywany
+          wiersz (userId z tokenu, roleLabel=role) + wpis w historii zdarzeń.
+        - "documentation" (domyślny, dopóki narzędzie MCP nie jest potwierdzone
+          na produkcji Projectly): stare zachowanie — strona dokumentacji per rola.
+        Oba warianty degradują się miękko: błąd MCP tylko loguje, nie wywala runnera."""
         cfg = self._cfg.get("live_status", {})
+        transport = cfg.get("transport", "documentation")
+        if transport == "agent_status_tool":
+            return self._publish_status_via_tool(role, payload)
+        return self._publish_status_via_documentation(role, payload, cfg)
+
+    def _publish_status_via_tool(self, role, payload):
+        """MCP: post_agent_status. Transport docelowy — patrz publish_status()."""
+        try:
+            args = {"roleLabel": role, **_map_status_payload(payload)}
+            self._mcp.call_tool("post_agent_status", args)
+            return True
+        except MCPError as exc:
+            print(f"[Projectly] Publikacja statusu (post_agent_status) nie powiodła się (nie blokuję runnera): {exc}")
+            return False
+
+    def _publish_status_via_documentation(self, role, payload, cfg):
+        """MCP: create/update_documentation. Transport legacy — jedna, nadpisywana
+        strona statusu per rola. Zachowany na czas przejścia (config
+        live_status.transport); do usunięcia po potwierdzeniu post_agent_status
+        na produkcji (PLAN-MONITOROWANIE-AGENTOW-WIRTUALNY-PRACOWNIK.md sekcja 3)."""
         project_name = cfg.get("project")
         if not project_name:
             print(f"[Projectly] live_status.project pusty — status roli '{role}' tylko lokalnie: {payload}")
@@ -348,7 +433,7 @@ class MockProjectlyClient:
         self.project_tasks_path = project_tasks_path or Path(__file__).parent / "mock_data" / "sample_project_tasks.json"
         self._created_tasks_path = MOCK_RUNS_DIR / "mock_created_tasks.json"
         self._comments_path = MOCK_RUNS_DIR / "mock_comments.json"
-        self._live_status_path = MOCK_RUNS_DIR / "mock_live_status.json"
+        self._agent_status_path = MOCK_RUNS_DIR / "mock_agent_status.json"
         self._feedback_path = MOCK_RUNS_DIR / "mock_feedback.json"
 
     def get_new_tasks(self):
@@ -411,10 +496,13 @@ class MockProjectlyClient:
         return {"count": 0, "relations": []}
 
     def publish_status(self, role, payload):
-        statuses = self._load(self._live_status_path, default={})
-        statuses[role] = payload
-        self._save(self._live_status_path, statuses)
-        print(f"[MOCK Projectly] status na żywo ({role}): {payload}")
+        """Zapisuje w kształcie kontraktu post_agent_status (nie surowego
+        payloadu), żeby tryb mock realnie testował ten sam schemat co
+        produkcja (PLAN-MONITOROWANIE-AGENTOW-WIRTUALNY-PRACOWNIK.md sekcja 1)."""
+        statuses = self._load(self._agent_status_path, default={})
+        statuses[role] = {"roleLabel": role, **_map_status_payload(payload)}
+        self._save(self._agent_status_path, statuses)
+        print(f"[MOCK Projectly] status na żywo ({role}): {statuses[role]}")
         return True
 
     def list_tasks(self, project_id=None, status=None):
