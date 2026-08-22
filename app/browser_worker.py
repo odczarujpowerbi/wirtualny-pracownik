@@ -143,19 +143,39 @@ def login(profile, url, out=print):
 
     profile_dir = _profile_dir(profile)
     profile_dir.mkdir(parents=True, exist_ok=True)
+    signal_path = PROFILES_DIR / f"{profile}.gotowe"
+    if signal_path.exists():
+        signal_path.unlink()
+
     with sync_playwright() as p:
         context = p.chromium.launch_persistent_context(str(profile_dir), headless=False)
         page = context.pages[0] if context.pages else context.new_page()
         page.goto(url)
         out(f"Zaloguj się ręcznie w otwartym oknie przeglądarki (profil '{profile}').")
-        out("Po zalogowaniu zamknij okno przeglądarki albo wciśnij Enter tutaj, żeby zapisać sesję.")
+        out(f"Gdy skończysz: wciśnij Enter tutaj (konsola interaktywna), ALBO utwórz plik "
+            f"'{signal_path}' (proces w tle bez konsoli — okno NIE zamknie się samo, dopóki "
+            f"ten plik się nie pojawi).")
         try:
             input()
         except EOFError:
-            pass
+            _wait_for_signal(signal_path)
         context.close()
     out(f"Sesja zapisana: {profile_dir}")
     return True
+
+
+def _wait_for_signal(signal_path, poll_seconds=3):
+    """Czeka (bez limitu czasu — okno ma zostać otwarte tak długo, jak trzeba),
+    aż pojawi się plik sygnałowy, potem go usuwa. Używane, gdy login() jest
+    uruchomiony w tle (bez konsoli interaktywnej), więc input() nie zadziała."""
+    import time
+
+    while not signal_path.exists():
+        time.sleep(poll_seconds)
+    try:
+        signal_path.unlink()
+    except OSError:
+        pass
 
 
 def run(url, steps=None, allowed_hosts=(), timeout_ms=DEFAULT_TIMEOUT_MS, out_dir=None,
