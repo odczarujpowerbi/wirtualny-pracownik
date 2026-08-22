@@ -82,6 +82,19 @@ def _validate_steps(steps):
     return None
 
 
+def _settle(page, timeout_ms=5000):
+    """Krótkie doczekanie na dociągnięcie treści przez JS PO zdarzeniu 'load' —
+    nowoczesne SPA (np. Meta Ads Manager) renderują właściwą zawartość dopiero
+    po asynchronicznych zapytaniach, więc zrzut zrobiony od razu po goto() łapie
+    sam spinner ładowania. Best-effort: strony z ciągłym ruchem sieciowym
+    (websockety, polling) nigdy nie osiągną 'networkidle' — timeout jest
+    normalny, nie błędem, i nie przerywa zadania."""
+    try:
+        page.wait_for_load_state("networkidle", timeout=timeout_ms)
+    except Exception:  # noqa: BLE001 — brak idle to nie błąd, tylko brak gwarancji
+        pass
+
+
 def _real_page_factory():
     """Prawdziwa przeglądarka (Chromium headless, BEZ zapisanej sesji — czysty
     profil za każdym razem). Zwraca (page, close)."""
@@ -228,6 +241,7 @@ def run(url, steps=None, allowed_hosts=(), timeout_ms=DEFAULT_TIMEOUT_MS, out_di
         page, close = _page_factory()
         try:
             page.goto(url, timeout=timeout_ms)
+            _settle(page)
             for step in steps:
                 action = step["action"]
                 try:
@@ -237,8 +251,10 @@ def run(url, steps=None, allowed_hosts=(), timeout_ms=DEFAULT_TIMEOUT_MS, out_di
                             blad_kroku = f"Krok goto na '{cel}' poza allowlistą hostów."
                             break
                         page.goto(cel, timeout=timeout_ms)
+                        _settle(page)
                     elif action == "click":
                         page.click(step["selector"], timeout=timeout_ms)
+                        _settle(page)
                     elif action == "fill":
                         page.fill(step["selector"], step["text"], timeout=timeout_ms)
                     elif action == "wait_for_selector":
