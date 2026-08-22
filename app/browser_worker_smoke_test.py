@@ -62,6 +62,9 @@ class _FakePage:
     def title(self):
         return self._title
 
+    def inner_text(self, selector):
+        return "Nagłówek strony testowej.\nTreść widoczna dla użytkownika."
+
 
 def _factory(fail_on=None):
     page = _FakePage(fail_on=fail_on)
@@ -88,6 +91,8 @@ def run():
         checks.append(("Happy path: zrzut zapisany na dysku",
                        res["screenshot_path"] and Path(res["screenshot_path"]).exists()))
         checks.append(("Happy path: tytuł strony w wyniku", res["title"] == "Strona testowa"))
+        checks.append(("Happy path: tekst strony wyciągnięty (page_text)",
+                       "Treść widoczna dla użytkownika" in res.get("page_text", "")))
 
         # --- odmowy bezpieczeństwa (przed odpaleniem jakiejkolwiek strony) ---
         obcy = browser_worker.run("https://zlosliwa-domena.example/x", allowed_hosts=ALLOWED,
@@ -211,6 +216,7 @@ def run():
 
     # --- wpięcie w executor: happy path z podmienionym kontraktem i browser_worker.run ---
     original_get_contract, original_run = tool_registry.get_contract, browser_worker.run
+    original_answer = executor.web_answer.answer
     try:
         with tempfile.TemporaryDirectory() as tmp:
             shot = Path(tmp) / "efekt.png"
@@ -222,19 +228,36 @@ def run():
             browser_worker.run = lambda url, steps=None, allowed_hosts=(), **kw: {
                 "available": True, "url": url, "final_url": url, "title": "Strona testowa",
                 "screenshot_path": str(shot), "steps_done": len(steps or []), "steps_total": len(steps or []),
-                "detail": "OK"}
+                "page_text": "Sekcje menu: Cennik, Kontakt, O nas.", "detail": "OK"}
+            executor.web_answer.answer = lambda question, content, url="", zrodlo_opis=None, ask=None: {
+                "available": True, "answer": "Menu zawiera: Cennik, Kontakt, O nas.",
+                "cost_usd": 0.002, "source": "atrapa", "detail": "OK"}
 
             wynik = executor.execute({"action": "browser_task", "url": "https://przyklad.example/x",
+                                      "title": "Jakie sekcje ma menu?",
                                       "browser_steps": [{"action": "click", "selector": "#a"}]})
             checks.append(("Executor: dozwolony host -> zadanie wykonane",
                            wynik is not None and wynik["executed"] is True))
+            checks.append(("Executor: acceptance_notes to REALNA odpowiedź modelu, nie log techniczny",
+                           wynik["acceptance_notes"] == "Menu zawiera: Cennik, Kontakt, O nas."))
+            checks.append(("Executor: koszt wywołania modelu raportowany", wynik["cost_usd"] == 0.002))
             checks.append(("Executor: screenshot_path w wyniku", wynik["screenshot_path"] == str(shot)))
             checks.append(("Executor: functional_check nonempty_file na zrzucie",
                            any(c["type"] == "nonempty_file" for c in wynik.get("functional_checks", []))))
             checks.append(("Executor: BRAK 'rerun' (kroki mogą mieć efekty uboczne)",
                            "rerun" not in wynik))
+
+            # --- brak page_text (np. pusta strona) -> jawna informacja, nie udajemy materiału ---
+            browser_worker.run = lambda url, steps=None, allowed_hosts=(), **kw: {
+                "available": True, "url": url, "final_url": url, "title": "Pusta strona",
+                "screenshot_path": str(shot), "steps_done": 0, "steps_total": 0,
+                "page_text": "", "detail": "OK"}
+            bez_tekstu = executor.execute({"action": "browser_task", "url": "https://przyklad.example/x"})
+            checks.append(("Executor: brak page_text -> jawne 'UWAGA', nie udawany materiał",
+                           bez_tekstu["executed"] is True and "UWAGA" in bez_tekstu["acceptance_notes"]))
     finally:
         tool_registry.get_contract, browser_worker.run = original_get_contract, original_run
+        executor.web_answer.answer = original_answer
 
     print("\n--- Wynik testu dymnego browser_worker ---")
     all_passed = True

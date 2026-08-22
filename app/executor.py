@@ -297,13 +297,42 @@ def _run_browser_task(task):
     if not wynik["available"]:
         return _refused(wynik["detail"], tool="browser_task")
 
+    # Tekst strony jest z definicji NIEZAUFANY (tak samo jak przy fetch_url) —
+    # kontrola wstrzyknięcia instrukcji PRZED podaniem go dalej do modelu.
+    page_text = wynik.get("page_text") or ""
+    if page_text:
+        safety = validator_prompt.check_prompt_safety(page_text[:4000])
+        if not safety["safe"]:
+            return _refused(
+                f"Treść strony '{url}' wygląda na próbę wstrzyknięcia instrukcji "
+                f"({safety['detail']}) — treść NIE jest podawana dalej do modelu.",
+                tool="browser_task")
+
+    # Sam zrzut/nawigacja to jeszcze nie wykonanie zadania — model odpowiada na
+    # pytanie z tytułu na podstawie tekstu strony, dokładnie jak _run_web_fetch
+    # robi to dla fetch_url (web_answer.py, ten sam mechanizm, inne źródło).
+    answer = (web_answer.answer(task.get("title", ""), page_text, url=wynik["final_url"],
+                                zrodlo_opis=wynik.get("title") or wynik["final_url"])
+              if page_text else {"available": False, "detail": "brak tekstu ze strony"})
+
+    if answer.get("available"):
+        acceptance_notes = answer["answer"]
+        koszt = answer.get("cost_usd", 0.0)
+    else:
+        # Bez modelu/tekstu nie ma opracowanej odpowiedzi — mówimy to wprost,
+        # zamiast udawać gotowy materiał (ten sam wzorzec co _build_web_report).
+        powod = answer.get("detail", "brak modelu")
+        acceptance_notes = (
+            f"UWAGA: nie udało się opracować odpowiedzi ({powod}) — wykonano "
+            f"{wynik['steps_done']}/{wynik['steps_total']} kroków na stronie "
+            f"'{wynik.get('title') or wynik['final_url']}'. Zrzut: {wynik['screenshot_path']}")
+        koszt = 0.0
+
     return {
-        "cost_usd": 0.0,
+        "cost_usd": koszt,
         "tool": "browser_task",
         "executed": True,
-        "acceptance_notes": (
-            f"Wykonano {wynik['steps_done']}/{wynik['steps_total']} kroków na stronie "
-            f"'{wynik.get('title') or wynik['final_url']}'. Zrzut: {wynik['screenshot_path']}"),
+        "acceptance_notes": acceptance_notes,
         "screenshot_path": wynik["screenshot_path"],
         "output": {"final_url": wynik["final_url"], "title": wynik["title"],
                    "steps_done": wynik["steps_done"], "steps_total": wynik["steps_total"]},

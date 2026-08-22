@@ -44,6 +44,7 @@ from web_fetch_worker import host_allowed
 OUT_DIR = Path(__file__).parent / "runs" / "browser"
 PROFILES_DIR = Path(__file__).parent / "secrets" / "browser_profiles"
 DEFAULT_TIMEOUT_MS = 15_000
+MAX_TEXT_CHARS = 20_000
 _ALLOWED_STEP_ACTIONS = {"goto", "click", "fill", "wait_for_selector", "screenshot"}
 
 
@@ -62,7 +63,7 @@ def _shot_name():
 
 def _unavailable(detail, url=None):
     return {"available": False, "url": url, "final_url": None, "title": None,
-            "screenshot_path": None, "steps_done": 0, "steps_total": 0, "detail": detail}
+            "screenshot_path": None, "steps_done": 0, "steps_total": 0, "detail": detail, "page_text": ""}
 
 
 def _validate_steps(steps):
@@ -249,18 +250,32 @@ def run(url, steps=None, allowed_hosts=(), timeout_ms=DEFAULT_TIMEOUT_MS, out_di
                 steps_done += 1
             final_url, title = page.url, page.title()
             page.screenshot(path=str(shot_path), full_page=True)
+            try:
+                # Tekst widoczny na stronie — bez tego executor nie ma z czego
+                # zbudować odpowiedzi na pytanie zadania (Bożena słusznie
+                # odrzucała "log techniczny": zrzut ekranu + licznik kroków,
+                # zero materiału). To samo pole 'text', z którego web_answer.py
+                # buduje odpowiedź dla fetch_url — ten sam mechanizm, inne źródło.
+                page_text = page.inner_text("body")
+            except Exception:  # noqa: BLE001 — brak tekstu nie może wywalić zadania
+                page_text = ""
         finally:
             close()
     except Exception as exc:  # noqa: BLE001 — awaria samej przeglądarki (start/zamknięcie)
         return {**_unavailable(f"Przeglądarka: {exc}", url), "steps_done": steps_done, "steps_total": len(steps)}
 
+    if len(page_text) > MAX_TEXT_CHARS:
+        page_text = page_text[:MAX_TEXT_CHARS] + "\n[...treść przycięta...]"
+
     if blad_kroku:
         return {**_unavailable(blad_kroku, url), "screenshot_path": str(shot_path),
-                "steps_done": steps_done, "steps_total": len(steps), "final_url": final_url, "title": title}
+                "steps_done": steps_done, "steps_total": len(steps), "final_url": final_url, "title": title,
+                "page_text": page_text}
 
     return {
         "available": True, "url": url, "final_url": final_url, "title": title,
         "screenshot_path": str(shot_path), "steps_done": steps_done, "steps_total": len(steps),
+        "page_text": page_text,
         "detail": f"Wykonano {steps_done}/{len(steps)} kroków, zrzut zapisany.",
     }
 
