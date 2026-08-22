@@ -447,6 +447,13 @@ class ProjectlyClient:
                 tasks.append(self._map_task(raw, project["id"]))
         return tasks
 
+    def get_week_report(self, week_offset=0):
+        """MCP: get_week_report. Co wykonano (po completedAt), statystyki per
+        osoba, blokery/po terminie, odchylenie estymacji — ze WSZYSTKICH
+        dostępnych kontu tokenu projektów. week_offset: 0=bieżący tydzień,
+        -1=poprzedni, itd. Używane przez knowledge_digest_publisher.py."""
+        return self._mcp.call_tool("get_week_report", {"weekOffset": week_offset})
+
 
 class MockProjectlyClient:
     """Symuluje Projectly przy użyciu lokalnych plików JSON — do testowania
@@ -537,6 +544,11 @@ class MockProjectlyClient:
         if status:
             tasks = [t for t in tasks if t.get("status") == status]
         return tasks
+
+    def get_week_report(self, week_offset=0):
+        """Mock: kształt minimalny, wystarczający do testów knowledge_digest_publisher.py
+        bez sieci - nie odzwierciedla realnej logiki serwera (completedAt itd.)."""
+        return {"weekOffset": week_offset, "completed": [], "byPerson": {}, "overdue": [], "estimationDeviation": None}
 
     @staticmethod
     def _load(path, default):
