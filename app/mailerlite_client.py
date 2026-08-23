@@ -84,6 +84,10 @@ def normalizuj_kampanie(surowa):
         "id": surowa.get("id"),
         "nazwa": surowa.get("name"),
         "temat": _pole(surowa, "subject") or _pole(pierwszy_mail, "subject") or surowa.get("name"),
+        # Tresc maila do analizy tonu/czytelnosci (mailerlite_report_analyzer.py) —
+        # zweryfikowane na koncie produkcyjnym 24.08.2026: API daje tylko plain_text,
+        # bez HTML w tym samym wywolaniu (potrzebny byloby osobny endpoint).
+        "tresc_plain": _pole(pierwszy_mail, "plain_text"),
         "data_wysylki": _na_date(_pole(surowa, "finished_at", "sent_at", "delivered_at", "scheduled_for", "updated_at")),
         "odbiorcy": odbiorcy,
         "otwarcia": otwarcia,

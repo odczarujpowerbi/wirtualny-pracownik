@@ -47,7 +47,7 @@ def verify():
     except graph.GraphAuthError as exc:
         return {"ok": False, "stage": "token", "detail": str(exc)}
 
-    mailbox = os.environ["MS_GRAPH_MAILBOX"]
+    mailbox = mailer.mailbox  # już sparsowany z ew. "Nazwa <adres>" na czysty adres
     url = f"{graph.GRAPH_BASE}/users/{mailbox}?$select=displayName,mail,userPrincipalName"
     try:
         resp = requests.get(url, headers={"Authorization": f"Bearer {token}"},

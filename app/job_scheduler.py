@@ -43,6 +43,7 @@ import yaml
 import control
 import env_bootstrap  # noqa: F401 — wymusza UTF-8 na stdout/stderr dla procesu schedulera (autostart Windows)
 import kill_switch
+import scheduler_lock
 
 # Ile znakow wyjscia (stdout+stderr) zapisujemy na przebieg. Powyzej tego
 # obcinamy, zeby pojedynczy zapyziaczony przebieg nie rozdal pliku historii.
@@ -284,6 +285,13 @@ def run_job_by_name(name, path=SCHEDULE_PATH):
 
 
 def run_scheduler(tick_seconds=5, schedule_path=SCHEDULE_PATH):
+    lock = scheduler_lock.acquire()
+    if not lock["ok"]:
+        print(lock["detail"])
+        import sys
+
+        sys.exit(1)
+
     state = _load_state()
     threads = {}
 
@@ -318,6 +326,8 @@ def run_scheduler(tick_seconds=5, schedule_path=SCHEDULE_PATH):
             time.sleep(tick_seconds)
     except KeyboardInterrupt:
         print("Zatrzymano ręcznie.")
+    finally:
+        scheduler_lock.release()
 
 
 def print_status(schedule_path=SCHEDULE_PATH):

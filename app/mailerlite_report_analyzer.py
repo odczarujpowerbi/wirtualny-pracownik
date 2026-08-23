@@ -23,7 +23,11 @@ from projectly_client import get_client
 
 
 def _plain_text(campaign):
-    return campaign.get("plain_body") or re.sub("<[^>]+>", " ", campaign.get("html_body", ""))
+    """Treść do analizy tonu/czytelności. Kształt kampanii to
+    mailerlite_client.normalizuj_kampanie() (klucz "tresc_plain") — API daje
+    tylko plain_text, nie HTML w tym samym wywołaniu (zweryfikowane na koncie
+    produkcyjnym 24.08.2026)."""
+    return campaign.get("tresc_plain") or ""
 
 
 def analyze_readability(text):
@@ -49,14 +53,23 @@ def analyze_readability(text):
 
 
 def compute_stats(campaign):
-    sent = campaign.get("sent_count", 0)
-    opens = campaign.get("opens", 0)
-    clicks = campaign.get("clicks", 0)
+    """open_rate/ctr są już wyliczone przez normalizuj_kampanie()
+    (mailerlite_client.py) w skali procentowej (0-100) i mogą być None, gdy
+    API nie dało liczby odbiorców — nie liczymy ich tu drugi raz z kluczy
+    ("sent_count"/"opens"/"clicks"), których ten kształt kampanii nie ma:
+    .get(..., 0) na nieistniejących kluczach dawał 0% dla KAŻDEJ kampanii
+    bez wyjątku — cicha, fałszywa liczba, gorsza niż awaria."""
+    otwarcia = campaign.get("otwarcia")
+    klikniecia = campaign.get("klikniecia")
     return {
-        "open_rate": round(opens / sent, 4) if sent else 0,
-        "ctr": round(clicks / sent, 4) if sent else 0,
-        "click_to_open_rate": round(clicks / opens, 4) if opens else 0,
+        "open_rate": campaign.get("open_rate"),
+        "ctr": campaign.get("ctr"),
+        "click_to_open_rate": round(100.0 * klikniecia / otwarcia, 2) if otwarcia else None,
     }
+
+
+def _fmt_pct(value):
+    return f"{value:.1f}%" if value is not None else "— (brak pomiaru)"
 
 
 def ai_feedback(subject, body_text):
@@ -87,12 +100,12 @@ def build_report(campaigns):
     for c in campaigns:
         stats = compute_stats(c)
         readability = analyze_readability(_plain_text(c))
-        feedback = ai_feedback(c["subject"], _plain_text(c))
+        feedback = ai_feedback(c["temat"], _plain_text(c))
 
-        lines.append(f"### {c['subject']}")
+        lines.append(f"### {c['temat']}")
         lines.append(
-            f"- Statystyki: open rate {stats['open_rate']*100:.1f}%, CTR {stats['ctr']*100:.2f}%, "
-            f"click-to-open {stats['click_to_open_rate']*100:.1f}%"
+            f"- Statystyki: open rate {_fmt_pct(stats['open_rate'])}, CTR {_fmt_pct(stats['ctr'])}, "
+            f"click-to-open {_fmt_pct(stats['click_to_open_rate'])}"
         )
         lines.append(
             f"- Czytelność: śr. {readability['avg_words_per_sentence']} słów/zdanie, "

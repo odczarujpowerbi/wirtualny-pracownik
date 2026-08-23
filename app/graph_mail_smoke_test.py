@@ -65,6 +65,16 @@ def run():
     checks.append(("GraphMailer.send: nagłówek Bearer z tokenem",
                    captured["headers"]["Authorization"] == "Bearer FAKE_TOKEN"))
 
+    # 2b. parse_mailbox_address: "Nazwa <adres>" (format z secrets/.env
+    # znaleziony 24.08.2026, powodował 404 ErrorInvalidUser) -> czysty adres.
+    checks.append(("parse_mailbox_address: wyciąga adres z 'Nazwa <adres>'",
+                   graph.parse_mailbox_address("Clickless <kontakt@clickless.pl>") == "kontakt@clickless.pl"))
+    checks.append(("parse_mailbox_address: czysty adres bez zmian",
+                   graph.parse_mailbox_address("kontakt@clickless.pl") == "kontakt@clickless.pl"))
+    mailer_display_name = graph.GraphMailer("cid", "secret", "tenant", "Clickless <kontakt@clickless.pl>")
+    checks.append(("GraphMailer: normalizuje mailbox z 'Nazwa <adres>' już w __init__",
+                   mailer_display_name.mailbox == "kontakt@clickless.pl"))
+
     # 3. GraphMailer.send: kod błędu -> GraphSendError.
     captured["response"] = _FakeResponse(500, {"error": "boom"})
     try:

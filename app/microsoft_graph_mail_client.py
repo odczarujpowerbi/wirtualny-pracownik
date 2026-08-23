@@ -18,6 +18,8 @@ email_safety.yaml — robi to warstwa wyżej (email_client.EmailClient), tak że
 niżej trafiał już bezpieczny odbiorca. Ten moduł to czysta hydraulika Graph.
 """
 
+import re
+
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 AUTHORITY_TEMPLATE = "https://login.microsoftonline.com/{tenant_id}"
 SCOPE = ["https://graph.microsoft.com/.default"]
@@ -38,6 +40,19 @@ def msal_available():
         return True
     except ImportError:
         return False
+
+
+def parse_mailbox_address(value):
+    """MS_GRAPH_MAILBOX bywa wpisany po ludzku jako "Nazwa <adres@domena>"
+    (znaleziono tak w secrets/.env 24.08.2026: "Clickless <kontakt@clickless.pl>"),
+    ale Graph pod /users/{id} wymaga czystego adresu/UPN — z tym zapisem
+    dostawał nieistniejącego użytkownika i odpowiadał 404 ErrorInvalidUser.
+    Wyciąga adres z <...>, jeśli jest; inaczej zwraca wartość bez zmian
+    (już czysty adres)."""
+    if not value:
+        return value
+    match = re.search(r"<([^<>]+)>", value)
+    return match.group(1).strip() if match else value.strip()
 
 
 def _to_recipients(addresses):
@@ -67,7 +82,7 @@ class GraphMailer:
         self.client_id = client_id
         self.client_secret = client_secret
         self.tenant_id = tenant_id
-        self.mailbox = mailbox
+        self.mailbox = parse_mailbox_address(mailbox)
         self._app = None
 
     def _get_app(self):
