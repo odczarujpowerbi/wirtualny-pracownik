@@ -40,6 +40,16 @@ jobs:
   function: check_daily_limit
   interval_seconds: 3600
   enabled: true
+- name: knowledge_digest_publisher
+  description: Cogodzinny digest "ostatnia aktywność" (zadania z tego tygodnia,
+    per konto) do bazy wiedzy Projectly, po jednym wpisie na konto AI (dev/
+    marketing/zarzad). Zapis wymaga narzędzia MCP jeszcze nieskonfigurowanego
+    (config/projectly.yaml -> knowledge_digest.mcp_tool) - do tego czasu tylko
+    czyta i loguje, bezpieczny do włączenia od razu.
+  module: knowledge_digest_publisher
+  function: run_knowledge_digest
+  interval_seconds: 3600
+  enabled: true
 - name: notebook_intake
   description: Dodatkowa lokalna sciezka zadan - czyta inbox/zadania.txt (notatnik)
     i przetwarza nowe zadania klientem MOCK (nie rusza zywego Projectly). Wynik i

@@ -16,7 +16,8 @@ Które narzędzie MCP do czego (zaszyta wiedza, spójna z config/projectly.yaml)
     get_comments    -> get_task_comments         (odczyt decyzji człowieka)
     create_task     -> create_task + link_tasks  (powiązanie z zadaniem-rodzicem)
     set_feedback    -> update_task (feedback + actualHours + completedAt)
-    publish_status  -> create/update_documentation (strona statusu per rola)
+    publish_status  -> post_agent_status (dedykowany wiersz statusu per rola —
+                       PLAN-MONITOROWANIE-AGENTOW-*.md; config: live_status.transport)
     list_tasks      -> get_project_tasks
 """
 
@@ -62,6 +63,92 @@ def _load_role():
         except (ValueError, OSError):
             return "dev"
     return "dev"
+
+
+_STATUS_ENUM = {"working", "idle", "alert", "paused", "stopped"}
+# snake_case (jak build_status() i inni wywolujacy publish_status) -> kontrakt
+# post_agent_status (camelCase, PLAN-MONITOROWANIE-AGENTOW-*.md sekcja 1).
+_STATUS_KEY_RENAME = {
+    "current_task_id": "currentTaskId",
+    "current_task_title": "currentTaskTitle",
+    "progress_label": "progressLabel",
+    "queue_depth": "queueDepth",
+    "needs_approval_count": "needsApprovalCount",
+    "cost_today_usd": "costTodayUsd",
+    "cost_limit_usd": "costLimitUsd",
+    "machine": "machine",
+    "message": "message",
+}
+
+
+def _map_status_payload(payload):
+    """Normalizuje DOWOLNY payload przekazany do publish_status(role, payload)
+    do kontraktu narzędzia MCP post_agent_status (PLAN-MONITOROWANIE-AGENTOW-*.md
+    sekcja 1). Cztery wywołujące (live_status_publisher, machine_status_reporter,
+    kacper_monitor, system_health_monitor) budują dziś CZTERY różne kształty
+    słownika — ta funkcja jest jedynym miejscem, które je pojednuje, więc żaden
+    z nich nie wymaga zmiany kodu.
+
+    Zasada: rozpoznane pola trafiają na wierzch (UI renderuje je specjalnie),
+    ale 'details' zawsze niesie CAŁY oryginalny payload bez strat — nic, czego
+    ta funkcja nie rozpozna, nie ginie."""
+    mapped = {}
+    for src_key, dst_key in _STATUS_KEY_RENAME.items():
+        if src_key in payload and payload[src_key] is not None:
+            mapped[dst_key] = payload[src_key]
+
+    # health: "ok"/"alert" wprost jeśli już w tym kształcie (live_status_publisher).
+    # Inaczej wnioskujemy z 'status' o znaczeniu health (system_health_monitor:
+    # ok/warning/critical) — fail-closed: niepewne/nierozpoznane traktujemy jako
+    # alert, nie ukrywamy problemu za zielonym statusem.
+    raw_health = payload.get("health")
+    raw_status_field = payload.get("status")
+    if raw_health in ("ok", "alert"):
+        mapped["health"] = raw_health
+    elif raw_status_field in ("critical", "warning", "error", "alert"):
+        mapped["health"] = "alert"
+    elif raw_status_field == "ok":
+        mapped["health"] = "ok"
+    else:
+        mapped["health"] = "ok"
+
+    issues = payload.get("issues")
+    if issues:
+        mapped["healthDetail"] = "; ".join(str(i) for i in issues) if isinstance(issues, list) else str(issues)
+
+    # status (aktywnosc bota: working/idle/alert/paused/stopped) - NIE to samo co
+    # health powyzej. Tylko live_status_publisher uzywa tego pola w tym sensie;
+    # role pomocnicze (machine-status/kacper-monitor/system-health) dostaja domyslnie
+    # "idle", bo ich wlasne 'status'/'health' znaczy cos innego (patrz wyzej).
+    mapped["status"] = raw_status_field if raw_status_field in _STATUS_ENUM else "idle"
+
+    # 'message' i 'health' nie zawsze da się wywnioskować generycznie (wyżej). Dla dwóch
+    # znanych kształtów bez własnego pola message/health (machine_status_reporter.py,
+    # kacper_monitor.py) budujemy krótkie, czytelne podsumowanie — narzędzie MCP
+    # post_agent_status na produkcji (stan na 2026-08-22) NIE ma pola 'details' (worek na
+    # resztę danych, zakładany w PLAN-MONITOROWANIE-AGENTOW-PROJECTLY.md), więc bez tego te
+    # dwie role trafiałyby do dashboardu jako puste wiersze.
+    if "message" not in mapped and "tool_versions" in payload:
+        versions = payload.get("tool_versions") or {}
+        parts = [f"{name}: {value or '?'}" for name, value in versions.items()]
+        ram = payload.get("ram_available_percent")
+        if ram is not None:
+            parts.append(f"RAM wolne: {ram}%")
+        if parts:
+            mapped["message"] = " | ".join(parts)
+
+    if "message" not in mapped and "repair_tasks_created" in payload:
+        repairs = payload.get("repair_tasks_created") or []
+        scanned = payload.get("events_scanned")
+        mapped["message"] = f"Przeskanowano {scanned} zdarzeń, utworzono {len(repairs)} zadań naprawczych"
+        if repairs:
+            mapped["health"] = "alert"
+
+    # 'details' wysyłamy mimo braku pola w dzisiejszym schemacie produkcyjnym: zod domyślnie
+    # ignoruje nierozpoznane klucze (potwierdzone testem na żywo), więc to nieszkodliwe —
+    # a gdy Projectly doda pole 'details', zacznie działać bez zmiany tego kodu.
+    mapped["details"] = payload
+    return mapped
 
 
 class ProjectlyClient:
@@ -274,11 +361,34 @@ class ProjectlyClient:
         return self._mcp.call_tool("get_task_relations", {"taskId": task_id})
 
     def publish_status(self, role, payload):
-        """MCP: create/update_documentation. Jeden, stały, nadpisywany wpis
-        'status na żywo' per rola jako strona dokumentacji (PLAN-WDROZENIA.md
-        sekcja 2). Degraduje się miękko: gdy live_status.project pusty lub
-        niedostępny, tylko loguje i nie wywala runnera."""
+        """Status na żywo per rola-w-koncie (PLAN-MONITOROWANIE-AGENTOW-*.md).
+        Transport wybierany przez config/projectly.yaml -> live_status.transport:
+        - "agent_status_tool" (docelowy): MCP post_agent_status — jeden nadpisywany
+          wiersz (userId z tokenu, roleLabel=role) + wpis w historii zdarzeń.
+        - "documentation" (domyślny, dopóki narzędzie MCP nie jest potwierdzone
+          na produkcji Projectly): stare zachowanie — strona dokumentacji per rola.
+        Oba warianty degradują się miękko: błąd MCP tylko loguje, nie wywala runnera."""
         cfg = self._cfg.get("live_status", {})
+        transport = cfg.get("transport", "documentation")
+        if transport == "agent_status_tool":
+            return self._publish_status_via_tool(role, payload)
+        return self._publish_status_via_documentation(role, payload, cfg)
+
+    def _publish_status_via_tool(self, role, payload):
+        """MCP: post_agent_status. Transport docelowy — patrz publish_status()."""
+        try:
+            args = {"roleLabel": role, **_map_status_payload(payload)}
+            self._mcp.call_tool("post_agent_status", args)
+            return True
+        except MCPError as exc:
+            print(f"[Projectly] Publikacja statusu (post_agent_status) nie powiodła się (nie blokuję runnera): {exc}")
+            return False
+
+    def _publish_status_via_documentation(self, role, payload, cfg):
+        """MCP: create/update_documentation. Transport legacy — jedna, nadpisywana
+        strona statusu per rola. Zachowany na czas przejścia (config
+        live_status.transport); do usunięcia po potwierdzeniu post_agent_status
+        na produkcji (PLAN-MONITOROWANIE-AGENTOW-WIRTUALNY-PRACOWNIK.md sekcja 3)."""
         project_name = cfg.get("project")
         if not project_name:
             print(f"[Projectly] live_status.project pusty — status roli '{role}' tylko lokalnie: {payload}")
@@ -337,6 +447,38 @@ class ProjectlyClient:
                 tasks.append(self._map_task(raw, project["id"]))
         return tasks
 
+    def get_week_report(self, week_offset=0):
+        """MCP: get_week_report. Co wykonano (po completedAt), statystyki per
+        osoba, blokery/po terminie, odchylenie estymacji — ze WSZYSTKICH
+        dostępnych kontu tokenu projektów. week_offset: 0=bieżący tydzień,
+        -1=poprzedni, itd. Używane przez knowledge_digest_publisher.py."""
+        return self._mcp.call_tool("get_week_report", {"weekOffset": week_offset})
+
+    def create_knowledge(self, title, content, scope="self", tags=None, links=None):
+        """MCP: create_knowledge. scope: "self" (własne konto, domyślne),
+        "general" (firmowa — wymaga pełnego dostępu, master/admin) albo ID
+        konta bota (jw). Zwraca dict z "id" nowego wpisu."""
+        args = {"title": title, "content": content, "scope": scope}
+        if tags is not None:
+            args["tags"] = tags
+        if links is not None:
+            args["links"] = links
+        return self._mcp.call_tool("create_knowledge", args)
+
+    def update_knowledge(self, knowledge_id, title=None, content=None, tags=None, links=None):
+        """MCP: update_knowledge. Podaj tylko pola do zmiany — content
+        ZASTĘPUJE całość, nie scala."""
+        args = {"knowledgeId": knowledge_id}
+        if title is not None:
+            args["title"] = title
+        if content is not None:
+            args["content"] = content
+        if tags is not None:
+            args["tags"] = tags
+        if links is not None:
+            args["links"] = links
+        return self._mcp.call_tool("update_knowledge", args)
+
 
 class MockProjectlyClient:
     """Symuluje Projectly przy użyciu lokalnych plików JSON — do testowania
@@ -348,8 +490,9 @@ class MockProjectlyClient:
         self.project_tasks_path = project_tasks_path or Path(__file__).parent / "mock_data" / "sample_project_tasks.json"
         self._created_tasks_path = MOCK_RUNS_DIR / "mock_created_tasks.json"
         self._comments_path = MOCK_RUNS_DIR / "mock_comments.json"
-        self._live_status_path = MOCK_RUNS_DIR / "mock_live_status.json"
+        self._agent_status_path = MOCK_RUNS_DIR / "mock_agent_status.json"
         self._feedback_path = MOCK_RUNS_DIR / "mock_feedback.json"
+        self._knowledge_path = MOCK_RUNS_DIR / "mock_knowledge.json"
 
     def get_new_tasks(self):
         with open(self.tasks_path, encoding="utf-8") as f:
@@ -411,10 +554,13 @@ class MockProjectlyClient:
         return {"count": 0, "relations": []}
 
     def publish_status(self, role, payload):
-        statuses = self._load(self._live_status_path, default={})
-        statuses[role] = payload
-        self._save(self._live_status_path, statuses)
-        print(f"[MOCK Projectly] status na żywo ({role}): {payload}")
+        """Zapisuje w kształcie kontraktu post_agent_status (nie surowego
+        payloadu), żeby tryb mock realnie testował ten sam schemat co
+        produkcja (PLAN-MONITOROWANIE-AGENTOW-WIRTUALNY-PRACOWNIK.md sekcja 1)."""
+        statuses = self._load(self._agent_status_path, default={})
+        statuses[role] = {"roleLabel": role, **_map_status_payload(payload)}
+        self._save(self._agent_status_path, statuses)
+        print(f"[MOCK Projectly] status na żywo ({role}): {statuses[role]}")
         return True
 
     def list_tasks(self, project_id=None, status=None):
@@ -424,6 +570,37 @@ class MockProjectlyClient:
         if status:
             tasks = [t for t in tasks if t.get("status") == status]
         return tasks
+
+    def get_week_report(self, week_offset=0):
+        """Mock: kształt minimalny, wystarczający do testów knowledge_digest_publisher.py
+        bez sieci - nie odzwierciedla realnej logiki serwera (completedAt itd.)."""
+        return {"weekOffset": week_offset, "completed": [], "byPerson": {}, "overdue": [], "estimationDeviation": None}
+
+    def create_knowledge(self, title, content, scope="self", tags=None, links=None):
+        entries = self._load(self._knowledge_path, default=[])
+        new_id = f"KNOW-{len(entries) + 1:04d}"
+        entries.append({"id": new_id, "title": title, "content": content, "scope": scope, "tags": tags, "links": links})
+        self._save(self._knowledge_path, entries)
+        print(f"[MOCK Projectly] baza wiedzy: utworzono '{title}' (scope={scope}) -> {new_id}")
+        return {"id": new_id}
+
+    def update_knowledge(self, knowledge_id, title=None, content=None, tags=None, links=None):
+        entries = self._load(self._knowledge_path, default=[])
+        for entry in entries:
+            if entry["id"] == knowledge_id:
+                if title is not None:
+                    entry["title"] = title
+                if content is not None:
+                    entry["content"] = content
+                if tags is not None:
+                    entry["tags"] = tags
+                if links is not None:
+                    entry["links"] = links
+                self._save(self._knowledge_path, entries)
+                print(f"[MOCK Projectly] baza wiedzy: zaktualizowano {knowledge_id}")
+                return {"id": knowledge_id}
+        print(f"[MOCK Projectly] baza wiedzy: {knowledge_id} nie znaleziony")
+        return {"id": knowledge_id}
 
     @staticmethod
     def _load(path, default):

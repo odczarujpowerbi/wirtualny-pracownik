@@ -53,6 +53,12 @@
     <p><code>usage_monitor.py</code> czyta to samo źródło co statuslinia terminala: koszt okna 5h i dziś, oraz estymację, ile zadań jeszcze wobec ustawianego budżetu. <code>cost_tracker.py</code> pilnuje dziennego limitu (<code>config/daily_cost_limit_usd.txt</code>) i wyzwala kill switch po przekroczeniu. Szczegóły liczenia kosztu: <a href="modele-i-koszty.html">Modele i koszty</a>.</p>
   </div>
 
+  <h2><span class="n">4</span> Monitorowanie floty (Projectly)</h2>
+  <div class="card">
+    <p>Ten panel jest <b>lokalny i na żądanie</b> — działa tylko na tej maszynie (<code>127.0.0.1</code>), przydatny do debugowania na miejscu. Widok <b>zdalny, na żywo, dla całej floty</b> jest w Projectly: zakładka <b>Monitorowanie agentów</b>, widoczna wyłącznie dla roli <code>master</code>. Każda karta pokazuje jedną rolę bota (np. „dev", „kacper-monitor", „machine-status") — bieżące zadanie, kolejkę, koszt, zdrowie i ostatnie zdarzenia.</p>
+    <p><code>live_status_publisher.py</code> (co ~1–2 min), <code>machine_status_reporter.py</code> (co godzinę) i <code>kacper_monitor.py</code> publikują tam status przez <code>ProjectlyClient.publish_status()</code> → MCP <code>post_agent_status</code> — dedykowany, nadpisywany wiersz per rola, <b>nie</b> strona dokumentacji projektu. Transport (docelowy/legacy) w <code>config/projectly.yaml → live_status.transport</code>.</p>
+  </div>
+
   <div class="foot">Wirtualny Pracownik AI — dokumentacja. <a href="jak-edytowac.html">Jak edytować tę dokumentację</a> · <a href="zadania-i-zrodla.html">Skąd zadania →</a></div>
 </div>
 </body>

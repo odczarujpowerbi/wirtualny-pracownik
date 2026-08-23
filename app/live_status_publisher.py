@@ -3,8 +3,10 @@ Utrzymuje jeden, stały, nadpisywany wpis "status na żywo" per bot-rola w
 Projectly (PLAN-WDROZENIA.md sekcja 2 — moduł analizy pracy w toku, nie
 tylko zakończonych zadań). Harmonogram: co 1-2 min (config/schedule.yaml).
 
-MCP: client.publish_status -> create/update_documentation (strona statusu per
-rola, nadpisywana). Cel/tytuł strony w config/projectly.yaml (live_status).
+client.publish_status -> MCP post_agent_status (dedykowany, nadpisywany wiersz
+statusu per rola — NIE strona dokumentacji projektu; PLAN-MONITOROWANIE-AGENTOW-
+WIRTUALNY-PRACOWNIK.md). Transport (docelowy/legacy) w config/projectly.yaml
+(live_status.transport) — przełączanie i mapowanie payloadu w projectly_client.py.
 Kolejki liczone LOKALNIE ze state_store (stan tej maszyny), nie z Projectly.
 """
 

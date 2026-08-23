@@ -40,10 +40,24 @@ poll:
   project_statuses: ["active"]   # które projekty pollować (status z list_projects)
   task_status: "todo"
 
-# Strona dokumentacji na "status na żywo" per rola (live_status_publisher.py).
-# publish_status znajdzie/utworzy/nadpisze stronę o tym tytule w tym projekcie.
-# Zostaw status_project puste, żeby wyłączyć publikację statusu (tryb tylko-log).
+# Status na żywo per rola (live_status_publisher.py, machine_status_reporter.py,
+# kacper_monitor.py, system_health_monitor.py — wszystkie przez
+# ProjectlyClient.publish_status). Zobacz PLAN-MONITOROWANIE-AGENTOW-*.md.
+#
+# transport:
+#   "documentation" (domyślny, dziś) — legacy: jedna strona dokumentacji per rola,
+#     nadpisywana (project/page_title_template niżej). Zostaw project puste, żeby
+#     wyłączyć publikację statusu (tryb tylko-log), bez zmiany transportu.
+#   "agent_status_tool" — docelowy: MCP post_agent_status, jeden nadpisywany
+#     wiersz (konto z tokenu, rola=roleLabel) + wpis w historii zdarzeń w Projectly.
+#     Przełącz DOPIERO po potwierdzeniu, że narzędzie działa na produkcji
+#     (PLAN-MONITOROWANIE-AGENTOW-WIRTUALNY-PRACOWNIK.md sekcja 3/11). Po
+#     ustabilizowaniu: usuń transport i project/page_title_template razem z
+#     kodem legacy w projectly_client.py._publish_status_via_documentation.
 live_status:
+  # Potwierdzone na żywo 22.08.2026: post_agent_status działa na produkcji
+  # (4 kształty payloadu, patrz PLAN-MONITOROWANIE-AGENTOW-WIRTUALNY-PRACOWNIK.md).
+  transport: "agent_status_tool"
   project: "Administracyjne"
   page_title_template: "Status na żywo — {role}"
 
@@ -63,6 +77,13 @@ field_mapping:
   acceptance_criteria: effect
   default_risk_level_hint: yellow
 
+# Cogodzinny digest "ostatnia aktywnosc" per konto AI -> baza wiedzy Projectly
+# (knowledge_digest_publisher.py). Zapis: MCP create_knowledge/update_knowledge
+# (potwierdzone na produkcji 22.08.2026), scope="self" - kazde konto pisze
+# wylacznie do wlasnego zakresu. Id utworzonego wpisu per rola trzymane w
+# app/runs/knowledge_entry_ids.json (upsert - jeden wpis, nadpisywany, nie
+# nowy co godzine; nie ma narzedzia MCP do usuwania wpisow).
+
 # --- Referencja: która funkcja MCP w jakiej sytuacji (zaszyta wiedza) ---
 # Nic tego nie parsuje — to mapa dla człowieka i dla agenta pracującego nad
 # kodem, spójna z docstringami w skryptach.
@@ -76,6 +97,6 @@ mcp_tool_usage:
   powiazania_odczyt:    get_task_relations
   feedback_po_zadaniu:  update_task          # feedback + actualHours + completedAt + status=done (samoocena/domknięcie)
   bloker_dodaj:         add_task_blocker     # bloker zewnętrzny (wolny tekst); bloker=zadanie -> link_tasks typ "blokuje"
-  status_na_zywo:       update_documentation # jedna strona per rola, nadpisywana (create_documentation gdy brak)
+  status_na_zywo:       post_agent_status    # docelowo (live_status.transport: agent_status_tool); legacy: update_documentation
   raport_tygodniowy:    get_week_report      # completedAt/actualHours/odchylenie estymacji — digest/retro
   baza_wiedzy:          get_knowledge

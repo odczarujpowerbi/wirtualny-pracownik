@@ -8,12 +8,12 @@ logiki).
 
 UCZCIWA GRANICA: wysyłka idzie przez TEN SAM interfejs co
 `live_status_publisher.py` i `system_health_monitor.py` —
-`client.publish_status()`. Realne API/MCP Projectly do zapisu statusu nie
-jest jeszcze podłączone (patrz `PROJECTLY-ROZWOJ.md`) — zapowiedziana
-dedykowana funkcja MCP do tego przyjdzie później. Gdy powstanie, podłącz
-ją w `ProjectlyClient.publish_status` (`projectly_client.py`) — TEN
-skrypt nie wymaga wtedy ŻADNEJ zmiany, bo już woła dokładnie ten
-interfejs, nie coś, co trzeba będzie przepisywać.
+`client.publish_status()`. Dedykowana funkcja MCP (`post_agent_status`) jest
+już podłączona w `ProjectlyClient.publish_status` (`projectly_client.py`,
+config `live_status.transport: agent_status_tool`) — TEN skrypt nie wymaga
+ŻADNEJ zmiany niezależnie od transportu, bo woła dokładnie ten sam interfejs
+co zawsze; payload (kształt inny niż `live_status_publisher.py`) jest
+normalizowany centralnie w `_map_status_payload` (`projectly_client.py`).
 
 Różnica względem `system_health_monitor.py` (co 2 min, eskaluje zadanie
 przy problemie): to jest rzadszy, czysto informacyjny zapis stanu —

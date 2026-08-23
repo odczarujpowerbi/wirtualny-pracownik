@@ -19,7 +19,7 @@ To nie jest pseudokod ani dokumentacja — to realny, uruchomiony i przetestowan
 | `bounded_red_executor.py` | Sprawdza granicę liczbową bounded red — bez wpisu w polityce zawsze odmawia (bezpieczny domyślny stan) | ✅ |
 | `cost_tracker.py` | Sumuje koszt dzienny, wyzwala kill switch po przekroczeniu limitu | ✅ |
 | `secret_scanner.py` | Maskuje sekrety wg wzorca pola i kształtu klucza | ✅ |
-| `live_status_publisher.py` | Buduje i publikuje status na żywo (kolejka, koszt, zdrowie) | ✅ |
+| `live_status_publisher.py` | Buduje i publikuje status na żywo (kolejka, koszt, zdrowie) — przez `ProjectlyClient.publish_status`, docelowo MCP `post_agent_status` (dedykowany wiersz, nie strona dokumentacji projektu); transport w `config/projectly.yaml → live_status.transport` | ✅ |
 | `skill_registry.py` / `skill_usage_logger.py` | Rejestr skilli z wersją, log użycia | ✅ |
 | `pbip_validate.py` | Waliduje strukturę PBIP (JSON, TMDL) bez Power BI Desktop | ✅ (na syntetycznym przykładzie w `mock_data/sample_pbip/`) |
 | `validator_prompt.py` | Wykrywa próby wstrzyknięcia instrukcji w treści zewnętrznej (heurystyka regex + opcjonalnie lokalny model przez Ollamę) — sprawdzane PRZED klasyfikacją, wykrycie zawsze eskaluje | ✅ heurystyka; opcjonalny lokalny model gracefully pomijany, gdy niedostępny |

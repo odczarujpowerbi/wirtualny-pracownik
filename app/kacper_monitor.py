@@ -26,6 +26,11 @@ wzorce w agregacie.
 Reszta (żadnego wzorca) trafia do statusu na żywo przez
 client.publish_status("kacper-monitor", ...) — ten sam mechanizm co
 system_health_monitor.py, osobna rola, nie nadpisuje statusu innych botów.
+Kształt tego payloadu (events_scanned/repair_tasks_created/checked_at) jest
+inny niż u pozostałych wywołujących publish_status — normalizacja do
+kontraktu MCP post_agent_status dzieje się centralnie w
+projectly_client.py._map_status_payload, więc ten moduł nic nie musi wiedzieć
+o docelowym kształcie.
 
 Bezargumentowa run_monitor_cycle() — dla job_scheduler.py (config/schedule.yaml,
 job "kacper_monitor", domyślnie WYŁĄCZONY: tworzy zadania, jak inne joby z tą

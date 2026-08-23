@@ -10,10 +10,12 @@ tylko, czy `runner_loop.py` sam o sobie regularnie "daje znać" (świeżość
 pliku) — nie widzą realnego stanu maszyny (RAM, czy proces w ogóle żyje w
 systemie operacyjnym, nie tylko czy napisał plik). Ten moduł patrzy o
 poziom niżej, na sam system operacyjny, i uzupełnia (nie zastępuje)
-watchdoga. `live_status_publisher.py` nadal jest jedynym miejscem, które
-nadpisuje "status na żywo" w Projectly — ten moduł publikuje NA TYM SAMYM
-mechanizmie (`client.publish_status`), pod osobną rolą "system-health",
-żeby nie nadpisywać statusu roli-bota.
+watchdoga. Publikuje status TYM SAMYM mechanizmem co `live_status_publisher.py`
+(`client.publish_status`, docelowo MCP `post_agent_status` — PLAN-MONITOROWANIE-
+AGENTOW-WIRTUALNY-PRACOWNIK.md), pod osobną rolą "system-health", żeby nie
+nadpisywać statusu roli-bota. Kształt payloadu (status ok/warning/critical +
+issues) różni się od tego z `live_status_publisher.py` — normalizacja centralna
+w `projectly_client.py._map_status_payload`, ten moduł nic nie zmienia.
 
 Razem z `runner_loop.py --loop` (cykl zadań z Projectly) tworzy dokładnie
 pętlę, o którą prosiłeś: jeden proces cyklicznie patrzy na stan maszyny i
