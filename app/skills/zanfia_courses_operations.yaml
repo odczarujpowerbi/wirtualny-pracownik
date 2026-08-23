@@ -1,0 +1,46 @@
+# Skill: zanfia_courses_operations — WIEDZA, jak korzystać z platformy kursów
+# zanfia.com przez MCP (hydraulika: zanfia_client.py + integracje_worker.py).
+#
+# STATUS: częściowo NIEZWERYFIKOWANY. Serwer MCP odrzuca dziś autoryzację
+# (HTTP 401), więc nie znamy nawet listy narzędzi, które wystawia. Wszystko
+# poniżej, co dotyczy konkretnych narzędzi, jest do uzupełnienia po pierwszym
+# udanym połączeniu — uruchom `python zanfia_client.py`, wklej listę narzędzi
+# do sekcji `narzedzia` i dopiero wtedy zawężaj regułę wyboru.
+#
+# UWAGA: zdania cytujemy pojedynczym apostrofem (dwukropek wywraca YAML).
+
+zakres:
+  wolno: >
+    Wyłącznie ODCZYT danych: sprzedaż, zamówienia, kursy, uczestnicy.
+  nie_wolno: >
+    Jakikolwiek zapis. zanfia_client.py odrzuca narzędzie, którego nazwa zawiera
+    czasownik zapisu (create/add/update/delete/send/refund/enroll/...), NIEZALEŻNIE
+    od tego, czy token ma takie uprawnienia. To jest obrona w głąb: token wystawiony
+    "na wszystko" nie może zamienić zadania "podsumuj sprzedaż" w zmianę danych
+    na platformie sprzedażowej.
+
+wybor_narzedzia:
+  - 'Nie zgaduj nazw narzędzi MCP. Odpytaj serwer (tools/list) i wybieraj z tego, co realnie zgłasza — wywołanie losowego narzędzia zwraca losowe dane, które wyglądają jak odpowiedź.'
+  - 'Do podsumowania sprzedaży bierz narzędzie, którego nazwa lub opis mówi o zamówieniach/sprzedaży/płatnościach. Gdy takiego nie ma — zapytaj człowieka, które ma być źródłem, zamiast brać pierwsze z brzegu.'
+  - 'Parametry zakresu dat dobieraj ze schematu narzędzia (inputSchema), nie z założenia. Serwery MCP nazywają je różnie (dateFrom/from/since/start_date), a nieznany parametr bywa po cichu ignorowany — wtedy dostajesz dane za CAŁY okres i raportujesz je jako tygodniowe.'
+  - 'Gdy narzędzie nie przyjmuje dat w ogóle, filtruj rekordy po swojej stronie i napisz w materiale, na jakim polu daty oparłeś filtrowanie.'
+
+okres:
+  - 'Ta sama zasada co w MailerLite — okres z period_resolver.py, w materiale konkretny zakres dat, bez domyślnych 7 dni przy braku wskazówki.'
+
+liczby:
+  - 'Podawaj wyłącznie liczby obecne w danych. Czego w odpowiedzi nie ma (np. marży, zwrotów), napisz wprost, że tego nie ma — nie licz tego z niczego.'
+  - 'Kwoty podawaj z walutą. Jeśli w danych nie ma waluty, napisz, że waluta nie jest podana, zamiast zakładać złotówki.'
+  - 'Sprzedaż to nie przychód zaksięgowany — jeśli dane zawierają zamówienia niezapłacone albo zwroty, rozdziel je, nie sumuj w jedną liczbę.'
+
+narzedzia:
+  # DO UZUPEŁNIENIA po pierwszym udanym tools/list. Format:
+  # nazwa_narzedzia:
+  #   opis: 'co realnie zwraca'
+  #   parametry: 'jakie i w jakim formacie'
+  #   uwagi: 'czego nie zwraca, o co łatwo się pomylić'
+  {}
+
+bledy:
+  401: 'Token ZANFIA_MCP_TOKEN jest nieważny, wygasł, albo serwer oczekuje innego nagłówka niż "Authorization: Bearer". Do odblokowania człowiek musi podać aktualny token z panelu zanfia.com i potwierdzić sposób uwierzytelnienia.'
+  404: 'Pod ZANFIA_MCP_URL nie ma serwera MCP — sprawdź adres w secrets/.env.'

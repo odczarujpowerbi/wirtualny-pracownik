@@ -209,12 +209,12 @@ def run():
                    z_krokami == "browser_task"))
 
     hint_readonly = risk_hint.hint_from_task(
-        {"title": "Sprawdź wyniki kampanii reklamowej"}, tool="browser_task_readonly")
+        {"title": "Sprawdź wyniki kampanii reklamowej"}, rozpoznane_narzedzie="browser_task_readonly")
     checks.append(("Słowo 'kampania' + browser_task_readonly -> mimo to 'green' (bez kroków klikania)",
                    hint_readonly == "green"))
 
     hint_z_krokami = risk_hint.hint_from_task(
-        {"title": "Sprawdź wyniki kampanii reklamowej"}, tool="browser_task")
+        {"title": "Sprawdź wyniki kampanii reklamowej"}, rozpoznane_narzedzie="browser_task")
     checks.append(("Słowo 'kampania' + browser_task (Z krokami) -> nadal 'red' (realne klikanie)",
                    hint_z_krokami == "red"))
 

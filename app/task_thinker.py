@@ -77,9 +77,20 @@ def _think_via_claude_code(claude_exe, prompt, caller, cwd=None):
     config/model_tiers.yaml (np. "task_thinker.think", "web_answer.answer") —
     stąd bierzemy poziom (high/low) i konkretny model (model_registry.resolve).
     cwd = repo zadania (kontekst) albo temp. Koszt subskrypcji szacowany proxy
-    (cost_estimator), żeby kill switch liczył wolumen wywołań."""
+    (cost_estimator), żeby kill switch liczył wolumen wywołań.
+
+    ANTHROPIC_API_KEY jest USUWANY ze środowiska podprocesu (znaleziony
+    23.08.2026): `claude` CLI traktuje obecność klucza jako priorytet nad
+    logowaniem `claude login` i wyłącza connectory ("connectors are disabled
+    because ANTHROPIC_API_KEY... takes precedence"), przez co `claude -p`
+    zwracał kod 1 na KAŻDYM wywołaniu żywego runnera (klucz jest w
+    secrets/.env, więc trafiał do środowiska każdego procesu). Zgodnie z
+    docstringiem modułu główny model MA działać przez logowanie w terminalu,
+    nie przez klucz — ten klucz jest dla innych skryptów (validator_visual.py
+    i inne), nie dla tego wywołania."""
     role, model = model_registry.resolve(caller)
     cost = cost_estimator.estimate_call("claude_code")
+    env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
     result = subprocess.run(
         [claude_exe, "-p", "--model", model, prompt],
         cwd=cwd or tempfile.gettempdir(),
@@ -87,6 +98,7 @@ def _think_via_claude_code(claude_exe, prompt, caller, cwd=None):
         text=True,
         encoding="utf-8",
         timeout=THINK_TIMEOUT_SECONDS,
+        env=env,
     )
     if result.returncode != 0:
         return {"available": True, "ok": False, "reasoning": None,

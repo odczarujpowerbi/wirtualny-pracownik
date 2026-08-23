@@ -193,6 +193,36 @@ class ProjectlyClient:
             return None
         return self._people_by_name.get(account_name.lower())
 
+    def _polled_account_names(self):
+        """Konta AI, których zadania bierze TA maszyna: własne konto roli plus
+        konta z poll.extra_accounts. Jedna maszyna obsługuje dziś kilka ról
+        naraz (rola 'dev' fizycznie wykonuje też zadania marketingowe), a bez
+        tego zadanie wrzucone na 'AI - Marketing' nie zostałoby podjęte przez
+        nikogo i po cichu wisiałoby w kolejce."""
+        wlasne = self._cfg.get("role_to_account", {}).get(self._role)
+        nazwy = [wlasne] if wlasne else []
+        for dodatkowe in self._cfg.get("poll", {}).get("extra_accounts", []) or []:
+            if dodatkowe and dodatkowe not in nazwy:
+                nazwy.append(dodatkowe)
+        return nazwy
+
+    def _polled_account_ids(self):
+        """(nazwa, id) dla kont do pollowania. Konto wymienione w configu, ale
+        nieistniejące w Projectly, jest RAPORTOWANE, nie pomijane po cichu —
+        literówka w nazwie inaczej wygląda dokładnie jak 'brak zadań'."""
+        self._ensure_directory()
+        pary, brakujace = [], []
+        for nazwa in self._polled_account_names():
+            konto_id = self._people_by_name.get(nazwa.lower())
+            if konto_id:
+                pary.append((nazwa, konto_id))
+            else:
+                brakujace.append(nazwa)
+        if brakujace:
+            print("[Projectly] Kont AI z configu nie ma w Projectly: %s — zadania z tych kont NIE będą "
+                  "pobierane. Sprawdź pisownię w config/projectly.yaml." % ", ".join(brakujace))
+        return pary
+
     def _resolve_person_id(self, alias_or_name):
         """Alias z config (pawel/bot/unassigned_pool) albo wprost nazwa osoby
         -> id osoby w Projectly. Zwraca None, gdy nieznana/celowo bez przypisania."""
@@ -257,20 +287,29 @@ class ProjectlyClient:
         """MCP: get_project_tasks. Zadania status=todo przypisane do konta AI
         tej roli, po wszystkich pollowanych projektach (filtr assigneeId po
         stronie serwera)."""
-        own_id = self._own_account_id()
-        if not own_id:
+        konta = self._polled_account_ids()
+        if not konta:
             account = self._cfg.get("role_to_account", {}).get(self._role, "?")
             print(f"[Projectly] Brak konta AI '{account}' dla roli '{self._role}' — nie pobieram zadań (fail-closed).")
             return []
         task_status = self._cfg.get("poll", {}).get("task_status", "todo")
         tasks = []
+        widziane = set()
         for project in self._pollable_projects():
-            result = self._mcp.call_tool(
-                "get_project_tasks",
-                {"projectId": project["id"], "status": task_status, "assigneeId": own_id},
-            )
-            for raw in self._as_task_list(result):
-                tasks.append(self._map_task(raw, project["id"]))
+            for nazwa_konta, konto_id in konta:
+                result = self._mcp.call_tool(
+                    "get_project_tasks",
+                    {"projectId": project["id"], "status": task_status, "assigneeId": konto_id},
+                )
+                for raw in self._as_task_list(result):
+                    # To samo zadanie może wyjść z dwóch kont (współprzypisanie) —
+                    # bez odsiania runner wykonałby je dwa razy.
+                    if raw.get("id") in widziane:
+                        continue
+                    widziane.add(raw.get("id"))
+                    zadanie = self._map_task(raw, project["id"])
+                    zadanie["ai_account"] = nazwa_konta
+                    tasks.append(zadanie)
         return tasks
 
     def post_comment(self, task_id, text):

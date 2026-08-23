@@ -1,0 +1,13 @@
+# Konfiguracja miejsca zapisu dokumentów agenta na SharePoint (Microsoft
+# Graph, integrations.yaml wpis `microsoft_365`). Nie-sekret — sam adres
+# witryny, nie token. Sekrety (MS_GRAPH_CLIENT_ID/SECRET/TENANT_ID) w
+# secrets/.env, współdzielone z microsoft_graph_mail_client.py.
+
+site_host: odczarujlowcode.sharepoint.com
+site_path: /sites/Wirtualny-pracownik
+library: "Shared Documents"
+
+# Folder główny dla wszystkich dokumentów wygenerowanych przez agenta —
+# jeden podfolder per zadanie (data + skrócony tytuł), żeby łatwo
+# odróżnić deliverable od reszty zawartości biblioteki.
+root_folder: "Zadania-Agenta"

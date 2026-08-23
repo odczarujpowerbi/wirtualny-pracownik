@@ -138,6 +138,41 @@ tools:
         required: false
         type: string
 
+  document_build:
+    risk: green
+    description: >
+      Generuje plik lokalny (PDF/DOCX/XLSX/QMD/MD/CSV) z gotowych danych
+      (document_builder.py, report_builder.py) — tylko zapis w runs/, bez
+      wysyłki na zewnątrz. To narzędzie NIE wgrywa nic do SharePoint —
+      od tego jest sharepoint_upload, osobny (żółty) krok.
+    allowed_roots:
+      - runs
+    params:
+      format:
+        required: true
+        type: string       # pdf | docx | xlsx | qmd | markdown | csv
+      output_path:
+        required: true
+        type: path
+
+  sharepoint_upload:
+    risk: yellow
+    description: >
+      Wgrywa plik już zbudowany przez document_build do biblioteki SharePoint
+      z config/sharepoint.yaml (jeden folder per zadanie). Tylko zapis do TEJ
+      witryny — żaden inny host SharePoint/OneDrive nie jest dozwolony.
+    allowed_domains:
+      - odczarujlowcode.sharepoint.com
+    source_names:
+      odczarujlowcode.sharepoint.com: SharePoint, biblioteka Wirtualny-pracownik
+    params:
+      remote_path:
+        required: true
+        type: string        # ścieżka względna w bibliotece, np. Zadania-Agenta/<zadanie>/plik.pdf
+      local_path:
+        required: true
+        type: path
+
   zanfia_query:
     risk: green
     description: >
