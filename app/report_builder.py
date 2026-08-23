@@ -9,10 +9,9 @@ formatuje wynik), nie źródło prawdy o KONKRETNYM raporcie firmowym —
 podłączenie realnych danych (np. z CRM, z systemu kadrowego) to osobny
 krok integracyjny, nie część tego modułu.
 
-CELOWO bez pandas/openpyxl (jeszcze niezainstalowane, patrz
-requirements.txt — "premature dependency bloat"): markdown i CSV działają
-dziś w 100% na bibliotece standardowej; prawdziwy .xlsx z formatowaniem
-zostaje jasnym stubem, dopóki ktoś realnie tego nie potrzebuje.
+Markdown i CSV działają na bibliotece standardowej. XLSX używa `openpyxl`
+(requirements.txt) — import LENIWY (wewnątrz write_xlsx_report), żeby import
+tego modułu nie wymagał pakietu, gdy nikt xlsx nie potrzebuje.
 
 Akcja `report_build` jest już `yellow` w approval_policy.yaml — wynik
 raportu przechodzi normalną ścieżkę walidacji/auto-zatwierdzenia z sekcji 3
@@ -20,6 +19,7 @@ planu, zanim trafi do klienta.
 """
 
 import csv
+import re
 
 
 def build_markdown_table(rows, columns=None):
@@ -46,6 +46,32 @@ def write_csv_report(rows, output_path, columns=None):
     return output_path
 
 
+_XLSX_SHEET_TITLE_INVALID = re.compile(r"[\\/*?:\[\]]")
+
+
+def _xlsx_sheet_title(title):
+    """Nazwa arkusza Excela: max 31 znaków, bez \\ / * ? : [ ] (openpyxl rzuca
+    ValueError na te znaki, nie tylko na długość — sam `title[:31]` nie wystarczy)."""
+    sanitized = _XLSX_SHEET_TITLE_INVALID.sub(" ", title).strip()
+    return sanitized[:31] or "Raport"
+
+
+def write_xlsx_report(title, rows, output_path, columns=None):
+    import openpyxl
+
+    columns = columns or (list(rows[0].keys()) if rows else [])
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = _xlsx_sheet_title(title)
+    sheet.append(columns)
+    for row in rows:
+        sheet.append([row.get(c, "") for c in columns])
+    for cell in sheet[1]:
+        cell.font = openpyxl.styles.Font(bold=True)
+    workbook.save(output_path)
+    return output_path
+
+
 def build_report(title, rows, columns=None, output_format="markdown", output_path=None):
     if output_format == "markdown":
         return f"# {title}\n\n{build_markdown_table(rows, columns)}"
@@ -56,10 +82,9 @@ def build_report(title, rows, columns=None, output_format="markdown", output_pat
         return write_csv_report(rows, output_path, columns)
 
     if output_format == "xlsx":
-        raise NotImplementedError(
-            "Formatowany .xlsx wymaga pakietu 'openpyxl' — celowo niezainstalowanego "
-            "(requirements.txt). Odkomentuj zależność i dopisz tę gałąź, gdy realnie potrzebne."
-        )
+        if not output_path:
+            raise ValueError("output_format='xlsx' wymaga output_path.")
+        return write_xlsx_report(title, rows, output_path, columns)
 
     raise ValueError(f"Nieznany output_format: {output_format!r} (obsługiwane: markdown, csv, xlsx)")
 

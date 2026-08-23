@@ -17,15 +17,19 @@ Użycie:
 """
 
 import argparse
+import os
+import re
 import sys
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 import env_bootstrap  # noqa: F401  # wczytuje .env / secrets/.env (patrz .env.example, bootstrap_init_secrets.py)
 
 import bot_gustaw_bramka
 import control
 import cost_tracker
+import document_builder
 import executor
 import heartbeat
 import kill_switch
@@ -39,6 +43,7 @@ import task_router
 import task_thinker
 import validator_prompt
 from escalation import escalate_to_human
+from projectly_client import _load_config as _load_projectly_config
 from projectly_client import get_client
 
 HINT_TO_ACTION = {
@@ -50,6 +55,63 @@ HINT_TO_ACTION = {
 
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
+
+
+def _escalation_assignee():
+    """Kto ma dostać zadanie eskalacji w Projectly — config/projectly.yaml
+    `escalation_default_assignee`, NIGDY 'owner' z task_router.route_task().
+    'owner' jest routing biznesowy/klienta (do jakiego klienta należy zadanie),
+    nie osoba do powiadomienia — dla nierozpoznanego tytułu route_task zwraca
+    'unassigned_pool', co przez people_aliases mapuje się na "" (brak
+    przypisania). Skutek namacalny 23.08.2026: WSZYSTKIE eskalacje (nowe i
+    historyczne) trafiały do Projectly z assignees=[] — niewidoczne dla
+    człowieka, nikt nie wiedział, że czekają na decyzję."""
+    try:
+        return _load_projectly_config().get("escalation_default_assignee", "pawel")
+    except Exception:  # noqa: BLE001 — config nieczytelny nie może zablokować eskalacji
+        return "pawel"
+
+
+def _slug(text, limit=60):
+    slug = re.sub(r"[^\w\-]+", "_", text or "", flags=re.UNICODE).strip("_")
+    return (slug[:limit] or "zadanie")
+
+
+def _save_result_to_onedrive(task, status, comment):
+    """Zapisuje wynik KAŻDEGO przetworzonego zadania do OneDrive (folder
+    ONEDRIVE_TASKS_ROOT z secrets/.env, jeden podfolder per zadanie) — decyzja
+    właściciela 23.08.2026: to ma być ZAWSZE, nie tylko wtedy, gdy ktoś ręcznie
+    uruchamia skrypt generujący dokument. Ten folder to lokalny mirror
+    biblioteki SharePoint (config/sharepoint.yaml), więc OneDrive sam wypycha
+    zapis do SharePoint — bez potrzeby Microsoft Graph (patrz sharepoint_client.py,
+    dziś zablokowany brakiem uprawnienia Sites.ReadWrite.All).
+
+    Fail-soft: brak ONEDRIVE_TASKS_ROOT albo błąd zapisu NIE MOŻE zablokować
+    przetwarzania zadania — to dodatkowy ślad, nie krytyczny krok pipeline'u.
+    Zwraca ścieżkę folderu albo None, gdy nie zapisano.
+
+    Nazwa folderu: PEŁNE task_id na początku (decyzja właściciela 23.08.2026 —
+    id jako przedrostek, żeby zadanie było łatwe do wyszukania po id), potem
+    data i skrócony tytuł dla człowieka. task_id jest zawsze dostępne — to
+    surowe id z Projectly (`raw.get("id")` w projectly_client._map_task),
+    ten sam identyfikator używany w całym pipeline, żadna zmiana MCP niepotrzebna."""
+    root = os.environ.get("ONEDRIVE_TASKS_ROOT")
+    if not root:
+        return None
+    try:
+        root_path = Path(root)
+        if not root_path.parent.exists():
+            return None  # OneDrive nie zsynchronizowany na tej maszynie — nie twórz sierocego folderu
+        data = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        folder = root_path / f"{task['task_id']}_{data}_{_slug(task.get('title', ''))}"
+        sections = [
+            {"heading": "Status", "text": status},
+            {"heading": "Wynik", "text": comment},
+        ]
+        document_builder.build_md(task.get("title") or "Zadanie", sections, folder / "wynik.md")
+        return str(folder)
+    except Exception:  # noqa: BLE001 — zapis dodatkowy, błąd nie może ubić przetwarzania zadania
+        return None
 
 
 def process_task(task, policy, routing, client):
@@ -76,14 +138,17 @@ def _process_task_core(task, policy, routing, client):
     state_store.record_event(task_id, "prompt_safety_check", str(prompt_check), now_iso())
     if not prompt_check["safe"]:
         owner, _ = task_router.route_task(task["title"], routing)
-        escalate_to_human(task, f"Wykryto podejrzaną treść: {prompt_check['detail']}", client, assignee=owner)
+        escalate_to_human(task, f"Wykryto podejrzaną treść: {prompt_check['detail']}", client,
+                          assignee=_escalation_assignee())
         state_store.log_decision(
             task_id, agent="pawel", decision="escalate",
             reason=f"prompt injection: {prompt_check['detail']}", now=now_iso(), event_type="escalation")
         status = "needs_approval"
         state_store.upsert_task(task_id, payload=task, status=status, assigned_to=owner, risk_level="red", now=now_iso())
-        client.post_comment(task_id, _comment_escalated(owner, prompt_check["detail"]))
+        komentarz = _comment_escalated(owner, prompt_check["detail"])
+        client.post_comment(task_id, komentarz)
         client.update_status(task_id, status)
+        _save_result_to_onedrive(task, status, komentarz)
         return {"task_id": task_id, "risk": "red", "owner": owner, "status": status}
 
     # Hint ryzyka: gdy źródło nie niesie własnego (albo niesie sztywny domyślny
@@ -139,18 +204,20 @@ def _process_task_core(task, policy, routing, client):
     # (nie podajemy podejrzanej ścieżki dalej do botów).
     if real is not None and real.get("executed") is False:
         reason = real["acceptance_notes"]
-        escalate_to_human(task, reason, client, assignee=owner)
+        escalate_to_human(task, reason, client, assignee=_escalation_assignee())
         state_store.log_decision(task_id, agent="pawel", decision="escalate", reason=reason,
                                  now=now_iso(), event_type="escalation")
         state_store.upsert_task(task_id, payload=task, status="needs_approval",
                                 assigned_to=owner, risk_level=risk, now=now_iso())
-        client.post_comment(task_id, _comment_escalated(owner, reason))
+        komentarz = _comment_escalated(owner, reason)
+        client.post_comment(task_id, komentarz)
         client.update_status(task_id, "needs_approval")
+        _save_result_to_onedrive(task, "needs_approval", komentarz)
         return {"task_id": task_id, "risk": risk, "owner": owner, "status": "needs_approval"}
 
     if risk == "red":
         reason = "Czerwona akcja — poza zakresem tego szkieletu, brak jeszcze zdefiniowanej bounded_red do sprawdzenia."
-        escalate_to_human(task, reason, client, assignee=owner)
+        escalate_to_human(task, reason, client, assignee=_escalation_assignee())
         state_store.log_decision(task_id, agent="pawel", decision="escalate", reason=reason,
                                  now=now_iso(), event_type="escalation")
         status, comment = "needs_approval", _comment_escalated(owner, reason)
@@ -178,7 +245,7 @@ def _process_task_core(task, policy, routing, client):
             gate, execution_result = _popraw_i_sprawdz_ponownie(task, execution_result, gate)
 
         if gate["passed"]:
-            status, comment = "done", _comment_gate_passed(owner, gate)
+            status, comment = "done", _comment_gate_passed(owner, gate, execution_result)
             skill_usage_logger.log_usage(task_id, "quality_gate", "success", gate["summary"])
         elif _zadanie_zle_postawione(execution_result, gate):
             # Zadanie bez potrzebnych danych albo źle postawione. Zakładanie zadania
@@ -192,7 +259,7 @@ def _process_task_core(task, policy, routing, client):
             skill_usage_logger.log_usage(task_id, "quality_gate", "failure", reason)
         else:
             reason = _gate_failure_reason(gate)
-            escalate_to_human(task, reason, client, assignee=owner)
+            escalate_to_human(task, reason, client, assignee=_escalation_assignee())
             state_store.log_decision(task_id, agent="pawel", decision="escalate", reason=reason,
                                      now=now_iso(), event_type="escalation")
             status, comment = "needs_approval", _comment_escalated(owner, reason)
@@ -213,6 +280,7 @@ def _process_task_core(task, policy, routing, client):
     client.post_comment(task_id, comment)
     client.update_status(task_id, status)
     _zapisz_feedback(client, task_id, status, execution_result, risk)
+    _save_result_to_onedrive(task, status, comment)
 
     return {"task_id": task_id, "risk": risk, "owner": owner, "status": status}
 
@@ -255,10 +323,16 @@ def _comment_green(owner):
     return f"✅ done\nCo zrobiono: klasyfikacja i routing (Faza 0-1 — bez realnego workera jeszcze).\nPrzypisano do: {owner}\n"
 
 
-def _comment_gate_passed(owner, gate):
+def _comment_gate_passed(owner, gate, execution_result=None):
+    """execution_result['acceptance_notes'] to RZECZYWISTY wynik workera (np.
+    treść odpowiedzi fetch_url, opis tego co zobaczył browser_task) — bez tego
+    komentarz mówił tylko 'bramka przeszła', a człowiek nie widział, CO
+    faktycznie zostało zrobione (znaleziony 23.08.2026, patrz [[testowanie-mechanizmu-zadan-projectly]])."""
+    notes = (execution_result or {}).get("acceptance_notes")
+    wynik = f"\n📄 Wynik:\n{notes}\n" if notes else ""
     return (
         f"✅ done (przeszło bramkę jakości: zgody {gate['approvals']}/{gate['required']})\n"
-        f"{gate['summary']}\nPrzypisano do: {owner}\n"
+        f"{gate['summary']}\n{wynik}Przypisano do: {owner}\n"
     )
 
 

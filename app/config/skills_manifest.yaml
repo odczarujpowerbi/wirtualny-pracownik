@@ -35,7 +35,19 @@ skills:
   - name: report_builder
     version: "0.1.0"
     risk: żółte
-    description: Generyczny silnik raportów (markdown/CSV) z listy rekordów — realne dane (Kadry, Finansowy) wymagają osobnego podłączenia źródła
+    description: Generyczny silnik raportów (markdown/CSV/XLSX) z listy rekordów — realne dane (Kadry, Finansowy) wymagają osobnego podłączenia źródła
+  - name: document_builder
+    version: "0.1.0"
+    risk: zielone
+    description: >
+      Generuje dokumenty narracyjne (PDF/DOCX/QMD) z gotowych sekcji (nagłówek + tekst/tabela) —
+      zapis tylko lokalny (runs/documents/); wysyłka na SharePoint to osobny skill (sharepoint_writer)
+  - name: sharepoint_writer
+    version: "0.1.0"
+    risk: żółte
+    description: >
+      Wgrywa plik wygenerowany przez document_builder/report_builder do biblioteki SharePoint
+      config/sharepoint.yaml, jeden folder per zadanie; link do folderu wraca jako komentarz Projectly
   - name: email_draft_generator
     version: "0.1.0 (tryb mock — realna wysyłka wymaga Microsoft Graph)"
     risk: żółte
@@ -84,7 +96,10 @@ skills:
   - name: microsoft_graph_operations
     version: "planned"
     risk: żółte
-    description: Mail (odczyt/wysyłka z jednego konta), SharePoint, OneDrive przez Microsoft Graph.
+    description: >
+      Mail (odczyt/wysyłka z jednego konta) przez Microsoft Graph — kod istnieje
+      (microsoft_graph_mail_client.py), ale skill (wzorce użycia) nie jest jeszcze
+      spisany. Zapis na SharePoint ma już własny skill: sharepoint_writer.
   - name: mailerlite_operations
     version: "planned"
     risk: żółte

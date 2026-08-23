@@ -11,7 +11,12 @@
 # ============================================================================
 $ErrorActionPreference = "Stop"
 $taskName = "WirtualnyPracownikAI"
-$batPath = Join-Path $PSScriptRoot "start-agent.bat"
+# start-agent.bat mieszka w KORZENIU repo, nie w tym folderze (instalacja/skrypty/)
+# - dwa poziomy wyzej. Zla wersja tej linii (Join-Path $PSScriptRoot "start-agent.bat")
+# nigdy nie trafiala na plik, ale nikt tego nie zauwazyl, bo zadanie bylo juz
+# zarejestrowane recznie/inaczej (naprawione 23.08.2026).
+$repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+$batPath = Join-Path $repoRoot "start-agent.bat"
 
 if (-not (Test-Path $batPath)) { throw "Brak pliku startowego: $batPath" }
 

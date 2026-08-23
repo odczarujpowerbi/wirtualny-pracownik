@@ -19,6 +19,8 @@ action_risk:
   draft_email: yellow
   update_task_status: yellow
   report_build: yellow
+  document_build: green      # generowanie pliku LOKALNEGO (PDF/DOCX/XLSX/QMD) — bez wysylki na zewnatrz
+  sharepoint_upload: yellow  # zapis pliku na wspoldzielonym zasobie SharePoint (dziedziczy validator_thresholds.default)
   data_tidy: yellow
   ad_variant_pause: yellow   # wyłączenie słabego wariantu testowego — ogranicza wydatek, nie zwiększa go (sekcja 20)
   ad_copy_draft: green       # sam tekst reklamy to draft, dopiero uruchomienie wydaje pieniądze

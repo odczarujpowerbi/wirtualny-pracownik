@@ -4,7 +4,12 @@ python-dotenv>=1.0
 anthropic>=0.40           # validator_visual.py, ad_copy_generator.py, mailerlite_report_analyzer.py
 requests>=2.31            # mailerlite_client.py, microsoft_graph_mail_client.py (REST Graph)
 psutil>=5.9               # system_health_monitor.py — RAM i lista procesów identycznie na Windows/Linux
-msal>=1.26               # microsoft_graph_mail_client.py / graph_verify.py — token app-only do Microsoft Graph
+msal>=1.26               # microsoft_graph_mail_client.py / graph_verify.py / sharepoint_client.py — token app-only do Microsoft Graph
+
+# --- Generowanie dokumentów (document_builder.py, report_builder.py xlsx) ---
+openpyxl>=3.1            # report_builder.py — zapis .xlsx
+reportlab>=4.0           # document_builder.py — zapis .pdf
+python-docx>=1.1         # document_builder.py — zapis .docx
 
 # --- Konektory zewnętrzne (używane przez napisane klienty) ---
 # Meta Ads (meta_ads_client.py) NIE wymaga osobnego SDK — używa `requests` (wyżej).
@@ -36,7 +41,6 @@ playwright>=1.40
 # workera; premature dependency bloat to ten sam problem co premature scope.
 # Odkomentuj/dodaj w miarę realnej potrzeby:
 #
-# pandas>=2.0                # data_tidy.py, report_builder.py, source_schema_watcher.py (diff schematu)
-# openpyxl>=3.1              # silnik Excela dla pandas przy plikach .xlsx
+# pandas>=2.0                # data_tidy.py, source_schema_watcher.py (diff schematu)
 # Pillow>=10.0                # screenshot_diff.py, screenshot_annotate.py
 # facebook-business          # opcjonalny SDK Meta — meta_ads_client.py działa bez niego (przez requests)
