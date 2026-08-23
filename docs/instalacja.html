@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wirtualny Pracownik AI — instalacja i obsługa</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <p class="kicker">Dokumentacja projektu</p>
+  <h1>Instalacja i obsługa</h1>
+  <p>Jak zainstalować i uruchomić narzędzie na nowej maszynie, co wpisać w dostępy i gdzie klikać. Po ludzku, w punktach.</p>
+</header>
+<div class="wrap">
+  <div class="sitenav">
+    <a href="index.html">Start</a><span class="sep">·</span>
+    <a href="architektura.html">Architektura</a><span class="sep">·</span>
+    <a href="przeplyw-zadania.html">Przepływ zadania</a><span class="sep">·</span>
+    <a href="boty-i-persony.html">Boty i persony</a><span class="sep">·</span>
+    <a href="buyer-persony.html">Buyer persony</a><span class="sep">·</span>
+    <a href="kontekst-firmy.html">Kontekst firmy</a><span class="sep">·</span>
+    <a href="modele-i-koszty.html">Modele i koszty</a><span class="sep">·</span>
+    <a href="bezpieczenstwo.html">Bezpieczeństwo</a><span class="sep">·</span>
+    <a href="panel-operatora.html">Panel operatora</a><span class="sep">·</span>
+    <a href="zadania-i-zrodla.html">Skąd zadania</a><span class="sep">·</span>
+    <a href="instalacja.html" class="current">Instalacja</a><span class="sep">·</span>
+    <a href="mapa-plikow.html">Mapa plików</a><span class="sep">·</span>
+    <a href="stan-i-roadmapa.html">Stan i roadmapa</a>
+  </div>
+
+  <h2><span class="n">0</span> Czego potrzebujesz</h2>
+  <div class="card">
+    <ul>
+      <li><b>Maszyna:</b> Windows Server 2022 albo Windows 11 (dedykowana, włączona 24/7, stały internet).</li>
+      <li><b>Konto Microsoft 365 Business Standard</b> (do aktywacji Office i pracy w chmurze).</li>
+      <li><b>Subskrypcja Claude</b> (do logowania w Claude Code) oraz klucze: Projectly, opcjonalnie inne.</li>
+      <li><b>Uprawnienia administratora</b> na maszynie (część instalacji tego wymaga).</li>
+    </ul>
+  </div>
+
+  <h2><span class="n">1</span> Instalacja środowiska</h2>
+  <p class="lead">Instalacja jest <b>bezobsługowa</b> — uruchamiasz i możesz wrócić później. Nie zatrzymuje się na logowaniach.</p>
+  <ol class="steps">
+    <li><h3>Pobierz projekt</h3>
+      <p><b>Maszyna zupełnie pusta</b> (bez repo, bez gita)? Otwórz <b>PowerShell jako administrator</b> i wklej jedną linię:</p>
+      <pre>$s="$env:TEMP\postaw.ps1"; irm https://raw.githubusercontent.com/odczarujpowerbi/wirtualny-pracownik/main/instalacja/skrypty/postaw-od-zera.ps1 -OutFile $s; powershell -ExecutionPolicy Bypass -File $s</pre>
+      <p>Jeśli repo już jest na maszynie — przejdź do kroku 2.</p></li>
+    <li><h3>Uruchom instalator</h3>
+      <p>Wejdź do folderu <code>instalacja</code>, kliknij prawym na <b>Przygotuj-srodowisko.bat</b> → <b>Uruchom jako administrator</b>. Zainstaluje po kolei: Git, Python, Node.js, Claude Code, VS Code, Office, aplikacje (Power BI, Teams, Outlook, Chrome), zależności, autostart 24/7, test i raport.</p>
+      <div class="callout">Każdy krok sprawdza, czy dana rzecz już jest — ponowne uruchomienie jest szybkie.</div></li>
+  </ol>
+
+  <h2><span class="n">2</span> Wpisz dostępy (secrets)</h2>
+  <p class="lead">Sekrety nigdy nie trafiają do repozytorium. Leżą lokalnie w <code>app/secrets/</code>.</p>
+  <h3>Plik <code>app/secrets/.env</code> — klucze</h3>
+  <table>
+    <thead><tr><th style="width:32%">Klucz</th><th>Co wpisać / skąd</th></tr></thead>
+    <tbody>
+      <tr><td><code>ANTHROPIC_API_KEY</code></td><td>Klucz API Anthropic (opcjonalny, jeśli logujesz się subskrypcją przez <code>claude login</code>). Fallback głównego modelu.</td></tr>
+      <tr><td><code>PROJECTLY_API_KEY</code> / <code>PROJECTLY_BASE_URL</code></td><td>Klucz i adres API Projectly. Bez klucza agent działa w trybie mock (dane lokalne).</td></tr>
+      <tr><td><code>MS_GRAPH_CLIENT_ID / SECRET / TENANT_ID / MAILBOX</code></td><td>Opcjonalnie — realna wysyłka maila przez Microsoft Graph (rejestracja aplikacji w Azure AD).</td></tr>
+      <tr><td><code>OLLAMA_HOST / OLLAMA_VISION_MODEL / OLLAMA_TEXT_MODEL</code></td><td>Opcjonalnie — modele lokalne (domyślnie <code>localhost:11434</code>).</td></tr>
+      <tr><td><code>CLAUDE_CODE_CALL_PROXY_USD</code> / <code>daily_cost_limit_usd.txt</code></td><td>Opcjonalnie — dostrojenie bezpiecznika kosztu (patrz <a href="modele-i-koszty.html">Modele i koszty</a>).</td></tr>
+    </tbody>
+  </table>
+  <h3>Folder <code>app/secrets/mcp/*.json</code> — integracje MCP</h3>
+  <p>Po jednym pliku na integrację MCP: <code>projectly.json</code>, <code>zoho_crm.json</code>, <code>zanfia_courses.json</code>. Uzupełnij adres serwera/token wg konkretnej konfiguracji MCP.</p>
+
+  <h2><span class="n">3</span> Uruchom agenta</h2>
+  <div class="card">
+    <p>Agent startuje <b>sam</b> po zalogowaniu (autostart ustawia instalator). Ręcznie:</p>
+    <pre>cd app
+python job_scheduler.py        # pętla 24/7 (pobiera zadania, klasyfikuje, waliduje)
+python dashboard.py            # podgląd: http://127.0.0.1:8787/</pre>
+  </div>
+
+  <h2><span class="n">4</span> Zaloguj się na konta</h2>
+  <p class="lead">Osobny, szybki krok — <b>po</b> instalacji. <code>instalacja/Zaloguj.bat</code> przewodzi po kolei.</p>
+  <table>
+    <thead><tr><th>Konto</th><th>Po co</th></tr></thead>
+    <tbody>
+      <tr><td>Claude Code (<code>claude</code> w terminalu)</td><td>Napęd głównego modelu — <b>konieczne</b>, inaczej bramka jakości degraduje (fail-closed).</td></tr>
+      <tr><td>VS Code — chmurowe + personalne</td><td>Kodowanie z agentem, Settings Sync, GitHub.</td></tr>
+      <tr><td>Microsoft 365 + aktywacja Office</td><td>Mail/SharePoint/OneDrive.</td></tr>
+      <tr><td>Gmail / Google, Meta Business, GitHub</td><td>Praca przez interfejs, gdy nie da się przez API.</td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="n">5</span> Codzienne użycie</h2>
+  <div class="card">
+    <ul>
+      <li><b>Nowy kod z GitHub:</b> dwuklik <code>aktualizuj-repo.bat</code>.</li>
+      <li><b>Podgląd pracy:</b> <code>python app/dashboard.py</code> → <a href="http://127.0.0.1:8787/">http://127.0.0.1:8787/</a> — patrz <a href="panel-operatora.html">Panel operatora</a>.</li>
+      <li><b>Zatrzymanie:</b> przycisk Stop w dashboardzie (albo Pauza — bez utraty stanu).</li>
+      <li><b>Nowe zadanie bez Projectly:</b> formularz „Dodaj zadanie" albo dopisz linię do <code>app/inbox/zadania.txt</code>.</li>
+    </ul>
+  </div>
+
+  <h2><span class="n">6</span> Gdy coś nie działa</h2>
+  <table>
+    <thead><tr><th style="width:38%">Objaw</th><th>Co zrobić</th></tr></thead>
+    <tbody>
+      <tr><td>Aplikacje / Terminal się nie zainstalowały</td><td>Na Windows Server często brak <b>winget</b>. Instalator próbuje go doinstalować.</td></tr>
+      <tr><td><code>claude</code> nie działa w terminalu</td><td>Dodaj <code>C:\Users\&lt;user&gt;\.local\bin</code> do PATH i otwórz nowy terminal.</td></tr>
+      <tr><td>Bramka jakości wszystko eskaluje</td><td>Sprawdź, czy jesteś zalogowany w <code>claude</code> — bez modelu odbiór biznesowy nie działa (celowo, fail-closed).</td></tr>
+      <tr><td>Pobieranie ze źródła internetowego zwraca odmowę</td><td>Sprawdź, czy host jest na allowliście: <code>app/config/tool_contracts.yaml</code> → <code>fetch_url.allowed_domains</code>.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="foot">Wirtualny Pracownik AI — dokumentacja. <a href="jak-edytowac.html">Jak edytować tę dokumentację</a> · <a href="mapa-plikow.html">Mapa plików →</a></div>
+</div>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wirtualny Pracownik AI — mapa plików</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <p class="kicker">Dokumentacja projektu</p>
+  <h1>Mapa plików</h1>
+  <p>Co jest czym w repo. Foldery pogrubione, po nich najważniejsze pliki.</p>
+</header>
+<div class="wrap">
+  <div class="sitenav">
+    <a href="index.html">Start</a><span class="sep">·</span>
+    <a href="architektura.html">Architektura</a><span class="sep">·</span>
+    <a href="przeplyw-zadania.html">Przepływ zadania</a><span class="sep">·</span>
+    <a href="boty-i-persony.html">Boty i persony</a><span class="sep">·</span>
+    <a href="buyer-persony.html">Buyer persony</a><span class="sep">·</span>
+    <a href="kontekst-firmy.html">Kontekst firmy</a><span class="sep">·</span>
+    <a href="modele-i-koszty.html">Modele i koszty</a><span class="sep">·</span>
+    <a href="bezpieczenstwo.html">Bezpieczeństwo</a><span class="sep">·</span>
+    <a href="panel-operatora.html">Panel operatora</a><span class="sep">·</span>
+    <a href="zadania-i-zrodla.html">Skąd zadania</a><span class="sep">·</span>
+    <a href="instalacja.html">Instalacja</a><span class="sep">·</span>
+    <a href="mapa-plikow.html" class="current">Mapa plików</a><span class="sep">·</span>
+    <a href="stan-i-roadmapa.html">Stan i roadmapa</a>
+  </div>
+
+  <h2><span class="n">1</span> Katalog główny</h2>
+  <pre>wirtualny-pracownik/
+├─ app/                    kod (patrz sekcja 2)
+├─ docs/                   ta dokumentacja (docs/*.html + assets/style.css)
+├─ instalacja/             instalator: Przygotuj-srodowisko.bat, Zaloguj.bat, skrypty/postaw-od-zera.ps1
+├─ .claude/agents/         definicje agentów pomocniczych (explorer, implementer, reviewer, tester)
+├─ CLAUDE.md               reguły projektu dla agenta pracującego w repo
+├─ PLAN-VM.md              plan wdrożenia dla agenta na nowej maszynie
+├─ aktualizuj-repo.bat     pobranie nowego kodu z GitHub (dwuklik)
+├─ start-agent.bat         ręczny start pętli
+└─ README.md               skrót projektu + linki do docs/index.html</pre>
+
+  <h2><span class="n">2</span> <code>app/</code> — kod</h2>
+  <table>
+    <thead><tr><th style="width:22%">Folder/plik</th><th>Co jest</th></tr></thead>
+    <tbody>
+      <tr><td><code>config/</code></td><td>Konfiguracja firmy — edytowalna bez zmiany kodu. <code>approval_policy.yaml</code> (klasy ryzyka), <code>tool_contracts.yaml</code> (allowlisty), <code>models.yaml</code>/<code>model_tiers.yaml</code> (rejestr modeli), <code>validation_gate.yaml</code>, <code>schedule.yaml</code>.</td></tr>
+      <tr><td><code>kontekst/</code></td><td>Wiedza o firmie: <code>firma-podstawy.md</code>, <code>marka-*.md</code>, <code>projekty/*.md</code>, <code>persony/&lt;marka&gt;/*.md</code> (buyer persony). Patrz <a href="kontekst-firmy.html">Kontekst firmy</a>, <a href="buyer-persony.html">Buyer persony</a>.</td></tr>
+      <tr><td><code>persony_botow/</code></td><td>Persony BOTÓW (jak mają oceniać) — dziś pusty (jedyna persona, odbioru biznesowego, usunięta razem z tym botem 22.08.2026). Miejsce na przyszłe persony botów. Nie mylić z <code>kontekst/persony/</code> (buyer persony klientów) — nazwy rozdzielone po realnej kolizji.</td></tr>
+      <tr><td><code>skills/</code></td><td>Wiedza "jak dobrze użyć" danego źródła/integracji, np. <code>web_research_operations.yaml</code> (per-hosta wskazówki dla web_answer).</td></tr>
+      <tr><td><code>inbox/zadania.txt</code></td><td>Notatnik zadań (lokalna ścieżka, patrz <a href="zadania-i-zrodla.html">Skąd zadania</a>).</td></tr>
+      <tr><td><code>mock_data/</code></td><td>Dane testowe (przykładowy PBIP, przykładowe zadania) do pracy bez żywych kluczy.</td></tr>
+      <tr><td><code>templates/email/</code></td><td>Szablony maili (<code>.md</code>) do <code>email_draft_generator.py</code>.</td></tr>
+      <tr><td><code>secrets/</code> <span class="tag warn">poza gitem</span></td><td><code>.env</code> + <code>mcp/*.json</code> — klucze i tokeny. Nigdy w repo.</td></tr>
+      <tr><td><code>runs/</code> <span class="tag warn">poza gitem</span></td><td>Stan lokalny: <code>state.db</code>, <code>run_history.jsonl</code>, heartbeat, zrzuty, pobrana treść z internetu (<code>runs/web/</code>).</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">Rdzeń pipeline'u</h3>
+  <table>
+    <tbody>
+      <tr><td style="width:26%"><code>runner_loop.py</code></td><td>Główna pętla: klasyfikacja → routing → wykonanie → poprawka → bramka → eskalacja/zamknięcie.</td></tr>
+      <tr><td><code>executor.py</code></td><td>Rozpoznaje typ zadania i woła właściwego workera (PBIP, web fetch, MailerLite, Zanfia).</td></tr>
+      <tr><td><code>task_thinker.py</code></td><td>Wołanie modelu (Claude Code → SDK → Ollama), z poziomem z <code>model_registry.py</code>.</td></tr>
+      <tr><td><code>tool_registry.py</code></td><td>Kontrakt uprawnień — allowlisty plików i domen.</td></tr>
+      <tr><td><code>model_registry.py</code></td><td>Rejestr modeli i poziomów (patrz <a href="modele-i-koszty.html">Modele i koszty</a>).</td></tr>
+      <tr><td><code>kontekst_firmy.py</code></td><td>Dobór wiedzy o marce/projekcie/personie do promptu.</td></tr>
+      <tr><td><code>poprawka_materialu.py</code></td><td>Nanoszenie zastrzeżeń bramki na materiał (pętla poprawek).</td></tr>
+      <tr><td><code>state_store.py</code></td><td>Zadania + dziennik decyzji w SQLite.</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">Workery i integracje</h3>
+  <table>
+    <tbody>
+      <tr><td style="width:26%"><code>web_fetch_worker.py</code></td><td>Pobranie HTTPS GET z allowlisty domen.</td></tr>
+      <tr><td><code>web_answer.py</code></td><td>Odpowiedź na zadanie na podstawie pobranej treści.</td></tr>
+      <tr><td><code>web_source_fixer.py</code></td><td>Samodzielna korekta/fallback adresu źródła.</td></tr>
+      <tr><td><code>pbip_validate.py</code> / <code>pbi_desktop_bridge.py</code></td><td>Walidacja struktury PBIP / otwarcie w Power BI Desktop i zrzut.</td></tr>
+      <tr><td><code>projectly_client.py</code></td><td>Realny + mock klient kolejki zadań Projectly.</td></tr>
+      <tr><td><code>integracje_worker.py</code></td><td>MailerLite (raporty kampanii) i Zanfia (zapytania kursowe przez MCP).</td></tr>
+      <tr><td><code>ad_copy_generator.py</code> / <code>email_draft_generator.py</code> / <code>mailerlite_report_analyzer.py</code> / <code>weekly_team_report.py</code> / <code>ocr_extract.py</code></td><td>Generatory treści (poziom modelu: niski).</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">Bramka jakości</h3>
+  <table>
+    <tbody>
+      <tr><td style="width:26%"><code>bot_gustaw_bramka.py</code></td><td>Orkiestrator — zbiera werdykty i wydaje decyzję bramki.</td></tr>
+      <tr><td><code>bot_bartek_dubler.py</code> / <code>bot_franek_funkcjonalny.py</code> / <code>bot_oskar_wizja.py</code></td><td>Regresja / testy funkcjonalne / ocena wizualna.</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">Dashboard, harmonogram, bezpieczniki</h3>
+  <table>
+    <tbody>
+      <tr><td style="width:26%"><code>job_scheduler.py</code></td><td>Centralny scheduler skryptów cyklicznych, stan w <code>runs/scheduler_status.json</code>.</td></tr>
+      <tr><td><code>dashboard.py</code> / <code>dashboard.html</code></td><td>Panel operatora na localhoście, patrz <a href="panel-operatora.html">Panel operatora</a>.</td></tr>
+      <tr><td><code>kill_switch.py</code> / <code>cost_tracker.py</code> / <code>cost_estimator.py</code></td><td>Bezpieczniki: STOP awaryjny, dzienny limit kosztu, wycena wywołania modelu.</td></tr>
+      <tr><td><code>self_check.py</code></td><td>Uruchamia wszystkie <code>*_smoke_test.py</code> — bramka jakości KODU (nie zadań).</td></tr>
+    </tbody>
+  </table>
+
+  <div class="foot">Wirtualny Pracownik AI — dokumentacja. <a href="jak-edytowac.html">Jak edytować tę dokumentację</a> · <a href="stan-i-roadmapa.html">Stan i roadmapa →</a></div>
+</div>
+</body>
+</html>

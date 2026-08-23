@@ -111,7 +111,7 @@ $text = $lines -join "`r`n"
 Write-Host $text
 
 if (-not $OutFile) {
-    $OutFile = Join-Path (Split-Path $PSScriptRoot -Parent) "instalacja\STAN-SRODOWISKA.txt"
+    $OutFile = Join-Path (Split-Path $PSScriptRoot -Parent) "STAN-SRODOWISKA.txt"
 }
 New-Item -ItemType Directory -Path (Split-Path $OutFile) -Force | Out-Null
 Set-Content -Path $OutFile -Value $text -Encoding UTF8

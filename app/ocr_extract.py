@@ -19,6 +19,7 @@ import re
 from pathlib import Path
 
 import env_bootstrap  # noqa: F401  # wczytuje .env / secrets/.env przed odczytem kluczy
+import model_registry
 
 DEFAULT_LANG = os.environ.get("OCR_LANG", "pol+eng")
 _ANTHROPIC_OCR_PROMPT = (
@@ -47,8 +48,9 @@ def _ocr_anthropic(path):
     media_type = mimetypes.guess_type(str(path))[0] or "image/png"
     image_b64 = base64.standard_b64encode(Path(path).read_bytes()).decode("utf-8")
     client = anthropic.Anthropic()
+    _, model = model_registry.resolve("ocr_extract.extract")
     response = client.messages.create(
-        model="claude-sonnet-4-6",
+        model=model,
         max_tokens=1500,
         messages=[{
             "role": "user",

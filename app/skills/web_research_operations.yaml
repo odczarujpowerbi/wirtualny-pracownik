@@ -1,0 +1,89 @@
+# Skill: web_research_operations — WIEDZA, jak dobrze korzystać z każdego źródła
+# internetowego z allowlisty (hydraulika jest w web_fetch_worker.py, tu jest "jak").
+#
+# To jest konfiguracja firmy (SKALOWANIE.md sekcja 2): edytowalna bez zmiany kodu.
+# web_answer.py dokleja wskazówki pasujące do hosta źródła wprost do promptu, więc
+# każda reguła dopisana tutaj działa od następnego zadania — bez wdrożenia kodu.
+#
+# Każdy wpis to lekcja z realnego odrzucenia przez odbiór biznesowy, nie teoria.
+# UWAGA: wskazówki cytujemy pojedynczym apostrofem — bez tego dwukropek w zdaniu
+# wywraca parsowanie YAML, a skill po cichu przestaje działać (realnie napotkane).
+
+ogolne:
+  - 'Gdy dane obejmują kilka dni, pozycji albo notowań, wybierz DOKŁADNIE ten okres, o który pyta zadanie. Nigdy nie mieszaj dnia dzisiejszego z jutrzejszym w jednej odpowiedzi.'
+  - 'Nie podawaj większej dokładności niż mają dane. Prognoza pogody to "ok. 24 stopnie", nie "24,3 stopnia"; kursy walut podawaj dokładnie tak, jak publikuje NBP.'
+  - 'Jeśli odnosisz się do daty z danych, zapisz ją w formacie DD.MM.RRRR.'
+  - 'Nie nazywaj dnia tygodnia ("z czwartku 14.08"), chyba że nazwa dnia jest wprost w treści źródła. Licząc dzień tygodnia w pamięci łatwo się pomylić, a to jest błąd merytoryczny — sama data wystarczy.'
+  - 'Jeżeli zadanie dotyczy innego dnia niż dane, które masz, NIE podstawiaj najbliższego dnia. Zgłoś BRAK_ODPOWIEDZI_W_ZRODLE i napisz, jakiego dnia potrzebujesz.'
+  - 'Zawsze podawaj jednostkę przy liczbie — temperatura w stopniach Celsjusza jako "24°C", opady w milimetrach, kursy w złotych.'
+
+zrodla:
+  api.nbp.pl:
+    nazwa: 'Narodowy Bank Polski, tabela kursów średnich (A)'
+    # Adres API jest nieczytelny dla odbiorcy, a sam numer tabeli zmusza go do
+    # szukania — w stopce podajemy stronę, na której tabelę widać (uwaga odbioru).
+    link_publiczny: 'https://nbp.pl/statystyka-i-sprawozdawczosc/kursy/tabela-a/'
+    # Co znaczy blad z tego zrodla — komunikat dla czlowieka, nie kod HTTP.
+    bledy:
+      404: 'NBP nie opublikował tabeli na ten dzień. Tabela A powstaje tylko w dni robocze (soboty, niedziele i święta są bez notowań).'
+    # Gdy pytanie dotyczy dnia wolnego, zadanie NIE jest niemozliwe — bierzemy
+    # ostatnie opublikowane notowanie i mowimy wprost, z ktorego dnia pochodzi.
+    fallback_przy_bledzie:
+      404:
+        # UWAGA: "last/1" byłoby błędem — zwraca notowanie NAJNOWSZE (dzisiejsze),
+        # a nie ostatnie przed zamówioną datą. Dla pytania o 15.08 dałoby kurs
+        # z 20.08, czyli odpowiedź merytorycznie fałszywą. Dlatego pobieramy
+        # ZAKRES kończący się zamówioną datą i bierzemy z niego ostatnią pozycję.
+        tryb: zakres_dni_wstecz
+        dni: 10
+        wzorzec: '/rates/a/([a-z]{3})/(\d{4}-\d{2}-\d{2})/'
+        adnotacja: 'W zamówionym dniu NBP nie opublikował tabeli (dzień wolny). Dostajesz notowania z kilku dni je poprzedzających — weź OSTATNIE z nich, czyli najbliższe zamówionej dacie, i napisz wprost, z którego dnia pochodzi kurs.'
+    # Gdy wskazany adres dotyczy innej waluty niż zadanie, agent poprawia go sam
+    # zamiast odsylac zadanie do czlowieka (uwaga odbioru biznesowego przy JPY).
+    korekta_adresu:
+      wzorzec_zadania: '\b(EUR|USD|GBP|CHF|JPY|CZK|SEK|NOK|DKK|CAD|AUD|HUF|UAH)\b'
+      szablon: 'https://api.nbp.pl/api/exchangerates/rates/a/{dopasowanie}/?format=json'
+    wskazowki:
+      - 'Tabela A to kurs ŚREDNI — napisz to wprost, bo odbiorca musi wiedzieć, że to nie kurs kupna ani sprzedaży.'
+      - 'Podaj numer tabeli (pole "no") i datę notowania (pole "effectiveDate") — bez nich kursu nie da się zweryfikować w źródle.'
+      - 'Tabela jest publikowana w dni robocze około 12:15. Jeżeli data notowania jest wcześniejsza niż dzisiejsza, to jest ostatnie dostępne notowanie, nie błąd.'
+      - 'Nigdy nie doradzaj, do czego kurs zastosować (faktury, VAT, umowy) — do rozliczeń stosuje się inne kursy niż bieżący i to nie jest nasza decyzja.'
+      - 'Kurs jena (JPY) NBP publikuje za 100 jenów — napisz to wprost, inaczej wartość jest myląca.'
+      - 'Przepisuj kurs dokładnie tak, jak w tabeli, z czterema miejscami po przecinku (4,6250 zł, nie 4,625 zł) — obcięte zero wygląda na niedokładność.'
+      - 'Pisz jednostkę wprost w formie "1 CHF = 4,6250 zł" — w materiale dla klienta sama liczba jest niejednoznaczna.'
+
+  api.open-meteo.com:
+    nazwa: 'Open-Meteo, publiczne dane pogodowe'
+    link_publiczny: 'https://open-meteo.com/'
+    bledy:
+      400: 'Serwis pogodowy odrzucił zapytanie — zwykle znaczy to błędne współrzędne albo nazwę parametru prognozy.'
+    wskazowki:
+      - 'Odpowiedź zawiera tablicę dni ("daily.time") — weź pozycję odpowiadającą dacie z zadania, zwykle pierwszą, i nie opisuj kolejnych dni.'
+      - 'Podawaj temperaturę maksymalną RAZEM z minimalną. Jedna liczba nie opisuje dnia.'
+      - 'Jeśli w danych są opady ("precipitation_sum"), zawsze o nich napisz — to pierwsza rzecz, o którą pyta odbiorca po temperaturze.'
+      - 'Zaokrąglaj temperatury do pełnych stopni.'
+
+  pl.wikipedia.org:
+    nazwa: 'Wikipedia (wersja polska)'
+    wskazowki:
+      - 'Streszczenie z API to kilka zdań wstępu, nie całe hasło — pisz z niego zwięźle i nie udawaj, że masz pełny artykuł.'
+      - 'Przy materiale dla klienta pisz własnymi słowami. Kalka encyklopedyczna typu "zbiorcza nazwa dla szeregu aplikacji i usług" brzmi ciężko i bywa odrzucana.'
+      - 'Streszczenia haseł o produktach IT zwykle NIE opisują zastosowań (raporty, pulpity, udostępnianie w firmie). Jeśli zadanie pyta "do czego służy", a w treści tego nie ma, zwróć BRAK_ODPOWIEDZI_W_ZRODLE zamiast domyślać się — właściwym źródłem jest wtedy dokumentacja producenta.'
+      - 'Nie pisz, że produkt "działa w chmurze", jeśli treść tego nie precyzuje — część narzędzi ma aplikacje instalowane lokalnie i taki skrót wprowadza w błąd.'
+
+  en.wikipedia.org:
+    nazwa: 'Wikipedia (wersja angielska)'
+    wskazowki:
+      - 'Treść jest po angielsku, a materiał ma być po polsku — tłumacz, nie cytuj.'
+      - 'Sprawdź, czy artykuł faktycznie dotyczy tematu z zadania. Streszczenie potrafi wskazać stronę zbiorczą (listę produktów) zamiast szukanego hasła.'
+
+  learn.microsoft.com:
+    nazwa: 'Microsoft Learn, dokumentacja produktowa'
+    wskazowki:
+      - 'Dokumentacja jest pisana dla wdrożeniowców. Odbiorca biznesowy potrzebuje tłumaczenia na korzyść — co dzięki temu policzy albo zobaczy w raporcie.'
+      - 'Nie przenoś przykładów kodu ani angielskich nazw funkcji do materiału po polsku.'
+
+  powerbi.microsoft.com:
+    nazwa: 'Microsoft, blog produktowy Power BI'
+    wskazowki:
+      - 'To źródło marketingowe producenta — oddzielaj zapowiedzi ("wkrótce") od funkcji już dostępnych i pisz, co jest czym.'

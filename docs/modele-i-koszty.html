@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wirtualny Pracownik AI — modele i koszty</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <p class="kicker">Dokumentacja projektu</p>
+  <h1>Modele i koszty</h1>
+  <p>Który model kiedy, skąd bierze się ta decyzja, i jak liczony jest koszt — jedno miejsce w kodzie, jedna tabela konfiguracyjna, żadnych zaszytych nazw modeli w 11 różnych plikach.</p>
+</header>
+<div class="wrap">
+  <div class="sitenav">
+    <a href="index.html">Start</a><span class="sep">·</span>
+    <a href="architektura.html">Architektura</a><span class="sep">·</span>
+    <a href="przeplyw-zadania.html">Przepływ zadania</a><span class="sep">·</span>
+    <a href="boty-i-persony.html">Boty i persony</a><span class="sep">·</span>
+    <a href="buyer-persony.html">Buyer persony</a><span class="sep">·</span>
+    <a href="kontekst-firmy.html">Kontekst firmy</a><span class="sep">·</span>
+    <a href="modele-i-koszty.html" class="current">Modele i koszty</a><span class="sep">·</span>
+    <a href="bezpieczenstwo.html">Bezpieczeństwo</a><span class="sep">·</span>
+    <a href="panel-operatora.html">Panel operatora</a><span class="sep">·</span>
+    <a href="zadania-i-zrodla.html">Skąd zadania</a><span class="sep">·</span>
+    <a href="instalacja.html">Instalacja</a><span class="sep">·</span>
+    <a href="mapa-plikow.html">Mapa plików</a><span class="sep">·</span>
+    <a href="stan-i-roadmapa.html">Stan i roadmapa</a>
+  </div>
+
+  <h2><span class="n">1</span> Zasada: dwa poziomy modelu</h2>
+  <div class="card">
+    <p><b>Wysoki poziom (Opus 5)</b> — tam, gdzie liczy się rozumowanie i osąd: analiza zadania, odbiór biznesowy, ocena zrzutu ekranu. Subtelny błąd tu jest kosztowny (np. przepuszczenie wymyślonej cechy oferty klientowi).</p>
+    <p><b>Niski poziom (Sonnet 4.6)</b> — mechaniczne wykonanie dobrze opisanego zadania z jasnym rezultatem: pisanie treści z gotowych danych wg reguł, naniesienie konkretnej listy poprawek, generowanie tekstu reklamowego. Mało przestrzeni na błąd, bo zadanie jest już precyzyjnie opisane.</p>
+    <div class="callout"><b>Decyzja właściciela (21.08.2026):</b> "model sterujący" zostaje na najmocniejszym modelu; "wykonawca", który dostał proste, dobrze opisane zadanie z oczekiwanym rezultatem, może być na słabszym. Decyzja o tym, co jest czym, ma być w KONFIGU, nie zaszyta w kodzie.</div>
+  </div>
+
+  <h2><span class="n">2</span> Dwa pliki konfiguracyjne — jedno źródło prawdy</h2>
+  <table>
+    <thead><tr><th style="width:26%">Plik</th><th>Co zawiera</th></tr></thead>
+    <tbody>
+      <tr><td><code>config/models.yaml</code></td><td>Jakie modele istnieją, ich ID (<code>claude-opus-5</code>, <code>claude-sonnet-4-6</code>...) i cennik (USD/milion tokenów). Plus szkielet OpenRouter (zadeklarowany, bez działającego klienta).</td></tr>
+      <tr><td><code>config/model_tiers.yaml</code></td><td>Który "caller" (identyfikator wywołania w kodzie, np. <code>web_answer.answer</code>) używa którego poziomu (<code>high</code>/<code>low</code>), i który model odpowiada każdemu poziomowi.</td></tr>
+    </tbody>
+  </table>
+  <div class="card">
+    <p><b>Fail-closed w obie strony:</b> nieznany caller w tabeli tiers → poziom <code>high</code> (lepiej przepłacić niż przepuścić błędny materiał na słabszym modelu). Nieznany tier/rola → <code>opus_5</code>.</p>
+  </div>
+
+  <h2><span class="n">3</span> Aktualny cennik (USD za milion tokenów)</h2>
+  <table>
+    <thead><tr><th>Model</th><th>ID</th><th>Input</th><th>Output</th></tr></thead>
+    <tbody>
+      <tr><td>Opus 5</td><td><code>claude-opus-5</code></td><td>5.00</td><td>25.00</td></tr>
+      <tr><td>Opus 4.8</td><td><code>claude-opus-4-8</code></td><td>5.00</td><td>25.00</td></tr>
+      <tr><td>Sonnet 5</td><td><code>claude-sonnet-5</code></td><td>3.00</td><td>15.00</td></tr>
+      <tr><td>Sonnet 4.6</td><td><code>claude-sonnet-4-6</code></td><td>3.00</td><td>15.00</td></tr>
+      <tr><td>Haiku 4.5</td><td><code>claude-haiku-4-5</code></td><td>1.00</td><td>5.00</td></tr>
+    </tbody>
+  </table>
+  <div class="callout warnc"><b>Nie istnieje:</b> "Sonnet 4.8" — zweryfikowane na żywo w tej sesji (<code>claude --model sonnet-4-8</code> → błąd "unrecognized model"). Częsta pomyłka z Sonnet 4.6, który realnie istnieje i działa.</div>
+
+  <h2><span class="n">4</span> Kto jest na jakim poziomie (11 miejsc)</h2>
+  <table>
+    <thead><tr><th style="width:30%">Miejsce w kodzie</th><th>Rola</th><th style="width:12%">Poziom</th></tr></thead>
+    <tbody>
+      <tr><td><code>task_thinker.think</code></td><td>Analiza zadania (co rozumiem / plan / ryzyka / rekomendacja)</td><td><span class="tag err">high</span></td></tr>
+      <tr><td><code>bot_oskar_wizja.review</code></td><td>Ocena zrzutu ekranu w bramce jakości</td><td><span class="tag err">high</span> ⬆</td></tr>
+      <tr><td><code>validators.visual_review</code></td><td>Ocena zrzutu względem oczekiwanego rezultatu</td><td><span class="tag err">high</span> ⬆</td></tr>
+      <tr><td><code>web_answer.answer</code></td><td>Pisanie treści z pobranych danych wg reguł</td><td><span class="tag ok">low</span></td></tr>
+      <tr><td><code>poprawka_materialu.popraw</code></td><td>Naniesienie listy zastrzeżeń na materiał</td><td><span class="tag ok">low</span></td></tr>
+      <tr><td><code>ad_copy_generator.generate</code></td><td>Warianty tekstu reklamowego z briefu</td><td><span class="tag ok">low</span></td></tr>
+      <tr><td><code>email_draft_generator.generate</code></td><td>Draft maila z szablonu</td><td><span class="tag ok">low</span></td></tr>
+      <tr><td><code>mailerlite_report_analyzer.analyze</code></td><td>Statystyki i ocena tonu kampanii</td><td><span class="tag ok">low</span></td></tr>
+      <tr><td><code>ocr_extract.extract</code></td><td>Odczyt liczb ze zrzutu ekranu</td><td><span class="tag ok">low</span></td></tr>
+      <tr><td><code>weekly_team_report.generate</code></td><td>Synteza raportu tygodniowego</td><td><span class="tag ok">low</span></td></tr>
+    </tbody>
+  </table>
+  <p class="lead">⬆ = świadomie podniesione z Sonnet 4.5 na wysoki poziom (ocena zrzutu to osąd, wymaga pewności na cyfrach/detalach) — potwierdzone z właścicielem, nie efekt uboczny migracji.</p>
+
+  <h2><span class="n">5</span> Rejestr w kodzie — <code>model_registry.py</code></h2>
+  <div class="card">
+    <pre>tier_for_caller(caller)      -> "high" | "low"      (fail-closed: "high")
+role_for_tier(tier)          -> "opus_5" | "sonnet_4_6"  (fail-closed: "opus_5")
+model_id(role)               -> "claude-opus-5" ...
+pricing(role)                -> (input_per_million, output_per_million)
+resolve(caller)              -> (role, model_id)   — cała ścieżka w jednym wywołaniu</pre>
+    <p>Wzorzec identyczny do <code>tool_registry.py</code>/<code>skill_registry.py</code>: konfiguracja YAML jest źródłem prawdy, kod tylko odczytuje. Zmiana modelu na nowszy = edycja <code>config/models.yaml</code>, nie kodu.</p>
+  </div>
+
+  <h2><span class="n">6</span> Jak liczony jest koszt</h2>
+  <div class="card">
+    <p><code>cost_estimator.py</code> ma dwie ścieżki: <b>Claude Code</b> (subskrypcja) liczy stały proxy per wywołanie — to bezpiecznik <b>wolumenu</b>, nie faktura (subskrypcja nie ma ceny per token). <b>SDK anthropic</b> liczy realnie wg cennika roli z <code>model_registry.pricing(role)</code>.</p>
+    <div class="callout errc"><b>Znaleziony i naprawiony błąd:</b> przed tą zmianą koszt SDK liczył się ZAWSZE wg cennika Opusa, i to złego — stałe $15/$75 za milion tokenów, <b>3× więcej</b> niż prawdziwa cena Opusa 5/4.8 ($5/$25). Koszt SDK był systematycznie zawyżany, niezależnie od realnie użytego modelu.</div>
+    <p>Dzienny limit kosztu: <code>config/daily_cost_limit_usd.txt</code> (dziś: 3000 USD, decyzja właściciela 21.08.2026 — patrz <a href="bezpieczenstwo.html">Bezpieczeństwo</a>). Po przekroczeniu: <code>kill_switch</code> zatrzymuje pętlę.</p>
+  </div>
+
+  <h2><span class="n">7</span> Poza zakresem (świadomie)</h2>
+  <div class="card">
+    <p>OpenRouter jest zadeklarowany w <code>config/models.yaml</code> (sekcja <code>openrouter</code>) i w <code>.env.example</code> (<code>OPENROUTER_API_KEY</code>), ale <b>nie ma jeszcze działającego klienta w kodzie</b> — <code>secrets_audit.py</code> jawnie oznacza go jako <code>DECLARED_NOT_USED</code>. Przeznaczenie z planu: obraz, głos, transkrypcja — tam, gdzie Anthropic jest słabszy.</p>
+  </div>
+
+  <div class="foot">Wirtualny Pracownik AI — dokumentacja. <a href="jak-edytowac.html">Jak edytować tę dokumentację</a> · <a href="bezpieczenstwo.html">Bezpieczeństwo</a></div>
+</div>
+</body>
+</html>

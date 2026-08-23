@@ -29,6 +29,7 @@ import cost_tracker
 import executor
 import heartbeat
 import kill_switch
+import poprawka_materialu
 import live_status_publisher
 import risk_classifier
 import risk_hint
@@ -90,7 +91,10 @@ def _process_task_core(task, policy, routing, client):
     # inaczej akcje czerwone (wysyłka/budżet/publikacja) nie byłyby rozpoznane.
     hint = task.get("risk_level_hint")
     if not hint or hint == "yellow":
-        hint = risk_hint.hint_from_task(task)
+        # Rozpoznanie workera PRZED klasyfikacją: gdy zadanie obsłuży narzędzie
+        # czysto odczytowe, kolor bierze się z tej wiedzy, a nie ze słów w tytule
+        # ("zestawienie WYSYŁEK KAMPANII" to odczyt, choć brzmi jak wysyłka).
+        hint = risk_hint.hint_from_task(task, executor.rozpoznaj_narzedzie(task))
     action_type = HINT_TO_ACTION.get(hint, "report_build")
     risk = risk_classifier.classify(action_type, policy)
     owner, confident = task_router.route_task(task["title"], routing)
@@ -104,8 +108,8 @@ def _process_task_core(task, policy, routing, client):
     # Krok myślenia: model analizuje zadanie (Claude Code headless przez
     # `claude login`, albo SDK z ANTHROPIC_API_KEY jako fallback). Degraduje się
     # bez wywalania pętli, gdy model niedostępny (task_thinker.think).
-    # action_type trafia do zadania, żeby Bożena (odbiór biznesowy) dobrała
-    # właściwą warstwę kontekstu biznesowego per typ zadania.
+    # action_type trafia do zadania — task_brief_builder go czyta przy budowaniu
+    # briefu dla kroku myślenia.
     task["action_type"] = action_type
 
     thinking = task_thinker.think(task)
@@ -160,16 +164,32 @@ def _process_task_core(task, policy, routing, client):
 
     else:
         # Żółte ORAZ zielone z efektem (zrzut/plik/testy) przechodzą pełną bramkę
-        # jakości (Gustaw): Bartek, Franek, Oskar, Bożena — zanim człowiek dostanie
+        # jakości (Gustaw): Bartek, Franek, Oskar — zanim człowiek dostanie
         # odpowiedź jako gotową.
         gate = bot_gustaw_bramka.run_gate(task, execution_result)
         state_store.log_decision(
             task_id, agent="gustaw",
             decision="gate_passed" if gate["passed"] else "gate_failed",
             reason=gate["summary"], now=now_iso(), event_type="quality_gate")
+        # Zanim cokolwiek trafi do człowieka: nanieś uwagi samodzielnie. Zastrzeżenia
+        # bramki są konkretne ("brak jednostki", "miały być trzy zdania"), więc
+        # odsyłanie ich właścicielowi to przerzucanie na niego pracy agenta.
+        if not gate["passed"]:
+            gate, execution_result = _popraw_i_sprawdz_ponownie(task, execution_result, gate)
+
         if gate["passed"]:
             status, comment = "done", _comment_gate_passed(owner, gate)
             skill_usage_logger.log_usage(task_id, "quality_gate", "success", gate["summary"])
+        elif _zadanie_zle_postawione(execution_result, gate):
+            # Zadanie bez potrzebnych danych albo źle postawione. Zakładanie zadania
+            # "wymaga decyzji" nic tu nie wnosi — zamykamy z konkretnym feedbackiem,
+            # czego zabrakło, żeby właściciel mógł poprawić polecenie i wrzucić je
+            # jeszcze raz. Agent ma zdejmować pracę, nie dokładać jej.
+            reason = _gate_failure_reason(gate)
+            state_store.log_decision(task_id, agent="pawel", decision="zamkniete_z_feedbackiem",
+                                     reason=reason, now=now_iso(), event_type="escalation")
+            status, comment = "done", _comment_zamkniete_z_feedbackiem(owner, execution_result, gate)
+            skill_usage_logger.log_usage(task_id, "quality_gate", "failure", reason)
         else:
             reason = _gate_failure_reason(gate)
             escalate_to_human(task, reason, client, assignee=owner)
@@ -181,14 +201,47 @@ def _process_task_core(task, policy, routing, client):
     state_store.upsert_task(task_id, payload=task, status=status, assigned_to=owner, risk_level=risk, now=now_iso())
     state_store.record_event(task_id, "status_set", status, now_iso())
 
+    # Pochodzenie danych: metadane komentarza, nie część dostarczonego materiału.
+    source_note = execution_result.get("source_note")
+    if source_note:
+        comment += "\n\n📎 Źródło: " + source_note
+
     reasoning = execution_result.get("thinking", {}).get("reasoning")
     if reasoning:
         comment += "\n\n🧠 Analiza (Claude):\n" + reasoning
 
     client.post_comment(task_id, comment)
     client.update_status(task_id, status)
+    _zapisz_feedback(client, task_id, status, execution_result, risk)
 
     return {"task_id": task_id, "risk": risk, "owner": owner, "status": status}
+
+
+def _zapisz_feedback(client, task_id, status, execution_result, risk):
+    """Samoocena agenta w polu `feedback` zadania (MCP update_task) — po to, żeby
+    człowiek widział W ZADANIU, czym się skończyła praca, bez czytania całego
+    wątku komentarzy. Zapisujemy zwięźle: co użyto, ile kosztowało, jaki wynik.
+
+    Feedback to pole informacyjne, więc jego brak nie może wywrócić przebiegu —
+    klient bez tej metody (starszy mock) albo błąd MCP są łapane."""
+    zapis = getattr(client, "set_task_feedback", None)
+    if not callable(zapis):
+        return False
+
+    narzedzie = execution_result.get("tool") or "brak workera"
+    koszt = execution_result.get("cost_usd", 0.0)
+    opis = {
+        "done": "Wykonane i przyjęte przez bramkę jakości.",
+        "needs_approval": "Wykonane, ale bramka jakości nie przepuściła — czeka na decyzję człowieka.",
+    }.get(status, f"Status: {status}.")
+    tresc = f"[agent] {opis} Narzędzie: {narzedzie}. Ryzyko: {risk}. Koszt modelu: {koszt:.2f} USD."
+    try:
+        zapis(task_id, feedback=tresc)
+        return True
+    except Exception as exc:  # noqa: BLE001 — feedback jest dodatkiem, nie może ubić przebiegu
+        state_store.log_decision(task_id, agent="pawel", decision="feedback_failed",
+                                 reason=f"Nie udało się zapisać feedbacku: {exc}", now=now_iso())
+        return False
 
 
 def _has_effect(execution_result):
@@ -213,6 +266,79 @@ def _comment_escalated(owner, reason):
     return f"⚠️ needs_approval\nWymaga decyzji: tak — {reason}\nUtworzono osobne zadanie dla: {owner}\n"
 
 
+MAX_POPRAWEK = 2
+
+# Zwroty, po których poznajemy, że problemem jest ZADANIE, a nie redakcja materiału.
+# Przy nich poprawka nic nie da, bo brakuje danych albo polecenie jest niejasne.
+_SYGNALY_ZLEGO_ZADANIA = (
+    "nie wykonano", "brak zamówionego elementu", "źródło nie zawiera",
+    "nie da się", "potrzebuję źródła", "nie odpowiada na zadanie",
+)
+
+
+def _popraw_i_sprawdz_ponownie(task, execution_result, gate):
+    """Nanosi zastrzeżenia bramki na materiał i puszcza go przez bramkę jeszcze raz.
+
+    Zwraca (gate, execution_result) — po poprawce albo bez zmian, gdy poprawka się
+    nie udała. Limit prób jest twardy: po MAX_POPRAWEK zadanie idzie dalej swoją
+    ścieżką, żeby agent nie kręcił się w kółko na materiale, którego nie umie
+    naprawić."""
+    for proba in range(1, MAX_POPRAWEK + 1):
+        uwagi = gate.get("concerns") or []
+        material = execution_result.get("acceptance_notes") or ""
+        if not uwagi or not material or _zadanie_zle_postawione(execution_result, gate):
+            return gate, execution_result
+
+        wynik = poprawka_materialu.popraw(
+            material, uwagi,
+            zadanie=" ".join(str(task.get(k) or "") for k in ("title", "description")))
+        if not wynik["available"]:
+            state_store.log_decision(task["task_id"], agent="patrycja", decision="poprawka_nieudana",
+                                     reason=wynik["powod"], now=now_iso(),
+                                     cost_usd=wynik.get("cost_usd", 0.0))
+            return gate, execution_result
+
+        execution_result = {**execution_result, "acceptance_notes": wynik["material"],
+                            "cost_usd": execution_result.get("cost_usd", 0.0) + wynik.get("cost_usd", 0.0)}
+        state_store.log_decision(
+            task["task_id"], agent="patrycja", decision=f"poprawka_{proba}",
+            reason="Naniesiono uwagi odbioru: " + "; ".join(uwagi)[:400],
+            now=now_iso(), event_type="execution", cost_usd=wynik.get("cost_usd", 0.0))
+
+        gate = bot_gustaw_bramka.run_gate(task, execution_result)
+        state_store.log_decision(
+            task["task_id"], agent="gustaw",
+            decision="gate_passed" if gate["passed"] else "gate_failed",
+            reason=f"po poprawce {proba}: {gate['summary']}", now=now_iso(), event_type="quality_gate")
+        if gate["passed"]:
+            break
+    return gate, execution_result
+
+
+def _zadanie_zle_postawione(execution_result, gate):
+    """Czy problem leży w ZADANIU (brak danych, niejasne polecenie), a nie w materiale.
+    Wtedy poprawka redakcyjna nic nie da i nie ma po co zakładać zadania dla człowieka —
+    wystarczy zamknąć z informacją, czego zabrakło."""
+    material = (execution_result.get("acceptance_notes") or "").lower()
+    if material.startswith("nie wykonano"):
+        return True
+    tekst = " ".join(str(c).lower() for c in (gate.get("concerns") or []))
+    return any(sygnal in tekst for sygnal in _SYGNALY_ZLEGO_ZADANIA)
+
+
+def _comment_zamkniete_z_feedbackiem(owner, execution_result, gate):
+    """Komentarz zamykający zadanie, którego nie da się wykonać w tej postaci.
+    Mówi wprost, czego zabrakło i co zrobić, żeby dało się je wykonać."""
+    braki = "\n".join(f"- {c}" for c in (gate.get("concerns") or [])) or "- (brak szczegółów)"
+    return (
+        "🔒 zamknięte z feedbackiem — zadania nie da się wykonać w tej postaci\n"
+        f"{execution_result.get('acceptance_notes') or ''}\n\n"
+        f"Czego zabrakło:\n{braki}\n\n"
+        "Nie zakładam osobnego zadania dla człowieka: popraw polecenie albo wskaż "
+        f"właściwe źródło i wrzuć je ponownie. Przypisane do: {owner}"
+    )
+
+
 def _gate_failure_reason(gate):
     concerns = "; ".join(gate["concerns"]) or "brak szczegółów"
     return f"Bramka jakości nie przepuściła zadania. {gate['summary']} Zastrzeżenia: {concerns}"
@@ -224,6 +350,15 @@ def run_once(client=None):
         return []
     if control.is_paused():
         print(f"PAUSE ({control.pause_reason()}) — runner nie podejmuje nowej pracy.")
+        return []
+
+    budget = cost_tracker.budget_state()
+    if budget["level"] != "ok":
+        print(
+            f"Budżet dobowy: {budget['level']} ({budget['percent']}%, "
+            f"{budget['total']:.2f}/{budget['limit']:.2f} USD) — runner nie podejmuje nowej pracy."
+        )
+        heartbeat.write_heartbeat(current_task_id=None, extra={"budget": budget})
         return []
 
     policy = risk_classifier.load_policy()
@@ -241,15 +376,15 @@ def run_once(client=None):
         heartbeat.write_heartbeat(current_task_id=task["task_id"])
         results.append(process_task(task, policy, routing, client))
 
-    heartbeat.write_heartbeat(current_task_id=None)
+    budget = cost_tracker.budget_state()
+    heartbeat.write_heartbeat(current_task_id=None, extra={"budget": budget})
     live_status_publisher.publish(client, role="dev")
 
-    daily_cost = cost_tracker.check_daily_limit()
-    if daily_cost["over_limit"]:
-        kill_switch.activate(
-            f"Przekroczono dzienny limit kosztu: {daily_cost['total']} > {daily_cost['limit']} USD."
+    if budget["level"] != "ok":
+        print(
+            f"UWAGA: budżet dobowy {budget['level']} ({budget['percent']}%) — "
+            f"kolejny przebieg nie zacznie nowych zadań, dopóki się nie odnowi."
         )
-        print("UWAGA: przekroczono dzienny limit kosztu, aktywowano kill switch.")
 
     return results
 

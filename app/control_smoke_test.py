@@ -18,6 +18,17 @@ def _isolate_flags():
     tmp = Path(tempfile.mkdtemp())
     control.PAUSE_FLAG_PATH = tmp / "PAUSE.flag"
     kill_switch.STOP_FLAG_PATH = tmp / "STOP.flag"
+    # should_run_new_work() dolicza budżet (cost_tracker.budget_state, żywa
+    # runs/state.db) — testy pause/stop mają sprawdzać TYLKO logikę pause/stop,
+    # więc budżet zaślepiamy na 'ok', żeby nie zależały od realnego kosztu
+    # nabitego na tej maszynie dzisiaj.
+    _stub_budget("ok")
+
+
+def _stub_budget(level, percent=0.0, total=0.0, limit=20.0):
+    control.cost_tracker.budget_state = lambda *a, **kw: {
+        "level": level, "total": total, "limit": limit, "percent": percent,
+    }
 
 
 def test_pause_resume():
@@ -49,6 +60,23 @@ def test_stop_priorytet_nad_pause():
     print("OK  STOP > PAUSE; start zdejmuje STOP, PAUSE zostaje aż do resume")
 
 
+def test_budget_blocks_new_work():
+    _isolate_flags()
+    assert control.state() == "running"
+    assert control.should_run_new_work() is True, "budżet 'ok' nie blokuje"
+
+    _stub_budget("warning", percent=93.0)
+    assert control.state() == "running", "warning nie zmienia stanu running/paused/stopped"
+    assert control.should_run_new_work() is False, "budżet 'warning' (92%+) musi wstrzymać nową pracę"
+
+    _stub_budget("exceeded", percent=104.0)
+    assert control.should_run_new_work() is False, "budżet 'exceeded' musi wstrzymać nową pracę"
+
+    _stub_budget("ok")
+    assert control.should_run_new_work() is True, "powrót do 'ok' odblokowuje bez ręcznego start"
+    print("OK  budżet warning/exceeded wstrzymuje nową pracę, 'ok' odblokowuje samoczynnie")
+
+
 def test_unknown_action():
     _isolate_flags()
     try:
@@ -63,5 +91,6 @@ def test_unknown_action():
 if __name__ == "__main__":
     test_pause_resume()
     test_stop_priorytet_nad_pause()
+    test_budget_blocks_new_work()
     test_unknown_action()
     print("\nWszystkie testy sterowania przeszły.")

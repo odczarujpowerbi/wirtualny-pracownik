@@ -3,146 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Wirtualny Pracownik AI — instrukcja instalacji i obsługi</title>
-<style>
-  :root{
-    --bg:#eef1f5; --card:#fff; --line:#dfe3ea; --ink:#1d2330; --muted:#657084;
-    --ok:#18A558; --warn:#E8A33D; --err:#E84040; --accent:#2b6cb0;
-    --ok-bg:#e6f6ee; --warn-bg:#fdf3e2; --err-bg:#fde8e8; --accent-bg:#eaf1fb;
-  }
-  *{box-sizing:border-box}
-  html,body{margin:0}
-  body{font-family:system-ui,"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.6}
-  header{background:linear-gradient(120deg,#171d29,#28324c);color:#fff;padding:28px 32px}
-  header h1{margin:0 0 6px;font-size:23px}
-  header p{margin:0;color:#c8cfdd;font-size:14.5px;max-width:940px}
-  .wrap{max-width:1000px;margin:0 auto;padding:26px 30px 90px}
-  h2{font-size:19px;margin:34px 0 6px;display:flex;align-items:center;gap:11px}
-  h2 .n{min-width:30px;height:30px;border-radius:8px;background:var(--accent);color:#fff;font-size:15px;
-        display:inline-flex;align-items:center;justify-content:center;flex:none}
-  h3{font-size:15.5px;margin:18px 0 6px}
-  p,li{font-size:14.5px}
-  .lead{color:var(--muted);margin:0 0 8px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin:12px 0}
-  ol.steps{counter-reset:s;list-style:none;padding:0;margin:0}
-  ol.steps>li{counter-increment:s;position:relative;padding:14px 16px 14px 56px;border:1px solid var(--line);
-        border-radius:11px;background:var(--card);margin:10px 0}
-  ol.steps>li::before{content:counter(s);position:absolute;left:14px;top:14px;width:30px;height:30px;border-radius:8px;
-        background:var(--accent);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center}
-  ol.steps>li h3{margin:0 0 5px}
-  code{background:#eef1f6;border-radius:4px;padding:1px 6px;font-size:13px}
-  pre{background:#0f1420;color:#e6e9ef;padding:13px 15px;border-radius:9px;overflow:auto;font-size:12.5px;line-height:1.5}
-  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:11px;overflow:hidden;font-size:13.8px;margin:10px 0}
-  th,td{text-align:left;padding:10px 13px;border-bottom:1px solid var(--line);vertical-align:top}
-  th{background:#f6f9fc;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
-  tr:last-child td{border-bottom:none}
-  .callout{background:var(--accent-bg);border:1px solid #cfe0f6;border-radius:11px;padding:13px 16px;font-size:14px;margin:12px 0}
-  .callout.warn{background:var(--warn-bg);border-color:#f0d9ac}
-  .callout.ok{background:var(--ok-bg);border-color:#bfe6cf}
-  b{color:#1d2330}
-  .foot{margin-top:40px;color:var(--muted);font-size:12.5px;text-align:center}
-  a{color:var(--accent)}
-</style>
+<meta http-equiv="refresh" content="0; url=instalacja.html">
+<title>Wirtualny Pracownik AI — przeniesione</title>
+<link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
-<header>
-  <h1>Wirtualny Pracownik AI — instrukcja</h1>
-  <p>Jak zainstalować i uruchomić narzędzie na nowej maszynie, co wpisać w dostępy i gdzie klikać. Po ludzku, w punktach. Pełny opis techniczny: <b>dokumentacja.html</b>. Mapa pokrycia celu: <b>przeplyw.html</b>.</p>
-</header>
-<div class="wrap">
-
-  <h2><span class="n">0</span> Czego potrzebujesz</h2>
-  <div class="card">
-    <ul>
-      <li><b>Maszyna:</b> Windows Server 2022 albo Windows 11 (dedykowana, włączona 24/7, stały internet).</li>
-      <li><b>Konto Microsoft 365 Business Standard</b> (do aktywacji Office i pracy w chmurze).</li>
-      <li><b>Subskrypcja Claude</b> (do logowania w Claude Code) oraz klucze: Projectly, opcjonalnie inne.</li>
-      <li><b>Uprawnienia administratora</b> na maszynie (część instalacji tego wymaga).</li>
-    </ul>
-  </div>
-
-  <h2><span class="n">1</span> Instalacja środowiska</h2>
-  <p class="lead">Instalacja jest <b>bezobsługowa</b> — uruchamiasz i możesz wrócić następnego dnia. Nie zatrzymuje się na logowaniach.</p>
-  <ol class="steps">
-    <li>
-      <h3>Pobierz projekt</h3>
-      <p><b>Maszyna zupełnie pusta</b> (bez repo, bez gita)? Otwórz <b>PowerShell jako administrator</b> i wklej jedną linię — pobierze gita, sklonuje repo i uruchomi cały instalator:</p>
-      <pre>$s="$env:TEMP\postaw.ps1"; irm https://raw.githubusercontent.com/odczarujpowerbi/wirtualny-pracownik/main/instalacja/skrypty/postaw-od-zera.ps1 -OutFile $s; powershell -ExecutionPolicy Bypass -File $s</pre>
-      <p>Jeśli repo już jest na maszynie — przejdź do kroku 2.</p>
-    </li>
-    <li>
-      <h3>Uruchom instalator</h3>
-      <p>Wejdź do folderu <code>instalacja</code>, kliknij prawym na <b>Przygotuj-srodowisko.bat</b> → <b>Uruchom jako administrator</b>.</p>
-      <p>Zainstaluje po kolei: Git, Python, Node.js, Claude Code, VS Code + rozszerzenie, Office, aplikacje (Power BI, Obsidian, Teams, Outlook, Chrome), Terminal + profile Claude, statuslinię limitów, modele lokalne, OneDrive, zależności, autostart 24/7, test i raport. <b>To potrwa</b> (Office i modele to kilka GB).</p>
-      <div class="callout">Każdy krok sprawdza, czy dana rzecz już jest — ponowne uruchomienie jest szybkie (pomija to, co zainstalowane).</div>
-    </li>
-  </ol>
-
-  <h2><span class="n">2</span> Wpisz dostępy (secrets)</h2>
-  <p class="lead">Sekrety nigdy nie trafiają do repozytorium. Leżą lokalnie w <code>app\secrets\</code>.</p>
-  <h3>Plik <code>app\secrets\.env</code> — klucze</h3>
-  <table>
-    <thead><tr><th style="width:32%">Klucz</th><th>Co wpisać / skąd</th></tr></thead>
-    <tbody>
-      <tr><td><code>ANTHROPIC_API_KEY</code></td><td>Klucz API Anthropic (opcjonalny, jeśli logujesz się subskrypcją przez <code>claude</code>). Główny model.</td></tr>
-      <tr><td><code>PROJECTLY_API_KEY</code></td><td>Klucz do Projectly (kolejka zadań). Bez niego agent działa w trybie mock (dane lokalne).</td></tr>
-      <tr><td><code>PROJECTLY_BASE_URL</code></td><td>Adres API Projectly (domyślny już wpisany).</td></tr>
-      <tr><td><code>MS_GRAPH_CLIENT_ID / SECRET / TENANT_ID / MAILBOX</code></td><td>Opcjonalnie — realna wysyłka maila przez Microsoft Graph (rejestracja aplikacji w Azure AD).</td></tr>
-      <tr><td><code>OLLAMA_HOST / OLLAMA_VISION_MODEL / OLLAMA_TEXT_MODEL</code></td><td>Opcjonalnie — modele lokalne (domyślnie <code>localhost:11434</code>).</td></tr>
-    </tbody>
-  </table>
-  <h3>Folder <code>app\secrets\mcp\*.json</code> — integracje MCP</h3>
-  <p>Po jednym pliku na integrację MCP: dziś <code>zoho_crm.json</code>, <code>projectly.json</code>, <code>zanfia_courses.json</code>. Uzupełnij w nich adres serwera/token wg konkretnej konfiguracji MCP.</p>
-  <div class="callout warn"><b>Google</b> nie ma jeszcze pliku w secrets — integracja Google Workspace nie jest zbudowana. Gdy powstanie, dojdzie tu service-account JSON. Na razie Google używasz przez przeglądarkę (krok 4).</div>
-
-  <h2><span class="n">3</span> Uruchom agenta</h2>
-  <div class="card">
-    <p>Agent startuje <b>sam</b> po zalogowaniu (autostart ustawia instalator). Ręcznie:</p>
-    <pre>cd app
-python job_scheduler.py        &lt;- pętla 24/7 (pobiera zadania, klasyfikuje, waliduje)
-python dashboard.py            &lt;- podgląd: http://127.0.0.1:8787/</pre>
-    <p>W dashboardzie (na localhoście) masz: pasek sterowania (Pauza / Stop), kondycję i limity Claude, formularz <b>Dodaj zadanie</b>, oraz widok <b>Zadania</b> z osią czasu decyzji każdego bota.</p>
-  </div>
-
-  <h2><span class="n">4</span> Zaloguj się na konta</h2>
-  <p class="lead">Osobny, szybki krok — <b>po</b> instalacji. Nie wszystko da się przez API, część idzie przez interfejs.</p>
-  <ol class="steps">
-    <li><h3>Uruchom <code>instalacja\Zaloguj.bat</code></h3><p>Przewodnik otworzy po kolei aplikacje/strony i zapyta, czy zalogowane.</p></li>
-  </ol>
-  <table>
-    <thead><tr><th>Konto</th><th>Po co</th></tr></thead>
-    <tbody>
-      <tr><td>Claude Code (<code>claude</code> w terminalu)</td><td>Napęd głównego modelu — <b>konieczne</b>, inaczej bramka jakości degraduje.</td></tr>
-      <tr><td>VS Code — chmurowe + personalne</td><td>Kodowanie z agentem, Settings Sync, GitHub.</td></tr>
-      <tr><td>Microsoft 365 + aktywacja Office</td><td>Mail/SharePoint/OneDrive; otwórz Excel/Word i zaloguj Business Standard, żeby aktywować licencję.</td></tr>
-      <tr><td>Gmail / Google</td><td>Praca przez interfejs Google.</td></tr>
-      <tr><td>Meta Business</td><td>Kampanie i zmiany przez panel Meta.</td></tr>
-      <tr><td>GitHub</td><td>Repozytoria stron internetowych.</td></tr>
-    </tbody>
-  </table>
-
-  <h2><span class="n">5</span> Aktualizacja i codzienne użycie</h2>
-  <div class="card">
-    <ul>
-      <li><b>Nowy kod z GitHub:</b> dwuklik <code>aktualizuj-repo.bat</code> w głównym folderze.</li>
-      <li><b>Podgląd pracy:</b> <code>python app\dashboard.py</code> → <a href="http://127.0.0.1:8787/">http://127.0.0.1:8787/</a>.</li>
-      <li><b>Zatrzymanie:</b> przycisk Stop w dashboardzie (albo Pauza — wstrzymuje bez utraty stanu).</li>
-      <li><b>Nowe zadanie bez Projectly:</b> formularz „Dodaj zadanie" w dashboardzie albo dopisz linię do <code>app\inbox\zadania.txt</code>.</li>
-    </ul>
-  </div>
-
-  <h2><span class="n">6</span> Gdy coś nie działa</h2>
-  <table>
-    <thead><tr><th style="width:38%">Objaw</th><th>Co zrobić</th></tr></thead>
-    <tbody>
-      <tr><td>Aplikacje / Terminal się nie zainstalowały</td><td>Na Windows Server często brak <b>winget</b>. Instalator próbuje go doinstalować; jeśli się nie uda — zainstaluj App Installer ze Sklepu albo aplikacje z bezpośrednich linków.</td></tr>
-      <tr><td><code>claude</code> nie działa w terminalu</td><td>Dodaj <code>C:\Users\&lt;user&gt;\.local\bin</code> do PATH i otwórz nowy terminal. Instalator wykrywa tę ścieżkę automatycznie.</td></tr>
-      <tr><td><code>git pull</code> zgłasza konflikt na <code>schedule.yaml</code></td><td>Jednorazowo: <code>git checkout -- app/config/schedule.yaml</code> potem <code>git pull</code>. Od kolejnego pobrania problem nie wraca (plik jest lokalny, w repo jest szablon).</td></tr>
-      <tr><td>Bramka jakości wszystko eskaluje</td><td>Sprawdź, czy jesteś zalogowany w <code>claude</code> — bez modelu odbiór biznesowy nie działa i wszystko idzie do człowieka (celowo, fail-closed).</td></tr>
-    </tbody>
-  </table>
-
-  <div class="foot">Wirtualny Pracownik AI. Instrukcja dla człowieka. Szczegóły techniczne: dokumentacja.html · Pokrycie celu i statusy: przeplyw.html</div>
+<div class="wrap" style="padding-top:60px">
+  <div class="callout">Ta strona przeniosła się do <a href="instalacja.html">instalacja.html</a> (część nowej,
+    wielostronicowej dokumentacji — patrz <a href="index.html">strona startowa</a>). Jeśli przekierowanie nie
+    zadziałało, kliknij link wyżej.</div>
 </div>
 </body>
 </html>

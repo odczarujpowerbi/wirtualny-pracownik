@@ -1,0 +1,39 @@
+# Rejestr modeli AI dla CAŁEGO projektu — jedno miejsce z aktualnymi ID modeli
+# i ich cennikiem. Zmiana modelu na nowszy = zmiana TU (pole "id"), nie w
+# kodzie. To jest konfiguracja firmy (SKALOWANIE.md sekcja 2), czytana przez
+# model_registry.py.
+#
+# Zrodlo cen: skill claude-api, cache 2026-06-24 (USD za milion tokenow).
+# Przy nastepnej aktualizacji cennika sprawdz go ponownie zamiast zgadywac.
+
+anthropic:
+  opus_5:
+    id: claude-opus-5
+    input_per_million: 5.00
+    output_per_million: 25.00
+  opus_4_8:
+    id: claude-opus-4-8
+    input_per_million: 5.00
+    output_per_million: 25.00
+  sonnet_5:
+    id: claude-sonnet-5
+    input_per_million: 3.00
+    output_per_million: 15.00
+  sonnet_4_6:
+    id: claude-sonnet-4-6
+    input_per_million: 3.00
+    output_per_million: 15.00
+  haiku_4_5:
+    id: claude-haiku-4-5
+    input_per_million: 1.00
+    output_per_million: 5.00
+
+# OpenRouter — zadeklarowane w .env.example (OPENROUTER_API_KEY), ale BEZ
+# dzialajacego klienta w kodzie (patrz secrets_audit.py: DECLARED_NOT_USED).
+# Przeznaczenie z docs/przeplyw.html: obraz, glos, transkrypcja — tam gdzie
+# Anthropic jest slabszy. Same role, bez wartosci — uzupelnic realnym ID
+# modelu, kiedy powstanie konektor. Nikt dzis tego nie odczytuje.
+openrouter:
+  image:
+  voice:
+  transcription:

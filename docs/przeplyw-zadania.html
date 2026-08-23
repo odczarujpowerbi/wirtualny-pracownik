@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wirtualny Pracownik AI — przepływ zadania</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <p class="kicker">Dokumentacja projektu</p>
+  <h1>Przepływ zadania</h1>
+  <p>Co się dzieje od momentu, gdy zadanie trafia do agenta, do statusu „done" albo eskalacji do człowieka — krok po kroku.</p>
+</header>
+<div class="wrap">
+  <div class="sitenav">
+    <a href="index.html">Start</a><span class="sep">·</span>
+    <a href="architektura.html">Architektura</a><span class="sep">·</span>
+    <a href="przeplyw-zadania.html" class="current">Przepływ zadania</a><span class="sep">·</span>
+    <a href="boty-i-persony.html">Boty i persony</a><span class="sep">·</span>
+    <a href="buyer-persony.html">Buyer persony</a><span class="sep">·</span>
+    <a href="kontekst-firmy.html">Kontekst firmy</a><span class="sep">·</span>
+    <a href="modele-i-koszty.html">Modele i koszty</a><span class="sep">·</span>
+    <a href="bezpieczenstwo.html">Bezpieczeństwo</a><span class="sep">·</span>
+    <a href="panel-operatora.html">Panel operatora</a><span class="sep">·</span>
+    <a href="zadania-i-zrodla.html">Skąd zadania</a><span class="sep">·</span>
+    <a href="instalacja.html">Instalacja</a><span class="sep">·</span>
+    <a href="mapa-plikow.html">Mapa plików</a><span class="sep">·</span>
+    <a href="stan-i-roadmapa.html">Stan i roadmapa</a>
+  </div>
+
+  <div class="card">
+    <pre>zadanie (Projectly / notatnik / dashboard)
+   │
+   ▼  kontrola treści (prompt injection?) ── wykryto → eskalacja
+   ▼  klasyfikacja ryzyka: zielone / żółte / czerwone            [decyzja: pawel]
+   ▼  routing do właściciela
+   ▼  wykonanie (executor) — tylko w granicach kontraktu          [decyzja: patrycja]
+   │      • zielone bez efektu → auto-done
+   │      • żółte / zielone z efektem → BRAMKA JAKOŚCI
+   ▼  bramka: Bartek(regresja) Franek(testy) Oskar(wizja)  [decyzja: gustaw]
+   │      • przeszło → done
+   │      • nie przeszło → PĘTLA POPRAWEK (nanieś zastrzeżenia, oceń ponownie, max 2 próby)
+   │           • poprawka pomogła → done
+   │           • zadanie źle postawione (brak danych) → zamknięte z feedbackiem, BEZ eskalacji
+   │           • poprawka się nie udała → eskalacja jako zadanie dla człowieka   [decyzja: pawel]
+   ▼  każdy krok → dziennik decyzji (state.db) → widok „Zadania"/„Przepływy" w dashboardzie</pre>
+    <p><b>Fail-closed:</b> przy niepewności agent nie wykonuje działania nieodwracalnego — zapisuje stan i eskaluje. Czerwone (publikacja, budżet, usunięcie danych) zawsze do człowieka.</p>
+  </div>
+
+  <h2><span class="n">1</span> Pętla poprawek — zanim człowiek zobaczy zadanie</h2>
+  <div class="card">
+    <p>Wcześniej każda wada, nawet drobna ("brak jednostki przy temperaturze"), kończyła zadanie statusem „wymaga decyzji" i zakładała właścicielowi nowe zadanie do rozpatrzenia — agent dokładał pracę zamiast ją zdejmować.</p>
+    <p>Dziś: gdy bramka nie przepuści materiału, <code>poprawka_materialu.py</code> nanosi zastrzeżenia bramki na materiał (bez dokładania nowych faktów) i <code>runner_loop._popraw_i_sprawdz_ponownie</code> puszcza go przez bramkę jeszcze raz — do 2 prób. Gdy problem leży w samym ZADANIU (brak danych, niejasne polecenie), zadanie zamyka się z konkretnym opisem, czego zabrakło, <b>bez</b> tworzenia zadania dla człowieka — właściciel poprawia polecenie i wrzuca je ponownie.</p>
+    <div class="callout"><b>Zweryfikowane na żywo:</b> notatka łącząca kurs waluty z prognozą pogody, odrzucana trzykrotnie z rzędu, po poprawkach przeszła bramkę. Zadanie ze złym adresem źródła zostało zamknięte z feedbackiem "Czego zabrakło: ..." bez zakładania zadania dla człowieka.</div>
+  </div>
+
+  <h2><span class="n">2</span> Realny worker: pobranie i napisanie treści z internetu</h2>
+  <div class="card">
+    <p><code>web_fetch_worker.py</code> — HTTPS GET, tylko hosty z allowlisty (<code>config/tool_contracts.yaml</code>), każde przekierowanie sprawdzane ponownie wobec allowlisty. <code>web_answer.py</code> domyka pętlę: samo pobranie danych to nie wykonanie zadania — model odpowiada na pytanie z tytułu zadania na podstawie treści (oznaczonej jako DANE, nie polecenia — obrona przed wstrzyknięciem instrukcji).</p>
+    <p><code>web_source_fixer.py</code> — samodzielna korekta adresu, gdy wskazane źródło nie zawiera odpowiedzi (np. inna waluta w tej samej tabeli NBP, albo dzień wolny → zakres dni kończący się zamówioną datą, nigdy "najnowsze notowanie").</p>
+  </div>
+
+  <h2><span class="n">3</span> Hierarchia metod wykonania</h2>
+  <p class="lead">Najstabilniejsza i najtańsza metoda, jaka wystarcza. Computer use dopiero, gdy nic innego nie działa.</p>
+  <table>
+    <thead><tr><th style="width:22%">Metoda</th><th>Stan</th><th>Opis</th></tr></thead>
+    <tbody>
+      <tr><td>1. API / MCP</td><td><span class="tag ok">działa</span></td><td>Projectly (realny klient + mock), MCP dla Zoho CRM/Zanfia. Najbardziej niezawodne, łatwe do audytu.</td></tr>
+      <tr><td>2. Pliki / CLI / skrypt</td><td><span class="tag ok">działa</span></td><td>Walidacja PBIP, pobieranie treści z internetu, generatory. Najbardziej dojrzała warstwa.</td></tr>
+      <tr><td>3. Przeglądarka (Playwright)</td><td><span class="tag err">plan</span></td><td>Zadania webowe wymagające klikania — <code>browser_worker.py</code> jeszcze nie istnieje.</td></tr>
+      <tr><td>4. Computer use</td><td><span class="tag err">plan</span></td><td>Klikanie po ekranie desktopowym poza przeglądarką. Substrat (zrzuty, okna, OCR, blokada UI) już zbudowany.</td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="n">4</span> Klasy ryzyka i człowiek w pętli</h2>
+  <table>
+    <thead><tr><th style="width:16%">Klasa</th><th style="width:40%">Przykłady</th><th>Zasada</th></tr></thead>
+    <tbody>
+      <tr><td><b>Zielona</b></td><td>Odczyt danych, zrzut, test, raport, draft pliku, pobranie ze allowlisty.</td><td>Automatycznie.</td></tr>
+      <tr><td><b>Żółta</b></td><td>Zmiana statusu, commit na gałęzi, wersja robocza, ograniczona korekta.</td><td>Automatycznie w granicach polityki, przez bramkę jakości.</td></tr>
+      <tr><td><b>Czerwona</b></td><td>Publikacja, zmiana budżetu, nadanie roli, masowa wiadomość, usunięcie danych.</td><td>Wymaga jawnej akceptacji człowieka.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="foot">Wirtualny Pracownik AI — dokumentacja. <a href="jak-edytowac.html">Jak edytować tę dokumentację</a> · <a href="boty-i-persony.html">Boty i persony →</a></div>
+</div>
+</body>
+</html>

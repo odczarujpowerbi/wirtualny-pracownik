@@ -11,8 +11,12 @@
 #   allowed_roots — katalogi (względem app/), w których narzędziu wolno operować
 #                   na plikach; ścieżka poza nimi = odmowa. Pomiń, gdy narzędzie
 #                   nie dotyka plików.
-#   params        — schemat parametrów: required (bool) + type (path/string/bool/number)
-#                   Parametr type=path jest sprawdzany wobec allowed_roots.
+#   allowed_domains — hosty, do których narzędziu wolno sięgnąć przez sieć (dokładnie
+#                   albo jako subdomena). Odpowiednik allowed_roots dla internetu;
+#                   brak wpisu = narzędzie nie może pobrać niczego.
+#   params        — schemat parametrów: required (bool) + type (path/url/string/bool/number)
+#                   Parametr type=path jest sprawdzany wobec allowed_roots,
+#                   type=url wobec allowed_domains (i musi być https).
 
 tools:
   validate_pbip:
@@ -36,6 +40,40 @@ tools:
         required: false
         type: path
 
+  fetch_url:
+    risk: green
+    description: >
+      Pobranie informacji ze strony/API przez HTTPS GET (read-only, bez wysyłania
+      danych). Allowlista hostów jest jedynym źródłem prawdy — dopisanie nowego
+      źródła to świadoma decyzja właściciela, nie decyzja modelu.
+    allowed_domains:
+      - api.nbp.pl                # kursy walut NBP (dane publiczne, stabilne API)
+      - pl.wikipedia.org          # kontekst merytoryczny (REST API i strony)
+      - en.wikipedia.org
+      - api.open-meteo.com        # pogoda (bez klucza API)
+      - learn.microsoft.com       # dokumentacja Power BI / Microsoft 365
+      - powerbi.microsoft.com     # blog i ogloszenia produktowe Power BI
+      # Wlasne strony firmy — zrodlo prawdy o ofercie, cenach i terminach.
+      - odczarujpowerbi.pl        # marka szkoleniowa (kursy, szkolenia, spolecznosc)
+      - powerbiday.com.pl         # konferencja Power BI Day
+      - clickless.pl              # marka wdrozeniowa (automatyzacje, raporty)
+    # Czytelne nazwy źródeł do stopki materiału dla odbiorcy — surowy adres API
+    # jest dla człowieka nieczytelny (uwaga z odbioru biznesowego).
+    source_names:
+      api.nbp.pl: Narodowy Bank Polski, tabela kursów średnich (A)
+      pl.wikipedia.org: Wikipedia (wersja polska)
+      en.wikipedia.org: Wikipedia (wersja angielska)
+      api.open-meteo.com: Open-Meteo, publiczne dane pogodowe
+      learn.microsoft.com: Microsoft Learn, dokumentacja produktowa
+      powerbi.microsoft.com: Microsoft, blog produktowy Power BI
+      odczarujpowerbi.pl: Odczaruj Power BI, strona marki szkoleniowej
+      powerbiday.com.pl: Power BI Day, strona konferencji
+      clickless.pl: Clickless, strona marki wdrozeniowej
+    params:
+      url:
+        required: true
+        type: url
+
   open_pbip_capture:
     risk: yellow
     description: Otwiera PBIP w Power BI Desktop i robi zrzut okna raportu (PBI-01, etap zrzutów).
@@ -46,3 +84,76 @@ tools:
       project_path:
         required: true
         type: path
+
+  mailerlite_report:
+    risk: green
+    description: >
+      Odczyt wysłanych kampanii i ich statystyk z MailerLite (GET po REST API,
+      bez żadnego zapisu). Samo zestawienie jest zielone — read-only. Tworzenie,
+      harmonogramowanie i wysyłka kampanii NIE jest tym narzędziem i pozostaje
+      czerwona w approval_policy.yaml (mass_email).
+    allowed_domains:
+      - connect.mailerlite.com
+    source_names:
+      connect.mailerlite.com: MailerLite, statystyki wysłanych kampanii
+    params:
+      od:
+        required: true
+        type: string      # data początku okresu (RRRR-MM-DD), rozwiązana przez period_resolver
+      do:
+        required: true
+        type: string      # data końca okresu (RRRR-MM-DD), włącznie
+
+  browser_task:
+    risk: yellow
+    description: >
+      Zadania webowe wymagające KLIKANIA/wypełniania (Playwright headless) — tam,
+      gdzie fetch_url (czyste GET) nie wystarcza. Kroki to zamknięty słownik
+      (goto/click/fill/wait_for_selector/screenshot), model nie dostaje dowolnego
+      JS ani powłoki. Wymaga: pip install playwright && playwright install chromium.
+      Zadania z profilem logowania (browser_profile) muszą TYLKO PRZEGLĄDAĆ —
+      żadnego klikania "wyślij/zapisz/opublikuj/usuń" na cudzym koncie (Meta Ads,
+      MailerLite) — rola workera to odczyt i zestawienie, nie edycja.
+    allowed_domains:
+      - dashboard.mailerlite.com   # panel MailerLite (rzeczy niedostepne przez API/MCP) — profil: mailerlite
+      - business.facebook.com      # Meta Ads Manager — WYLACZNIE przegladanie kampanii, bez edycji — profil: meta_ads
+      - adsmanager.facebook.com    # alternatywny adres Meta Ads Manager — profil: meta_ads
+      - podatki.gov.pl             # publiczna strona rzadowa (obejmuje www.podatki.gov.pl), bez logowania — test bezpiecznej nawigacji
+    # Nazwy profili logowania dozwolone dla browser_profile (executor.py
+    # odmawia nieznanej nazwy — nie tworzy cicho nowego, pustego profilu).
+    # Profil trzeba zalogowac RECZNIE: python browser_worker.py --login <profil> <adres>.
+    allowed_profiles: [mailerlite, meta_ads]
+    # Auto-dobor profilu logowania po hoscie adresu — zadania z Projectly nie
+    # maja pola na jawne ustawienie browser_profile (nie ma go w schemacie
+    # Projectly), wiec domena z tresci zadania jednoznacznie wskazuje profil.
+    profile_by_domain:
+      dashboard.mailerlite.com: mailerlite
+      business.facebook.com: meta_ads
+      adsmanager.facebook.com: meta_ads
+    params:
+      url:
+        required: true
+        type: url
+      browser_profile:
+        required: false
+        type: string
+
+  zanfia_query:
+    risk: green
+    description: >
+      Odczyt danych z platformy kursów zanfia.com przez MCP. Narzędzia MCP
+      serwera są odkrywane w locie (tools/list), ale wywołać wolno WYŁĄCZNIE
+      odczytowe — zanfia_client.py odrzuca każdą nazwę z czasownikiem zapisu
+      niezależnie od uprawnień tokenu.
+    allowed_domains:
+      - app.zanfia.com
+      - zanfia.com
+    source_names:
+      app.zanfia.com: Zanfia, platforma sprzedaży kursów online
+    params:
+      od:
+        required: true
+        type: string
+      do:
+        required: true
+        type: string

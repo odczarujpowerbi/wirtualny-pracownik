@@ -32,6 +32,7 @@ import urllib.request
 from pathlib import Path
 
 import env_bootstrap  # noqa: F401  # wczytuje .env / secrets/.env przed odczytem kluczy
+import model_registry
 import ocr_extract
 from bot_common import verdict
 
@@ -88,8 +89,11 @@ def _ask_anthropic_vision(prompt, image_b64, media_type):
         return None
     try:
         client = anthropic.Anthropic()
+        # Ocena zrzutu ekranu to osad (podobny profil ryzyka do Bożeny), więc
+        # config/model_tiers.yaml przypisuje temu callerowi wysoki poziom.
+        _, model = model_registry.resolve("bot_oskar_wizja.review")
         response = client.messages.create(
-            model="claude-sonnet-4-5",
+            model=model,
             max_tokens=300,
             messages=[{
                 "role": "user",
@@ -142,10 +146,22 @@ def review(task, execution_result, config=None):
     screenshot_path = execution_result.get("screenshot_path")
 
     if not screenshot_path:
+        # Brak zrzutu jest zastrzeżeniem TYLKO tam, gdzie efekt miał być wizualny.
+        # Przy zadaniu tekstowym (pobrane dane, walidacja pliku) zgłaszanie tego
+        # jako zastrzeżenia zaniżało ocenę odbioru biznesowego przy każdym takim
+        # zadaniu — realnie obserwowane na przebiegach zadań internetowych.
+        tool = (execution_result.get("tool") or "").lower()
+        visual_tools = [str(t).lower() for t in config.get("visual_tools",
+                                                           ["capture_screenshot", "open_pbip_capture"])]
+        if tool in visual_tools:
+            return verdict(
+                BOT, "skipped", 0.3,
+                "Brak zrzutu ekranu efektu — nie ma czego oceniać wizualnie.",
+                concerns=["Efekt bez zrzutu ekranu nie przeszedł kontroli wizualnej."],
+            )
         return verdict(
             BOT, "skipped", 0.3,
-            "Brak zrzutu ekranu efektu — nie ma czego oceniać wizualnie.",
-            concerns=["Efekt bez zrzutu ekranu nie przeszedł kontroli wizualnej."],
+            f"Efekt narzędzia '{tool or 'nieznane'}' nie jest wizualny — kontrola wizualna nie dotyczy.",
         )
 
     path = Path(screenshot_path)

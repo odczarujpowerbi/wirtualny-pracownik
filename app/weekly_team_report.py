@@ -22,6 +22,7 @@ dziś zawsze do człowieka wewnątrz firmy (Paweł/Aldona), nie do całego zespo
 import os
 
 import digest_generator
+import model_registry
 import stale_time_entry_nudger
 from email_client import get_email_client
 from projectly_client import get_client
@@ -78,7 +79,8 @@ def ai_weaknesses_summary(split, stale_grouped):
         f"Godziny zalogowane jako 'otwarte' bez domknięcia wg osoby: {stale_summary}\n"
     )
     client = anthropic.Anthropic()
-    response = client.messages.create(model="claude-sonnet-4-5", max_tokens=400, messages=[{"role": "user", "content": prompt}])
+    _, model = model_registry.resolve("weekly_team_report.generate")
+    response = client.messages.create(model=model, max_tokens=400, messages=[{"role": "user", "content": prompt}])
     return response.content[0].text.strip()
 
 

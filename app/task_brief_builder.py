@@ -15,6 +15,7 @@ przecieku z poprzedniego. Domknięty blok (status done/needs_approval) runner
 oznacza zdarzeniem 'block_closed' — brief kolejnych zadań go nie wciąga.
 """
 
+import kontekst_firmy
 import state_store
 
 MAX_FIELD_CHARS = 1500
@@ -71,8 +72,14 @@ def build_brief(task, execution_result=None, events=None, max_events=MAX_EVENTS)
 
 
 def build_thinking_prompt(task, execution_result=None, events=None):
-    """Pełny prompt dla kroku myślenia: instrukcja + brief z kontekstem."""
+    """Pełny prompt kroku myślenia: instrukcja + realia firmy + brief zadania.
+
+    Kontekst firmy stoi PRZED briefem, bo decyduje, jak zadanie w ogóle rozumieć:
+    to samo polecenie "przygotuj materiał o Power BI" znaczy co innego dla marki
+    szkoleniowej (sprzedajemy wiedzę) i wdrożeniowej (sprzedajemy gotowy efekt)."""
     brief = build_brief(task, execution_result=execution_result, events=events)
+    tekst_zadania = " ".join(str(task.get(k) or "") for k in ("title", "description"))
+    kontekst = kontekst_firmy.zbuduj(tekst_zadania)
     return (
         "Jesteś wirtualnym pracownikiem. Przeanalizuj zadanie w jego pełnym "
         "kontekście i odpowiedz zwięźle (maks. 8 zdań), w punktach:\n"
@@ -80,7 +87,8 @@ def build_thinking_prompt(task, execution_result=None, events=None):
         "2. Proponowany plan/podejście (kroki).\n"
         "3. Ryzyka albo czego brakuje, żeby to wykonać.\n"
         "4. Rekomendacja: automatycznie czy potrzebna decyzja człowieka.\n\n"
-        f"{brief}\n"
+        + (f"{kontekst}\n\n" if kontekst else "")
+        + f"{brief}\n"
     )
 
 

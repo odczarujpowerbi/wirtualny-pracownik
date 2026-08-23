@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wirtualny Pracownik AI — panel operatora</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <p class="kicker">Dokumentacja projektu</p>
+  <h1>Panel operatora (dashboard)</h1>
+  <p><code>python app/dashboard.py</code> → <b>http://127.0.0.1:8787/</b> — tylko na localhoście. To strona O dashboardzie; sam dashboard jest osobnym, żywym programem (<code>app/dashboard.py</code> + <code>app/dashboard.html</code>), nie tą stroną dokumentacji.</p>
+</header>
+<div class="wrap">
+  <div class="sitenav">
+    <a href="index.html">Start</a><span class="sep">·</span>
+    <a href="architektura.html">Architektura</a><span class="sep">·</span>
+    <a href="przeplyw-zadania.html">Przepływ zadania</a><span class="sep">·</span>
+    <a href="boty-i-persony.html">Boty i persony</a><span class="sep">·</span>
+    <a href="buyer-persony.html">Buyer persony</a><span class="sep">·</span>
+    <a href="kontekst-firmy.html">Kontekst firmy</a><span class="sep">·</span>
+    <a href="modele-i-koszty.html">Modele i koszty</a><span class="sep">·</span>
+    <a href="bezpieczenstwo.html">Bezpieczeństwo</a><span class="sep">·</span>
+    <a href="panel-operatora.html" class="current">Panel operatora</a><span class="sep">·</span>
+    <a href="zadania-i-zrodla.html">Skąd zadania</a><span class="sep">·</span>
+    <a href="instalacja.html">Instalacja</a><span class="sep">·</span>
+    <a href="mapa-plikow.html">Mapa plików</a><span class="sep">·</span>
+    <a href="stan-i-roadmapa.html">Stan i roadmapa</a>
+  </div>
+
+  <h2><span class="n">1</span> Co zawiera</h2>
+  <div class="cards">
+    <div class="card"><h3>Pasek operatora</h3><p>Stan (Pracuje/Wstrzymany/Zatrzymany), kolejka, koszt, zdrowie, limity Claude (5h/dziś) i szacowana liczba pozostałych zadań.</p></div>
+    <div class="card"><h3>Dodaj zadanie</h3><p>Formularz (treść, poziom ryzyka, ścieżka PBIP albo adres źródła) — przetwarzane od razu lokalnie, tym samym pipeline co Projectly.</p></div>
+    <div class="card"><h3>Zadania</h3><p>Grupowane po zadaniu, rozwijana oś czasu: czas → agent → krok → decyzja → dlaczego.</p></div>
+    <div class="card"><h3>Przepływy</h3><p>Decyzje wszystkich botów na żywo (kto → co → dlaczego → model → koszt), odświeżane co kilka sekund.</p></div>
+    <div class="card"><h3>Skrypty i harmonogram</h3><p>Edycja interwałów, „uruchom teraz", historia przebiegów z pełnym przechwyconym wyjściem (stdout+stderr).</p></div>
+  </div>
+
+  <h2><span class="n">2</span> Sterowanie</h2>
+  <table>
+    <thead><tr><th style="width:20%">Przycisk</th><th>Efekt</th></tr></thead>
+    <tbody>
+      <tr><td><b>PAUSE</b></td><td>Wstrzymuje podejmowanie nowej pracy, bez utraty stanu. Bieżące zadanie dokańcza się.</td></tr>
+      <tr><td><b>STOP</b></td><td>Wyłącznik awaryjny (kill switch) — żadna pętla nie podejmuje akcji do wyczyszczenia flagi.</td></tr>
+      <tr><td><b>START</b></td><td>Wznawia pracę po PAUSE/STOP.</td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="n">3</span> Limity i koszt</h2>
+  <div class="card">
+    <p><code>usage_monitor.py</code> czyta to samo źródło co statuslinia terminala: koszt okna 5h i dziś, oraz estymację, ile zadań jeszcze wobec ustawianego budżetu. <code>cost_tracker.py</code> pilnuje dziennego limitu (<code>config/daily_cost_limit_usd.txt</code>) i wyzwala kill switch po przekroczeniu. Szczegóły liczenia kosztu: <a href="modele-i-koszty.html">Modele i koszty</a>.</p>
+  </div>
+
+  <h2><span class="n">4</span> Monitorowanie floty (Projectly)</h2>
+  <div class="card">
+    <p>Ten panel jest <b>lokalny i na żądanie</b> — działa tylko na tej maszynie (<code>127.0.0.1</code>), przydatny do debugowania na miejscu. Widok <b>zdalny, na żywo, dla całej floty</b> jest w Projectly: zakładka <b>Monitorowanie agentów</b>, widoczna wyłącznie dla roli <code>master</code>. Każda karta pokazuje jedną rolę bota (np. „dev", „kacper-monitor", „machine-status") — bieżące zadanie, kolejkę, koszt, zdrowie i ostatnie zdarzenia.</p>
+    <p><code>live_status_publisher.py</code> (co ~1–2 min), <code>machine_status_reporter.py</code> (co godzinę) i <code>kacper_monitor.py</code> publikują tam status przez <code>ProjectlyClient.publish_status()</code> → MCP <code>post_agent_status</code> — dedykowany, nadpisywany wiersz per rola, <b>nie</b> strona dokumentacji projektu. Transport (docelowy/legacy) w <code>config/projectly.yaml → live_status.transport</code>.</p>
+  </div>
+
+  <div class="foot">Wirtualny Pracownik AI — dokumentacja. <a href="jak-edytowac.html">Jak edytować tę dokumentację</a> · <a href="zadania-i-zrodla.html">Skąd zadania →</a></div>
+</div>
+</body>
+</html>

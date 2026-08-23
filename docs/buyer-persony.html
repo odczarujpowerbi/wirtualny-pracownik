@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wirtualny Pracownik AI — buyer persony</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <p class="kicker">Dokumentacja projektu</p>
+  <h1>Buyer persony — dla kogo piszemy</h1>
+  <p>Realne profile odbiorców treści marketingowych obu marek. <code>ad_copy_generator.py</code> używa ich, żeby pisać nie „dobry tekst w ogóle", ale tekst, który <b>trafia w konkretną osobę</b>, dla której go piszemy.</p>
+</header>
+<div class="wrap">
+  <div class="sitenav">
+    <a href="index.html">Start</a><span class="sep">·</span>
+    <a href="architektura.html">Architektura</a><span class="sep">·</span>
+    <a href="przeplyw-zadania.html">Przepływ zadania</a><span class="sep">·</span>
+    <a href="boty-i-persony.html">Boty i persony</a><span class="sep">·</span>
+    <a href="buyer-persony.html" class="current">Buyer persony</a><span class="sep">·</span>
+    <a href="kontekst-firmy.html">Kontekst firmy</a><span class="sep">·</span>
+    <a href="modele-i-koszty.html">Modele i koszty</a><span class="sep">·</span>
+    <a href="bezpieczenstwo.html">Bezpieczeństwo</a><span class="sep">·</span>
+    <a href="panel-operatora.html">Panel operatora</a><span class="sep">·</span>
+    <a href="zadania-i-zrodla.html">Skąd zadania</a><span class="sep">·</span>
+    <a href="instalacja.html">Instalacja</a><span class="sep">·</span>
+    <a href="mapa-plikow.html">Mapa plików</a><span class="sep">·</span>
+    <a href="stan-i-roadmapa.html">Stan i roadmapa</a>
+  </div>
+
+  <h2><span class="n">1</span> Co to jest buyer persona i po co ona agentowi</h2>
+  <div class="card">
+    <p>Buyer persona to <b>opis konkretnego typu klienta</b>: kim jest, czego się boi, co go przekonuje, jakim językiem mówi. To NIE jest persona bota (jak Paweł czy Gustaw — te opisano w <a href="boty-i-persony.html">Boty i persony</a>) — to profil <b>odbiorcy po stronie klienta</b>, dla którego piszemy reklamę, post czy maila.</p>
+    <p>Bez tego agent pisałby treść marketingową generycznie — „dobry tekst w ogóle". Realny problem: post mógł być poprawny technicznie i stylistycznie, a mimo to mówić do złej osoby (np. argumenty dla dyrektora finansowego zamiast dla właściciela małej firmy). <code>ad_copy_generator.py</code> dostaje prawdziwy profil persony i pisze względem NIEJ — jej celów, obiekcji i tego, czego unika.</p>
+  </div>
+
+  <div class="callout warnc">
+    <b>Ważne — kolizja imion między markami.</b> Obie marki mają personę o imieniu <b>„Tomek"</b> — to dwie różne osoby (patrz niżej). Dopasowanie persony do zadania <b>wymaga znanej marki</b>; bez niej agent nie zgaduje (fail-closed) — lepiej brak profilu niż profil złej osoby.
+  </div>
+
+  <h2><span class="n">2</span> Skąd się biorą i gdzie leżą</h2>
+  <div class="card">
+    <p>Źródło: realne profile opracowane dla obu marek, przechowywane w OneDrive („Buyer persony Odczaruj PBI", „Buyer persony clickless"). <b>Kopia</b> leży w repo w <code>app/kontekst/persony/&lt;marka&gt;/</code>, żeby agent miał do nich dostęp niezależnie od tego, czy OneDrive jest zsynchronizowany na danej maszynie.</p>
+    <pre>app/kontekst/persony/
+  odczaruj/    5 person — Paweł, Kasia, Zuzanna, Tomek, Joanna
+  clickless/   7 person — Marek, Roman, Małgorzata, Aleksandra, Tomek, Katarzyna, Krzysztof</pre>
+    <p>Aktualizacja: te pliki to kopia. Gdy właściciel zmieni personę w OneDrive, trzeba ją skopiować tutaj ręcznie (patrz <code>app/kontekst/persony/README.md</code>).</p>
+  </div>
+
+  <h2><span class="n">3</span> Persony marki Odczaruj Power BI</h2>
+  <p class="lead">Szkolenia i społeczność — odbiorca chce <b>sam umieć</b>. Persony skupione na etapie kariery i nauki.</p>
+
+  <div class="persona">
+    <div class="top"><h3>Paweł — manager raportów w korporacji</h3><span class="tag info">02</span></div>
+    <div class="grid">
+      <div class="col"><b class="h">Kim jest</b><p>Zarządza zespołem/procesem raportowania w dużej firmie, ale nie jest twórcą raportów od podstaw — potrzebuje rozumieć, żeby nadzorować i rozmawiać z zespołem/dostawcami na równych zasadach.</p></div>
+      <div class="col"><b class="h">Czego unika</b><ul><li>Kursu pisanego dla kandydata na dewelopera, nie na managera.</li><li>Nadmiaru technicznego żargonu bez przełożenia na decyzje.</li></ul></div>
+    </div>
+  </div>
+
+  <div class="persona">
+    <div class="top"><h3>Kasia — aspirująca analityczka</h3><span class="tag info">03</span></div>
+    <div class="quote">„Skończyłam już kilka kursów, ale nadal nie mogę znaleźć pracy."</div>
+    <div class="grid">
+      <div class="col"><b class="h">Kim jest</b><p>~40 lat, robi raporty w firmie rodzinnej, chce przebranżowić się na analityczkę/Power BI Developerkę juniorską. Systematyczna, ale kolejne nieudane rekrutacje podważają jej pewność siebie.</p>
+        <b class="h">Cele</b><ul><li>Pierwsza praca jako analityczka.</li><li>Portfolio, które pokaże realne umiejętności.</li><li>Szczera informacja, czego jej brakuje.</li></ul></div>
+      <div class="col"><b class="h">Czego unika</b><ul><li>Kolejnego kursu z samych nagrań, bez feedbacku.</li><li>Obietnicy gwarantowanego zatrudnienia (brzmi zbyt dobrze, żeby było prawdziwe).</li><li>Komunikacji sugerującej, że wiek (~40) jest przeszkodą.</li></ul>
+        <b class="h">Co ją przekonuje</b><ul><li>Praktyczne projekty do portfolio, feedback od praktyków.</li><li>Historie osób, które weszły do branży bez wcześniejszego stanowiska analitycznego.</li></ul></div>
+    </div>
+  </div>
+
+  <div class="persona">
+    <div class="top"><h3>Zuzanna — młoda specjalistka analityczna</h3><span class="tag info">04</span></div>
+    <div class="grid">
+      <div class="col"><b class="h">Kim jest</b><p>Na wczesnym etapie kariery, już pracuje z danymi, chce szybko awansować i pogłębić kompetencje, żeby wyróżnić się na rynku.</p></div>
+      <div class="col"><b class="h">Czego unika</b><ul><li>Kursów dla zupełnych początkujących (już to przeszła).</li><li>Wolnego tempa bez wyzwań.</li></ul></div>
+    </div>
+  </div>
+
+  <div class="persona">
+    <div class="top"><h3>Tomek (Odczaruj) — analityk obawiający się stagnacji</h3><span class="tag info">05</span></div>
+    <div class="grid">
+      <div class="col"><b class="h">Kim jest</b><p>Pracuje jako analityk, ale czuje, że jego umiejętności się nie rozwijają, a rynek idzie do przodu (AI, nowe funkcje Power BI). Obawia się, że zostanie z tyłu.</p></div>
+      <div class="col"><b class="h">Co go przekonuje</b><ul><li>Konkretny plan nadążania za zmianami w narzędziu.</li><li>Dowód, że inwestycja w naukę przełoży się na pozycję zawodową.</li></ul></div>
+    </div>
+    <div class="callout"><b>Uwaga:</b> to INNY Tomek niż w Clickless (patrz sekcja 4) — inny profil, inne obiekcje. Agent rozróżnia ich po marce zadania, nigdy po samym imieniu.</div>
+  </div>
+
+  <div class="persona">
+    <div class="top"><h3>Joanna — liderka analityki</h3><span class="tag info">06</span></div>
+    <div class="grid">
+      <div class="col"><b class="h">Kim jest</b><p>Prowadzi już zespół/obszar analityki, potrzebuje wiedzy na poziomie strategicznym i przywódczym, nie tylko technicznym.</p></div>
+      <div class="col"><b class="h">Czego unika</b><ul><li>Treści adresowanych do juniorów.</li></ul></div>
+    </div>
+  </div>
+
+  <h2><span class="n">4</span> Persony marki Clickless</h2>
+  <p class="lead">Wdrożenia raportowania i aplikacji — odbiorca chce <b>mieć zrobione</b>. Persony skupione na roli w firmie i obawach biznesowych.</p>
+
+  <div class="persona">
+    <div class="top"><h3>Marek — właściciel małej/średniej firmy</h3><span class="tag info">01</span></div>
+    <div class="quote">„Mam dane, ale decyzje podejmuję na czuja."</div>
+    <div class="grid">
+      <div class="col"><b class="h">Bóle</b><ul><li>Co miesiąc ktoś traci dni na ręczne sklejanie raportów w Excelu.</li><li>Nie wie, gdzie ucieka kasa ani na których klientach realnie zarabia.</li></ul></div>
+      <div class="col"><b class="h">Czego się boi</b><ul><li>Wielkiego, drogiego projektu na pół roku, którego nikt potem nie użyje.</li><li>Dostawcy, który zniknie zaraz po podpisaniu umowy.</li></ul></div>
+    </div>
+  </div>
+
+  <div class="persona">
+    <div class="top"><h3>Roman — dyrektor finansowy</h3><span class="tag info">02</span></div>
+    <div class="grid">
+      <div class="col"><b class="h">Bóle</b><p>Potrzebuje raportów, którym może zaufać, żeby obronić je przed zarządem — liczby muszą się zgadzać, bez wątpliwości co do metodologii.</p></div>
+      <div class="col"><b class="h">Co go przekonuje</b><ul><li>Przejrzysta metodologia liczenia (marża I/II/III stopnia).</li><li>Kontrola dostępu — kto widzi co.</li></ul></div>
+    </div>
+  </div>
+
+  <div class="persona">
+    <div class="top"><h3>Małgorzata — menedżer HR</h3><span class="tag info">03</span></div>
+    <div class="grid">
+      <div class="col"><b class="h">Kim jest</b><p>Potrzebuje danych i procesów (grafiki, rozliczenia, formularze) uporządkowanych poza arkuszami Excel, żeby zespół HR nie tracił czasu na ręczne zestawienia.</p></div>
+    </div>
+  </div>
+
+  <div class="persona">
+    <div class="top"><h3>Aleksandra — decydent korporacyjny</h3><span class="tag info">04</span></div>
+    <div class="grid">
+      <div class="col"><b class="h">Kim jest</b><p>Podejmuje decyzje o wdrożeniach w większej organizacji — potrzebuje formalnych gwarancji (NDA, dokumentacja, przekazanie wiedzy), nie tylko dobrego efektu.</p></div>
+    </div>
+  </div>
+
+  <div class="persona">
+    <div class="top"><h3>Tomek (Clickless) — sceptyk techniczny</h3><span class="tag info">05</span></div>
+    <div class="grid">
+      <div class="col"><b class="h">Kim jest</b><p>Osoba techniczna w firmie klienta, sprawdza, czy dostawca faktycznie wie, co robi — pyta o architekturę, integracje, bezpieczeństwo danych. Nieufny wobec marketingowych ogólników.</p></div>
+      <div class="col"><b class="h">Co go przekonuje</b><ul><li>Konkretne systemy, z którymi integrujemy (SAP, Comarch, SQL...).</li><li>Techniczne odpowiedzi, nie slogany.</li></ul></div>
+    </div>
+    <div class="callout"><b>Uwaga:</b> to INNY Tomek niż w Odczaruj (sekcja 3) — sceptyk technika, nie analityk obawiający się stagnacji. Kolizja imion jest realna i celowa (dwie różne, niezależnie opracowane persony).</div>
+  </div>
+
+  <div class="persona">
+    <div class="top"><h3>Katarzyna — dyrektor sprzedaży</h3><span class="tag info">06</span></div>
+    <div class="grid">
+      <div class="col"><b class="h">Bóle</b><p>Sprzedaż rośnie, a marża spada i nie wie dlaczego — każdy handlowiec ma swój Excel, brak wspólnej prawdy o wyniku.</p></div>
+    </div>
+  </div>
+
+  <div class="persona">
+    <div class="top"><h3>Krzysztof — architekt Fabric</h3><span class="tag info">07</span></div>
+    <div class="grid">
+      <div class="col"><b class="h">Kim jest</b><p>Odpowiada za architekturę danych po stronie klienta (Microsoft Fabric i pokrewne) — ocenia, czy proponowane rozwiązanie wpisuje się w istniejącą infrastrukturę, nie tylko czy „działa".</p></div>
+    </div>
+  </div>
+
+  <h2><span class="n">5</span> Jak to działa technicznie</h2>
+  <div class="card">
+    <p><code>ad_copy_generator.py</code> generuje tekst reklamowy z pełnym kontekstem person danej marki i sam wybiera, do której z nich pisze (<code>target_persona</code> w wyniku). Mechanizm dopasowania: <code>kontekst_firmy.dopasuj_persone(target_persona, brand)</code> — fail-closed, bez znanej marki nie zgaduje.</p>
+    <div class="callout"><b>Uwaga (22.08.2026):</b> wcześniej ocena trafności gotowego materiału względem persony (nie tylko jej dobór przy generowaniu) należała do bota odbioru biznesowego (Bożena), usuniętego z bramki na decyzję właściciela. Dziś dobór persony przy generowaniu treści działa jak opisano wyżej; nikt w bramce jakości nie weryfikuje już GOTOWEGO materiału względem profilu persony.</div>
+  </div>
+
+  <div class="foot">Wirtualny Pracownik AI — dokumentacja. <a href="jak-edytowac.html">Jak edytować tę dokumentację</a> · <a href="boty-i-persony.html">Boty i persony (wewnętrzne)</a></div>
+</div>
+</body>
+</html>

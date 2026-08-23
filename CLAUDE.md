@@ -31,7 +31,7 @@
 - Operacje na bazie tylko SELECT, chyba że jawnie zlecone inaczej.
 
 ## Dokumentacja
-- Dokumentacja (nowa, jedyna): docs/dokumentacja.html (całość projektu), docs/instrukcja.html (jak zainstalować/używać), docs/przeplyw.html (pokrycie celu + statusy). README.md w root = skrót o projekcie.
+- Dokumentacja: docs/index.html — zestaw małych, samodzielnych stron (architektura, przepływ zadania, boty i persony, buyer persony, kontekst firmy, modele i koszty, bezpieczeństwo, panel operatora, skąd zadania, instalacja, mapa plików, stan i roadmapa). Jak dodać/zmienić stronę: docs/jak-edytowac.html. README.md w root = skrót o projekcie.
 - Instalacja i konfiguracja maszyny: folder instalacja/ (Przygotuj-srodowisko.bat, Zaloguj.bat, postaw-od-zera.ps1)
 - Stan kodu (co działa / czego brak): app/README.md
 - Stara dokumentacja (.md/PDF) usunięta z repo (jest w historii git). Nie odtwarzać bez potrzeby.

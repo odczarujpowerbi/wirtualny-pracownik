@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wirtualny Pracownik AI — bezpieczeństwo</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <p class="kicker">Dokumentacja projektu</p>
+  <h1>Bezpieczeństwo</h1>
+  <p>Model nigdy nie dostaje dowolnego shell — tylko zarejestrowane narzędzia, w granicach, które jawnie zadeklarowano.</p>
+</header>
+<div class="wrap">
+  <div class="sitenav">
+    <a href="index.html">Start</a><span class="sep">·</span>
+    <a href="architektura.html">Architektura</a><span class="sep">·</span>
+    <a href="przeplyw-zadania.html">Przepływ zadania</a><span class="sep">·</span>
+    <a href="boty-i-persony.html">Boty i persony</a><span class="sep">·</span>
+    <a href="buyer-persony.html">Buyer persony</a><span class="sep">·</span>
+    <a href="kontekst-firmy.html">Kontekst firmy</a><span class="sep">·</span>
+    <a href="modele-i-koszty.html">Modele i koszty</a><span class="sep">·</span>
+    <a href="bezpieczenstwo.html" class="current">Bezpieczeństwo</a><span class="sep">·</span>
+    <a href="panel-operatora.html">Panel operatora</a><span class="sep">·</span>
+    <a href="zadania-i-zrodla.html">Skąd zadania</a><span class="sep">·</span>
+    <a href="instalacja.html">Instalacja</a><span class="sep">·</span>
+    <a href="mapa-plikow.html">Mapa plików</a><span class="sep">·</span>
+    <a href="stan-i-roadmapa.html">Stan i roadmapa</a>
+  </div>
+
+  <h2><span class="n">1</span> Mechanizmy</h2>
+  <table>
+    <thead><tr><th style="width:28%">Mechanizm</th><th>Opis</th></tr></thead>
+    <tbody>
+      <tr><td>Kontrakt uprawnień <span class="tag ok">jest</span></td><td>Model uruchamia tylko zarejestrowane narzędzia, w granicach <code>allowed_roots</code> (pliki) i <code>allowed_domains</code> (internet). Reszta = odmowa. <code>tool_registry.py</code>.</td></tr>
+      <tr><td>Klasy ryzyka <span class="tag ok">jest</span></td><td>Zielone (auto) / żółte (auto w granicach polityki, przez bramkę) / czerwone (zawsze człowiek). <code>config/approval_policy.yaml</code>.</td></tr>
+      <tr><td>Panel operatora <span class="tag ok">jest</span></td><td>PAUSE (wstrzymaj bez utraty stanu) / STOP (wyłącznik awaryjny) / START. Wszystkie pętle respektują.</td></tr>
+      <tr><td>Ochrona sekretów <span class="tag ok">jest</span></td><td>Klucze nigdy w repo/logach/zrzutach; maskowanie pól. Sekrety w <code>app/secrets/</code> (poza gitem).</td></tr>
+      <tr><td>Ślad audytowy <span class="tag ok">jest</span></td><td>Każda decyzja w SQLite: kto/co/dlaczego/model/koszt. Eksport CSV/JSONL do analizy.</td></tr>
+      <tr><td>Kontrola prompt injection <span class="tag ok">jest</span></td><td>Treść zewnętrzna (z zadania i z internetu) sprawdzana przed klasyfikacją i przed podaniem do modelu; wykrycie zawsze eskaluje.</td></tr>
+      <tr><td>Kill switch kosztowy <span class="tag ok">jest</span></td><td><code>cost_tracker.py</code> sumuje koszt dzienny; po przekroczeniu limitu zatrzymuje pętlę. Limit: <code>config/daily_cost_limit_usd.txt</code> (dziś 3000 USD).</td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="n">2</span> Pobieranie z internetu — allowlista domen</h2>
+  <div class="card">
+    <p><code>web_fetch_worker.py</code>: tylko HTTPS, tylko GET, tylko hosty z <code>config/tool_contracts.yaml</code> → <code>fetch_url.allowed_domains</code>. Każde przekierowanie (302) sprawdzane PONOWNIE wobec allowlisty — serwer nie może przez przekierowanie ominąć kontroli. Pobrana treść jest z definicji niezaufana: trafia do promptu oznaczona jako DANE, nie polecenia, i przechodzi kontrolę wstrzyknięcia instrukcji ZANIM dojdzie do modelu piszącego odpowiedź.</p>
+  </div>
+
+  <h2><span class="n">3</span> Fail-closed — wzorzec powtarzający się w całym systemie</h2>
+  <div class="cards">
+    <div class="card"><h3>Narzędzie</h3><p>Nieznane narzędzie / ścieżka poza <code>allowed_roots</code> / domena poza <code>allowed_domains</code> → odmowa.</p></div>
+    <div class="card"><h3>Model</h3><p>Nieznany "caller" w tabeli tier → poziom <b>wysoki</b> (lepiej przepłacić niż przepuścić błąd na słabszym modelu).</p></div>
+    <div class="card"><h3>Persona</h3><p>Nieznana marka przy dopasowaniu buyer persony → brak dopasowania (nigdy zgadywanie, bo dwie marki mają personę o tym samym imieniu).</p></div>
+    <div class="card"><h3>Ryzyko</h3><p>Nieznany typ akcji w <code>approval_policy.yaml</code> → <b>red</b> (nigdy zielony/żółty z domysłu — człowiek decyduje).</p></div>
+  </div>
+
+  <h2><span class="n">4</span> Twarde granice (poza zakresem bez akceptacji)</h2>
+  <table>
+    <thead><tr><th style="width:60%">Działanie</th><th>Zasada</th></tr></thead>
+    <tbody>
+      <tr><td>Nadawanie ról administracyjnych, usuwanie użytkowników/danych/repozytoriów</td><td>Zabronione w pilotażu</td></tr>
+      <tr><td>Zwiększanie wydatków reklamowych, masowe wiadomości do klientów</td><td>Tylko po akceptacji człowieka</td></tr>
+      <tr><td>Dowolne polecenia systemowe poza listą narzędzi</td><td>Zabronione</td></tr>
+      <tr><td>Zapis bezpośrednio do gałęzi main</td><td>Zabronione — tylko branch + PR</td></tr>
+      <tr><td>Porady podatkowe, prawne, rozliczeniowe</td><td>Zabronione — nawet gdy wydają się oczywiste</td></tr>
+    </tbody>
+  </table>
+
+  <div class="foot">Wirtualny Pracownik AI — dokumentacja. <a href="jak-edytowac.html">Jak edytować tę dokumentację</a> · <a href="panel-operatora.html">Panel operatora →</a></div>
+</div>
+</body>
+</html>

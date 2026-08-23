@@ -27,7 +27,13 @@ _GREEN_KEYWORDS = (
     "raport tylko do odczytu", "wylistuj", "policz",
 )
 # Akcje workerów, które są z definicji read-only (zielone) niezależnie od tytułu.
-_GREEN_ACTIONS = {"validate_pbip", "read_report", "capture_screenshot"}
+# browser_task_readonly = executor.rozpoznaj_narzedzie zwraca to TYLKO gdy
+# zadanie nie niesie żadnych browser_steps — bez kroków worker mechanicznie
+# nie może kliknąć/wypełnić niczego (sam navigate+screenshot+odczyt tekstu),
+# więc słowo "kampania" w treści (żywy przypadek: "sprawdź WYNIKI KAMPANII")
+# nie powinno podnosić koloru do red — to ten sam odczyt co fetch_url, inne
+# źródło. Zadanie Z krokami (klikanie) zostaje pod zwykłą klasyfikację słów.
+_GREEN_ACTIONS = {"validate_pbip", "read_report", "capture_screenshot", "fetch_url", "browser_task_readonly"}
 
 
 def _haystack(task):
@@ -36,10 +42,14 @@ def _haystack(task):
     return " ".join(p for p in parts if p).lower()
 
 
-def hint_from_task(task):
-    """Zwraca 'green' | 'yellow' | 'red' na podstawie treści i akcji zadania."""
+def hint_from_task(task, tool=None):
+    """Zwraca 'green' | 'yellow' | 'red' na podstawie treści zadania i (opcjonalnie)
+    rozpoznanego narzędzia (executor.rozpoznaj_narzedzie(task)). Narzędzie z
+    definicji read-only daje 'green' NIEZALEŻNIE od słów w tytule — inaczej
+    "zestawienie WYSYŁEK KAMPANII" (fetch_url, czysty odczyt) wpadłoby w 'red'
+    tylko dlatego, że tytuł zawiera słowo z listy czerwonych fraz."""
     action = (task.get("action") or "").lower()
-    if action in _GREEN_ACTIONS:
+    if action in _GREEN_ACTIONS or (tool and tool in _GREEN_ACTIONS):
         return "green"
 
     text = _haystack(task)

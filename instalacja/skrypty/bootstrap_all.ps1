@@ -29,6 +29,8 @@
 #   .\bootstrap_all.ps1
 # z lokalnym modelem AI sterującym ekranem (computer use, kilka GB):
 #   .\bootstrap_all.ps1 -WithLocalModel
+# z workerem przeglądarkowym (Playwright + Chromium, Faza 3.1):
+#   .\bootstrap_all.ps1 -WithBrowserWorker
 # albo wskazując inne repo/fork:
 #   .\bootstrap_all.ps1 -RepoUrl "https://github.com/<org>/<repo>.git"
 
@@ -46,7 +48,11 @@ param(
 
     # Lokalny model AI (Ollama) sterujący ekranem + walidator promptów. Krok
     # opcjonalny, bo to kilka GB pobierania — patrz bootstrap_install_local_model.ps1.
-    [switch]$WithLocalModel
+    [switch]$WithLocalModel,
+
+    # Worker przeglądarkowy (Playwright + Chromium, Faza 3.1). Krok opcjonalny,
+    # bo to dodatkowe ~150-300 MB — patrz bootstrap_install_browser_worker.ps1.
+    [switch]$WithBrowserWorker
 )
 
 $ErrorActionPreference = "Stop"
@@ -116,6 +122,12 @@ if ($SkipClaudeCode) {
 # ostrzega, nie przerywa całego bootstrapu.
 if ($WithLocalModel) {
     $steps += @{ Name = "Lokalny model AI (Ollama)"; Required = $false; Run = { Invoke-PowerShellScript (Get-BootstrapScriptPath "bootstrap_install_local_model.ps1") @() } }
+}
+
+# Opcjonalny worker przeglądarkowy (Playwright + Chromium) — tylko z
+# przełącznikiem -WithBrowserWorker, bo to dodatkowe ~150-300 MB.
+if ($WithBrowserWorker) {
+    $steps += @{ Name = "Worker przeglądarkowy (Playwright)"; Required = $false; Run = { Invoke-PowerShellScript (Get-BootstrapScriptPath "bootstrap_install_browser_worker.ps1") @("-AppPath", $appPath) } }
 }
 
 $total = $steps.Count

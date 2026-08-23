@@ -2,7 +2,7 @@
 Gustaw — bramka jakości (orkiestrator).
 
 Funkcja: przepuszcza zadanie po kolei przez wszystkich botów walidujących
-(Bartek, Franek, Oskar, Bożena), zbiera ich werdykty i podejmuje JEDNĄ decyzję:
+(Bartek, Franek, Oskar), zbiera ich werdykty i podejmuje JEDNĄ decyzję:
 czy efekt może iść do człowieka jako gotowy, czy trzeba go eskalować z zebranymi
 zastrzeżeniami. To jest ta "seria testów, zanim człowiek dostanie odpowiedź".
 
@@ -30,7 +30,6 @@ from pathlib import Path
 import yaml
 
 import bot_bartek_dubler
-import bot_bozena_biznes
 import bot_franek_funkcjonalny
 import bot_oskar_wizja
 from bot_common import verdict
@@ -41,7 +40,6 @@ REGISTRY = {
     "bartek": bot_bartek_dubler.review,
     "franek": bot_franek_funkcjonalny.review,
     "oskar": bot_oskar_wizja.review,
-    "bozena": bot_bozena_biznes.review,
 }
 
 

@@ -17,6 +17,7 @@ import os
 import re
 from datetime import datetime, timedelta, timezone
 
+import model_registry
 from mailerlite_client import get_mailerlite_client
 from projectly_client import get_client
 
@@ -76,7 +77,8 @@ def ai_feedback(subject, body_text):
         "klarowna i angażująca, i jedną konkretną rzecz do poprawy następnym razem."
     )
     client = anthropic.Anthropic()
-    response = client.messages.create(model="claude-sonnet-4-5", max_tokens=250, messages=[{"role": "user", "content": prompt}])
+    _, model = model_registry.resolve("mailerlite_report_analyzer.analyze")
+    response = client.messages.create(model=model, max_tokens=250, messages=[{"role": "user", "content": prompt}])
     return response.content[0].text.strip()
 
 

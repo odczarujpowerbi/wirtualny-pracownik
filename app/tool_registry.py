@@ -8,10 +8,12 @@ check_call(tool, params) -> {allowed: bool, reason: str, risk: str}:
   - narzędzie spoza rejestru -> odmowa (fail-closed),
   - brak wymaganego parametru -> odmowa,
   - parametr type=path poza allowed_roots -> odmowa,
+  - parametr type=url poza allowed_domains albo nie-https -> odmowa,
 Każda odmowa niesie czytelny powód (trafia do audytu i eskalacji).
 """
 
 from pathlib import Path
+from urllib.parse import urlparse
 
 import yaml
 
@@ -36,6 +38,20 @@ def _resolve_roots(contract):
 def _path_within(path, roots):
     resolved = Path(path).resolve()
     return any(resolved == root or root in resolved.parents for root in roots)
+
+
+def allowed_domains(contract):
+    """Allowlista hostów narzędzia — odpowiednik allowed_roots dla sieci."""
+    return list(contract.get("allowed_domains", []))
+
+
+def _host_within(url, domains):
+    """Host równy wpisowi albo jego subdomena. Sam sufiks nie wystarcza —
+    'api.nbp.pl.atakujacy.example' nie może przejść jako 'api.nbp.pl'."""
+    host = (urlparse(url).hostname or "").lower()
+    if not host:
+        return False
+    return any(host == d.lower() or host.endswith("." + d.lower()) for d in domains)
 
 
 def _allow(risk):
@@ -69,6 +85,16 @@ def check_call(tool, params, path=CONTRACTS_PATH):
             if not _path_within(value, roots):
                 return _deny(
                     f"Ścieżka '{value}' (parametr '{name}') jest poza allowed_roots narzędzia '{tool}' "
+                    f"— odmowa (fail-closed).", risk)
+        if spec.get("type") == "url":
+            domains = allowed_domains(contract)
+            if not domains:
+                return _deny(f"Narzędzie '{tool}' nie ma zadeklarowanych allowed_domains — odmowa (fail-closed).", risk)
+            if urlparse(str(value)).scheme != "https":
+                return _deny(f"Adres '{value}' (parametr '{name}') nie jest https — odmowa (fail-closed).", risk)
+            if not _host_within(str(value), domains):
+                return _deny(
+                    f"Host adresu '{value}' (parametr '{name}') jest poza allowed_domains narzędzia '{tool}' "
                     f"— odmowa (fail-closed).", risk)
 
     return _allow(risk)

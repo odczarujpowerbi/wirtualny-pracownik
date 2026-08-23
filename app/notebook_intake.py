@@ -53,13 +53,22 @@ def _parse_line(raw):
             risk, text = level, text.replace(tag, "")
 
     project_path = None
+    url = None
     if "@" in text:
-        text, _, path_part = text.partition("@")
-        project_path = path_part.strip() or None
+        text, _, target = text.partition("@")
+        target = target.strip() or None
+        # Po znaku @ może stać ścieżka PBIP albo adres www — rozstrzyga kształt
+        # wartości, żeby notatnik pozostał jedną prostą składnią.
+        if target and target.lower().startswith("https://"):
+            url = target
+        else:
+            project_path = target
 
     title = " ".join(text.split())
     if not title and project_path:
         title = f"Waliduj strukturę PBIP {project_path}"
+    if not title and url:
+        title = f"Pobierz informacje ze źródła {url}"
 
     digest = hashlib.sha1(raw.encode("utf-8")).hexdigest()
     task = {
@@ -73,6 +82,9 @@ def _parse_line(raw):
     if project_path:
         task["action"] = "validate_pbip"
         task["project_path"] = project_path
+    if url:
+        task["action"] = "fetch_url"
+        task["url"] = url
     return task
 
 
