@@ -454,6 +454,31 @@ class ProjectlyClient:
         -1=poprzedni, itd. Używane przez knowledge_digest_publisher.py."""
         return self._mcp.call_tool("get_week_report", {"weekOffset": week_offset})
 
+    def create_knowledge(self, title, content, scope="self", tags=None, links=None):
+        """MCP: create_knowledge. scope: "self" (własne konto, domyślne),
+        "general" (firmowa — wymaga pełnego dostępu, master/admin) albo ID
+        konta bota (jw). Zwraca dict z "id" nowego wpisu."""
+        args = {"title": title, "content": content, "scope": scope}
+        if tags is not None:
+            args["tags"] = tags
+        if links is not None:
+            args["links"] = links
+        return self._mcp.call_tool("create_knowledge", args)
+
+    def update_knowledge(self, knowledge_id, title=None, content=None, tags=None, links=None):
+        """MCP: update_knowledge. Podaj tylko pola do zmiany — content
+        ZASTĘPUJE całość, nie scala."""
+        args = {"knowledgeId": knowledge_id}
+        if title is not None:
+            args["title"] = title
+        if content is not None:
+            args["content"] = content
+        if tags is not None:
+            args["tags"] = tags
+        if links is not None:
+            args["links"] = links
+        return self._mcp.call_tool("update_knowledge", args)
+
 
 class MockProjectlyClient:
     """Symuluje Projectly przy użyciu lokalnych plików JSON — do testowania
@@ -467,6 +492,7 @@ class MockProjectlyClient:
         self._comments_path = MOCK_RUNS_DIR / "mock_comments.json"
         self._agent_status_path = MOCK_RUNS_DIR / "mock_agent_status.json"
         self._feedback_path = MOCK_RUNS_DIR / "mock_feedback.json"
+        self._knowledge_path = MOCK_RUNS_DIR / "mock_knowledge.json"
 
     def get_new_tasks(self):
         with open(self.tasks_path, encoding="utf-8") as f:
@@ -549,6 +575,32 @@ class MockProjectlyClient:
         """Mock: kształt minimalny, wystarczający do testów knowledge_digest_publisher.py
         bez sieci - nie odzwierciedla realnej logiki serwera (completedAt itd.)."""
         return {"weekOffset": week_offset, "completed": [], "byPerson": {}, "overdue": [], "estimationDeviation": None}
+
+    def create_knowledge(self, title, content, scope="self", tags=None, links=None):
+        entries = self._load(self._knowledge_path, default=[])
+        new_id = f"KNOW-{len(entries) + 1:04d}"
+        entries.append({"id": new_id, "title": title, "content": content, "scope": scope, "tags": tags, "links": links})
+        self._save(self._knowledge_path, entries)
+        print(f"[MOCK Projectly] baza wiedzy: utworzono '{title}' (scope={scope}) -> {new_id}")
+        return {"id": new_id}
+
+    def update_knowledge(self, knowledge_id, title=None, content=None, tags=None, links=None):
+        entries = self._load(self._knowledge_path, default=[])
+        for entry in entries:
+            if entry["id"] == knowledge_id:
+                if title is not None:
+                    entry["title"] = title
+                if content is not None:
+                    entry["content"] = content
+                if tags is not None:
+                    entry["tags"] = tags
+                if links is not None:
+                    entry["links"] = links
+                self._save(self._knowledge_path, entries)
+                print(f"[MOCK Projectly] baza wiedzy: zaktualizowano {knowledge_id}")
+                return {"id": knowledge_id}
+        print(f"[MOCK Projectly] baza wiedzy: {knowledge_id} nie znaleziony")
+        return {"id": knowledge_id}
 
     @staticmethod
     def _load(path, default):

@@ -4,6 +4,7 @@ get_week_report/._mcp.call_tool, pliki .env sa tymczasowe. Wpina sie
 automatycznie w self_check.py.
 """
 
+import json
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -29,21 +30,22 @@ SAMPLE_REPORT = {
 }
 
 
-class _FakeMCP:
-    def __init__(self):
-        self.calls = []
-
-    def call_tool(self, name, arguments=None):
-        self.calls.append((name, arguments))
-        return {"ok": True}
-
-
 class _FakeClient:
-    def __init__(self):
-        self._mcp = _FakeMCP()
+    def __init__(self, next_id="KNOW-0001"):
+        self.created = []
+        self.updated = []
+        self._next_id = next_id
 
     def get_week_report(self, week_offset=0):
         return SAMPLE_REPORT
+
+    def create_knowledge(self, title, content, scope="self", tags=None, links=None):
+        self.created.append({"title": title, "content": content, "scope": scope})
+        return {"id": self._next_id}
+
+    def update_knowledge(self, knowledge_id, title=None, content=None, tags=None, links=None):
+        self.updated.append({"knowledgeId": knowledge_id, "title": title, "content": content})
+        return {"id": knowledge_id}
 
 
 def test_build_digest_text_shows_own_stats_and_org_context():
@@ -94,22 +96,21 @@ def test_load_agent_env_reads_present_file():
     print("OK  _load_agent_env czyta obecny plik .env roli")
 
 
-def test_publish_to_knowledge_base_no_tool_configured_is_noop():
-    client = _FakeClient()
-    ok = kdp._publish_to_knowledge_base(client, "dev", "Tytuł", "Treść", cfg={"knowledge_digest": {"mcp_tool": None}})
-    assert ok is False
-    assert client._mcp.calls == [], "brak skonfigurowanego narzedzia -> zero wywolan MCP"
-    print("OK  brak knowledge_digest.mcp_tool w configu -> no-op, zero wywolan MCP")
+def test_publish_to_knowledge_base_creates_then_updates_same_entry():
+    tmp_ids = Path(tempfile.mkdtemp()) / "knowledge_entry_ids.json"
+    client = _FakeClient(next_id="KNOW-0007")
 
+    ok1 = kdp._publish_to_knowledge_base(client, "dev", "Tytuł", "Treść 1", entry_ids_path=tmp_ids)
+    assert ok1 is True
+    assert client.created == [{"title": "Tytuł", "content": "Treść 1", "scope": "self"}]
+    assert client.updated == [], "pierwszy przebieg -> create, nie update"
+    assert json.loads(tmp_ids.read_text(encoding="utf-8")) == {"dev": "KNOW-0007"}
 
-def test_publish_to_knowledge_base_calls_configured_tool():
-    client = _FakeClient()
-    ok = kdp._publish_to_knowledge_base(
-        client, "dev", "Tytuł", "Treść", cfg={"knowledge_digest": {"mcp_tool": "upsert_knowledge_entry"}}
-    )
-    assert ok is True
-    assert client._mcp.calls == [("upsert_knowledge_entry", {"title": "Tytuł", "contentMarkdown": "Treść"})]
-    print("OK  narzedzie skonfigurowane -> woła je z tytulem i trescia")
+    ok2 = kdp._publish_to_knowledge_base(client, "dev", "Tytuł", "Treść 2", entry_ids_path=tmp_ids)
+    assert ok2 is True
+    assert len(client.created) == 1, "drugi przebieg NIE powinien tworzyć nowego wpisu"
+    assert client.updated == [{"knowledgeId": "KNOW-0007", "title": "Tytuł", "content": "Treść 2"}]
+    print("OK  pierwszy przebieg create_knowledge, kolejne update_knowledge tego samego wpisu (id z pliku)")
 
 
 def test_run_knowledge_digest_skips_role_without_token():
@@ -133,7 +134,6 @@ if __name__ == "__main__":
     test_build_digest_text_no_own_row_still_works()
     test_load_agent_env_missing_folder_returns_none()
     test_load_agent_env_reads_present_file()
-    test_publish_to_knowledge_base_no_tool_configured_is_noop()
-    test_publish_to_knowledge_base_calls_configured_tool()
+    test_publish_to_knowledge_base_creates_then_updates_same_entry()
     test_run_knowledge_digest_skips_role_without_token()
     print("\nWszystkie testy knowledge_digest_publisher przeszly.")

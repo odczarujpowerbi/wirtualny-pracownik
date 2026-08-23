@@ -12,23 +12,23 @@ digest_generator.py/weekly_team_report.py uzywaja do cotygodniowych podsumowan;
 tu wolane co godzine i per-konto (kazdy bot widzi SWOJ wiersz w perPerson +
 ogolny kontekst organizacji), zamiast raz w tygodniu i zbiorczo do komentarza.
 
-Zapis do bazy wiedzy: WYMAGA narzedzia MCP do zapisu. Na dzien napisania
-(22.08.2026) produkcja Projectly NIE MA takiego narzedzia - tylko get_knowledge/
-get_knowledge_base/get_knowledge_attachment (odczyt). Nazwa/schema przyszlego
-narzedzia zapisu jest NIEZNANA, wiec zamiast zgadywac ja na sztywno w kodzie
-(ryzyko cichego, blednego wywolania co godzine), czytamy ja z
-config/projectly.yaml -> knowledge_digest.mcp_tool. Puste/None = skrypt
-buduje i loguje tresc digestu, ale NIE probuje zapisac (fail-soft) - ustaw
-te wartosc, jak tylko nazwa narzedzia bedzie potwierdzona, bez zmiany kodu.
+Zapis do bazy wiedzy: MCP create_knowledge/update_knowledge (potwierdzone na
+produkcji 22.08.2026). Każde konto pisze WYŁĄCZNIE do własnego zakresu
+(scope="self", domyślne) - jeden, stały wpis per rola, NADPISYWANY co przebieg
+(update_knowledge), nie nowy wpis co godzinę - id utworzonego wpisu trzymamy
+lokalnie w runs/knowledge_entry_ids.json (nie ma narzędzia do usuwania wpisów,
+więc raz utworzony zostaje - stąd upsert po id, nie tworzenie na ślepo).
 """
 
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
 from mcp_client import MCPError
-from projectly_client import ProjectlyClient, _load_config
+from projectly_client import ProjectlyClient
 
 AGENTS_DIR = Path(__file__).parent / "secrets" / "agents"
+ENTRY_IDS_PATH = Path(__file__).parent / "runs" / "knowledge_entry_ids.json"
 ROLES = ["dev", "marketing", "zarzad"]
 BOT_DISPLAY_NAME = {"dev": "AI - Dev", "marketing": "AI - Marketing", "zarzad": "AI - Zarząd"}
 DEFAULT_TITLE = "Ostatnia aktywność (automatyczny digest)"
@@ -114,29 +114,45 @@ def build_digest_text(client, role, now=None):
     return "\n".join(lines)
 
 
-def _publish_to_knowledge_base(client, role, title, content, cfg=None):
-    """Zapisuje wpis bazy wiedzy w zakresie WLASNEGO konta (tozsamosc = token,
-    ten sam wzorzec co post_agent_status). Nazwa narzedzia MCP z configu - patrz
-    docstring modulu (cfg wstrzykiwalny - testowalnosc, domyslnie config/projectly.yaml).
-    Brak configu/blad MCP = tylko log, nie wywala przebiegu."""
-    cfg = (cfg if cfg is not None else _load_config()).get("knowledge_digest", {})
-    tool_name = cfg.get("mcp_tool")
-    if not tool_name:
-        print(
-            f"[knowledge_digest] [{role}] narzędzie MCP zapisu bazy wiedzy jeszcze "
-            f"nieskonfigurowane (config/projectly.yaml -> knowledge_digest.mcp_tool) "
-            f"- treść zbudowana, ale NIE zapisana:\n{content}\n"
-        )
-        return False
+def _load_entry_ids(path=ENTRY_IDS_PATH):
+    if path.exists():
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            return {}
+    return {}
+
+
+def _save_entry_ids(entry_ids, path=ENTRY_IDS_PATH):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(entry_ids, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _publish_to_knowledge_base(client, role, title, content, entry_ids_path=ENTRY_IDS_PATH):
+    """Upsert wpisu bazy wiedzy w zakresie WŁASNEGO konta (scope="self",
+    tożsamość = token — jak post_agent_status): pierwszy przebieg tworzy
+    (create_knowledge), kolejne NADPISUJĄ ten sam wpis (update_knowledge) po
+    id zapamiętanym w entry_ids_path — bez tego co godzinę powstawałby nowy
+    wpis, a nie ma narzędzia MCP do usuwania. Błąd MCP = tylko log, nie
+    wywala przebiegu (fail-soft, jak publish_status)."""
+    entry_ids = _load_entry_ids(entry_ids_path)
+    existing_id = entry_ids.get(role)
     try:
-        client._mcp.call_tool(tool_name, {"title": title, "contentMarkdown": content})
+        if existing_id:
+            client.update_knowledge(existing_id, title=title, content=content)
+        else:
+            result = client.create_knowledge(title, content, scope="self")
+            new_id = result.get("id") if isinstance(result, dict) else None
+            if new_id:
+                entry_ids[role] = new_id
+                _save_entry_ids(entry_ids, entry_ids_path)
         return True
     except MCPError as exc:
         print(f"[knowledge_digest] [{role}] zapis do bazy wiedzy nie powiódł się: {exc}")
         return False
 
 
-def run_knowledge_digest(roles=None, agents_dir=AGENTS_DIR):
+def run_knowledge_digest(roles=None, agents_dir=AGENTS_DIR, entry_ids_path=ENTRY_IDS_PATH):
     """Bezargumentowe dla job_scheduler.py (config/schedule.yaml, job
     'knowledge_digest_publisher', co godzinę). Zwraca {rola: wynik} - dla
     dashboardu (zakładka Skrypty) i testów."""
@@ -154,8 +170,8 @@ def run_knowledge_digest(roles=None, agents_dir=AGENTS_DIR):
             print(f"[knowledge_digest] [{role}] błąd pobierania danych (get_week_report): {exc}")
             results[role] = "blad_odczytu"
             continue
-        ok = _publish_to_knowledge_base(client, role, DEFAULT_TITLE, text)
-        results[role] = "opublikowano" if ok else "narzedzie_zapisu_niedostepne"
+        ok = _publish_to_knowledge_base(client, role, DEFAULT_TITLE, text, entry_ids_path=entry_ids_path)
+        results[role] = "opublikowano" if ok else "zapis_nieudany"
     return results
 
 

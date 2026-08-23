@@ -78,14 +78,11 @@ field_mapping:
   default_risk_level_hint: yellow
 
 # Cogodzinny digest "ostatnia aktywnosc" per konto AI -> baza wiedzy Projectly
-# (knowledge_digest_publisher.py). mcp_tool: nazwa narzedzia MCP do zapisu wpisu
-# bazy wiedzy - NIEUSTAWIONE, dopoki Projectly nie potwierdzi nazwy/schematu
-# (stan na 22.08.2026: produkcja ma tylko get_knowledge/get_knowledge_base/
-# get_knowledge_attachment, zaden zapis). Puste = skrypt czyta i loguje tresc,
-# ale swiadomie NIE probuje zapisac (fail-soft, zamiast zgadywac nazwe
-# nieistniejacego jeszcze narzedzia).
-knowledge_digest:
-  mcp_tool: null
+# (knowledge_digest_publisher.py). Zapis: MCP create_knowledge/update_knowledge
+# (potwierdzone na produkcji 22.08.2026), scope="self" - kazde konto pisze
+# wylacznie do wlasnego zakresu. Id utworzonego wpisu per rola trzymane w
+# app/runs/knowledge_entry_ids.json (upsert - jeden wpis, nadpisywany, nie
+# nowy co godzine; nie ma narzedzia MCP do usuwania wpisow).
 
 # --- Referencja: która funkcja MCP w jakiej sytuacji (zaszyta wiedza) ---
 # Nic tego nie parsuje — to mapa dla człowieka i dla agenta pracującego nad
