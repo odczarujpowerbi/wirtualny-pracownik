@@ -19,11 +19,20 @@ sensownych podzadań -> should_split=False, zadanie idzie normalną ścieżką
 
 import json
 
+import agentic_worker
 import cost_estimator
 import task_thinker
 
 MIN_SUBTASKS = 2
-MAX_SUBTASKS = 6
+MAX_SUBTASKS = 5
+
+# Budżet czasu jednego subagenta — ta sama liczba, co twardy timeout procesu
+# w agentic_worker.py (AGENTIC_TIMEOUT_SECONDS), żeby kryterium podziału nie
+# rozjechało się z rzeczywistym limitem wykonania. Decyzja właściciela
+# 24.08.2026: komputer się zawiesił po rozbiciu zadania na zbyt wiele
+# podzadań wykonywanych jedno po drugim — dzielić TYLKO gdy realnie się nie
+# zmieści w tym budżecie, nie z powodu samej liczby kroków.
+TIME_BUDGET_MINUTES = agentic_worker.AGENTIC_TIMEOUT_SECONDS // 60
 
 _ZDOLNOSCI_BOTA = (
     "- fetch_url: pobranie treści strony (GET, tylko odczyt)\n"
@@ -42,14 +51,19 @@ def _build_prompt(task):
         f"Kryteria akceptacji: {task.get('acceptance_criteria', '')}\n"
         f"Opis: {(task.get('description') or '')[:2000]}\n\n"
         f"Dziś bot ma te zdolności:\n{_ZDOLNOSCI_BOTA}\n\n"
-        "Zdecyduj: czy to zadanie da się wykonać wprost jedną z tych zdolności, czy "
-        "jest za duże/niejasne i lepiej rozbić je na proste podzadania, każde "
-        "mapujące się na JEDNĄ zdolność z listy (albo wąski task tekstowy)? Rozbijaj "
-        f"TYLKO gdy to realnie ułatwi wykonanie — od {MIN_SUBTASKS} do {MAX_SUBTASKS} "
-        "podzadań, każde z jednoznacznym tytułem i opisem (co zrobić, jak sprawdzić "
-        "czy zrobione dobrze). Gdy zadanie już jest proste/jednoznaczne — nie rozbijaj.\n\n"
+        "Zdecyduj: da się to wykonać JEDNYM ciągłym przebiegiem subagenta "
+        f"(Read/Write/Edit, bez przerwy) w ~{TIME_BUDGET_MINUTES} minutach, czy "
+        "realnie nie zmieści się w tym czasie? To jest JEDYNE kryterium podziału — "
+        "nie liczba kroków ani to, że zadanie 'ma kilka części'. Najpierw oszacuj "
+        "czas w minutach (estimated_minutes), potem z NIEGO wyprowadź split: "
+        f"gdy estimated_minutes <= {TIME_BUDGET_MINUTES} -> split=false, nawet jeśli "
+        "zadanie wygląda na wieloetapowe. Gdy split=true — rozbij na od "
+        f"{MIN_SUBTASKS} do {MAX_SUBTASKS} podzadań, każde mapujące się na JEDNĄ "
+        "zdolność z listy (albo wąski task tekstowy), z jednoznacznym tytułem i "
+        "opisem (co zrobić, jak sprawdzić czy zrobione dobrze), każde SAMO w "
+        f"budżecie ~{TIME_BUDGET_MINUTES} minut.\n\n"
         "Odpowiedz WYŁĄCZNIE obiektem JSON, bez komentarza:\n"
-        '{"split": true|false, "reasoning": "<1-2 zdania>", '
+        '{"estimated_minutes": <liczba>, "split": true|false, "reasoning": "<1-2 zdania>", '
         '"subtasks": [{"title": "...", "description": "..."}]}'
     )
 
@@ -72,7 +86,11 @@ def _parse_decision(answer_text):
         {"title": str(s.get("title") or "").strip(), "description": str(s.get("description") or "").strip()}
         for s in data["subtasks"] if isinstance(s, dict) and str(s.get("title") or "").strip()
     ]
-    return {"split": data["split"], "reasoning": str(data.get("reasoning") or "").strip(), "subtasks": subtasks}
+    estimated_minutes = data.get("estimated_minutes")
+    if not isinstance(estimated_minutes, (int, float)) or isinstance(estimated_minutes, bool):
+        estimated_minutes = None
+    return {"split": data["split"], "reasoning": str(data.get("reasoning") or "").strip(),
+            "subtasks": subtasks, "estimated_minutes": estimated_minutes}
 
 
 def decide(task):
@@ -97,6 +115,16 @@ def decide(task):
             else (decyzja["reasoning"] or "Model uznał zadanie za wystarczająco proste.")
         return {"should_split": False, "reasoning": reason, "subtasks": [],
                 "cost_usd": cost_usd, "source": odpowiedz.get("source")}
+
+    # Model sam sobie zaprzeczył (chce dzielić, ale własny szacunek mieści się
+    # w budżecie) — fail-closed w stronę NIE dzielenia, żeby liczba kroków
+    # sama z siebie nie napędzała dekompozycji.
+    est = decyzja["estimated_minutes"]
+    if est is not None and est <= TIME_BUDGET_MINUTES:
+        return {"should_split": False,
+                "reasoning": f"Model oszacował {est} min (budżet {TIME_BUDGET_MINUTES} min), mimo to "
+                             "chciał dzielić — sprzeczne, zadanie idzie normalną ścieżką.",
+                "subtasks": [], "cost_usd": cost_usd, "source": odpowiedz.get("source")}
 
     subtasks = decyzja["subtasks"]
     if len(subtasks) < MIN_SUBTASKS:

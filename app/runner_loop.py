@@ -24,7 +24,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-import env_bootstrap  # noqa: F401  # wczytuje .env / secrets/.env (patrz .env.example, bootstrap_init_secrets.py)
+import env_bootstrap  # wczytuje .env / secrets/.env (patrz .env.example, bootstrap_init_secrets.py); też _current_role()
 
 import agentic_worker
 import bot_gustaw_bramka
@@ -53,6 +53,15 @@ HINT_TO_ACTION = {
     "yellow": "report_build",
     "red": "budget_change",
 }
+
+# Ile zadań przetwarzamy w JEDNYM przebiegu run_once. get_new_tasks() nie ma
+# własnego limitu (Projectly zwraca wszystko ze statusem "todo") — bez tego
+# capa duży zaległy backlog (np. po rozbiciu zadania na podzadania) trafiał w
+# całości do jednej, sekwencyjnej pętli i mógł zajmować maszynę godzinami bez
+# przerwy (żywy incydent 24.08.2026: ~50 zadań na raz). Reszta nie przepada —
+# zostaje w Projectly ze statusem "todo" i czeka na kolejny poll (30s, patrz
+# schedule.yaml), więc to naturalna kolejka, nie utrata zadań.
+MAX_TASKS_PER_RUN = 5
 
 
 def now_iso():
@@ -510,6 +519,11 @@ def run_once(client=None):
     heartbeat.write_heartbeat(current_task_id=None)
 
     tasks = client.get_new_tasks()
+    deferred = []
+    if len(tasks) > MAX_TASKS_PER_RUN:
+        print(f"{len(tasks)} nowych zadań — przetwarzam {MAX_TASKS_PER_RUN} w tym przebiegu, "
+              "reszta zaczeka na kolejny poll.")
+        deferred, tasks = tasks[MAX_TASKS_PER_RUN:], tasks[:MAX_TASKS_PER_RUN]
     results = []
     for task in tasks:
         heartbeat.write_heartbeat(current_task_id=task["task_id"])
@@ -517,7 +531,14 @@ def run_once(client=None):
 
     budget = cost_tracker.budget_state()
     heartbeat.write_heartbeat(current_task_id=None, extra={"budget": budget})
-    live_status_publisher.publish(client, role="dev")
+    # Rola z config/role.json (dev/marketing/zarząd...), NIE stały "dev" — inaczej
+    # maszyna z inną rolą publikowałaby swój status na żywo pod cudzą etykietą
+    # (żywy błąd, znaleziony 24.08.2026 przy rozszerzaniu statusu o kolejkę zadań).
+    live_status_publisher.publish(
+        client, role=env_bootstrap._current_role(),
+        processed_tasks=[{"task_id": t["task_id"], "title": t.get("title", "")} for t in tasks],
+        queued_tasks=[{"task_id": t["task_id"], "title": t.get("title", "")} for t in deferred],
+    )
 
     if budget["level"] != "ok":
         print(

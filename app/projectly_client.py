@@ -147,6 +147,27 @@ def _map_status_payload(payload):
         if repairs:
             mapped["health"] = "alert"
 
+    # Trzeci znany kształt bez własnego message: live_status_publisher.py
+    # (queued_tasks/processed_this_cycle). Bez syntezy queueDepth widać jako
+    # liczba, ale KTÓRE to zadania (tytuł/id, o co user prosił 24.08.2026)
+    # ginęłoby w 'details', które produkcja dziś ignoruje.
+    if "message" not in mapped and "queued_tasks" in payload:
+        def _etykieta(t):
+            return str(t.get("title") or t.get("task_id") or "?")[:60]
+
+        processed = payload.get("processed_this_cycle") or []
+        queued = payload.get("queued_tasks") or []
+        parts = []
+        if processed:
+            parts.append("Ostatnio wykonane: " + ", ".join(_etykieta(t) for t in processed))
+        if queued:
+            est = payload.get("estimated_minutes_to_clear_queue")
+            czas = f", ~{est} min" if est else ""
+            parts.append(f"W kolejce ({len(queued)}{czas}): " + ", ".join(_etykieta(t) for t in queued))
+        else:
+            parts.append("Kolejka pusta")
+        mapped["message"] = (" | ".join(parts))[:500]
+
     # 'details' wysyłamy mimo braku pola w dzisiejszym schemacie produkcyjnym: zod domyślnie
     # ignoruje nierozpoznane klucze (potwierdzone testem na żywo), więc to nieszkodliwe —
     # a gdy Projectly doda pole 'details', zacznie działać bez zmiany tego kodu.
