@@ -201,6 +201,10 @@ def raport_mailerlite(task, klient=None, dzis=None):
         # Rerun musi zwrócić DOKŁADNIE ten sam kształt co output — Bartek
         # porównuje sygnatury i inaczej każde zadanie wyglądałoby na losowe.
         "rerun": lambda: _sygnatura_mailerlite(klient, okres),
+        # Dane do arkusza Excel obok wynik.md (runner_loop._save_result_to_onedrive) —
+        # bez treści maila (tresc_plain), ta idzie tylko do analizy tonu, nie do arkusza.
+        "table_title": "Kampanie MailerLite %s" % okres["opis"],
+        "table_rows": [{k: v for k, v in kampania.items() if k != "tresc_plain"} for kampania in kampanie],
     }
 
 
@@ -257,7 +261,7 @@ def podsumowanie_zanfia(task, klient=None, dzis=None):
             "Surowe dane leżą w pliku %s." % (odpowiedz.get("detail", "brak modelu"), sciezka),
             "zanfia_query", sygnatura)
 
-    return {
+    wynik_dict = {
         "cost_usd": odpowiedz.get("cost_usd", 0.0),
         "tool": "zanfia_query",
         "executed": True,
@@ -269,3 +273,11 @@ def podsumowanie_zanfia(task, klient=None, dzis=None):
         "rerun": lambda: {"zrodlo": "zanfia", "od": okres["od"].isoformat(), "do": okres["do"].isoformat(),
                           "narzedzie_mcp": wynik.get("narzedzie"), "argumenty": wynik.get("argumenty")},
     }
+    # Kształt odpowiedzi Zanfia nie jest znany z góry (patrz komentarz przy
+    # `tresc` wyżej) — arkusz dopisujemy TYLKO gdy dane realnie są listą
+    # płaskich rekordów; inny kształt (dict/liczba/tekst) zostaje bez arkusza,
+    # bez wyjątku.
+    if isinstance(dane, list) and dane and all(isinstance(d, dict) for d in dane):
+        wynik_dict["table_title"] = "Zanfia %s" % okres["opis"]
+        wynik_dict["table_rows"] = dane
+    return wynik_dict

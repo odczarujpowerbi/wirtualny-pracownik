@@ -139,11 +139,19 @@ def run():
     checks.append(("MailerLite: rerun() zwraca dokładnie ten sam kształt co output",
                    wynik["rerun"]() == wynik["output"]))
     checks.append(("MailerLite: raport bez modelu nie generuje kosztu", wynik["cost_usd"] == 0.0))
+    checks.append(("MailerLite: table_rows do arkusza ma dokładnie kampanie z okresu",
+                   len(wynik["table_rows"]) == 3))
+    checks.append(("MailerLite: table_rows NIE niesie treści maila (tresc_plain)",
+                   all("tresc_plain" not in row for row in wynik["table_rows"])))
+    checks.append(("MailerLite: table_title nazywa konkretny okres",
+                   "13-19 sierpnia 2026" in wynik["table_title"]))
 
     # --- MailerLite: przypadki brzegowe ---
     pusty = integracje_worker.raport_mailerlite(ZADANIE_ML, klient=AtrapaMailerLitePusta(), dzis=DZIS)
     checks.append(("MailerLite: zero wysyłek to poprawny wynik, nie błąd",
                    pusty["executed"] is True and "nie wysłano żadnej kampanii" in pusty["acceptance_notes"]))
+    checks.append(("MailerLite: zero wysyłek -> brak table_rows (nic do arkusza)",
+                   "table_rows" not in pusty))
 
     z_mocka = integracje_worker.raport_mailerlite(ZADANIE_ML, klient=AtrapaMailerLiteMock(), dzis=DZIS)
     checks.append(("MailerLite: dane z mocka NIE budują materiału (odmowa)",
@@ -192,6 +200,21 @@ def run():
         checks.append(("Zanfia: happy path zwraca podsumowanie i sygnaturę z nazwą narzędzia MCP",
                        zan_ok["executed"] is True and zan_ok["output"]["narzedzie_mcp"] == "get_orders"))
         checks.append(("Zanfia: koszt modelu jest raportowany", zan_ok["cost_usd"] == 0.002))
+        # AtrapaZanfia.call() zwraca {"orders": [...]} (dict opakowujący listę) — to
+        # jest DOKŁADNIE ten "kształt nieznany z góry" z docstringu; skoro `dane`
+        # sam nie jest listą, best-effort eksport do arkusza NIE powinien się włączyć.
+        checks.append(("Zanfia: dict opakowujący listę (kształt serwera) -> brak table_rows, brak wyjątku",
+                       zan_ok["executed"] is True and "table_rows" not in zan_ok))
+
+        klient_zan_lista = AtrapaZanfia(narzedzia_ok)
+        klient_zan_lista.call = lambda nazwa, argumenty=None: [
+            {"course": "Power BI od zera", "amount": 499, "date": "2026-08-15"},
+            {"course": "DAX praktycznie", "amount": 299, "date": "2026-08-17"},
+        ]
+        zan_ok_lista = integracje_worker.podsumowanie_zanfia(ZADANIE_ZAN, klient=klient_zan_lista, dzis=DZIS)
+        checks.append(("Zanfia: serwer zwraca listę płaskich rekordów -> table_rows dołożone do arkusza",
+                       "table_rows" in zan_ok_lista and len(zan_ok_lista["table_rows"]) == 2
+                       and zan_ok_lista["table_rows"][0]["course"] == "Power BI od zera"))
     finally:
         integracje_worker.web_answer.answer = original
 
