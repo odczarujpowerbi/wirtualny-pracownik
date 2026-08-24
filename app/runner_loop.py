@@ -29,13 +29,12 @@ import env_bootstrap  # noqa: F401  # wczytuje .env / secrets/.env (patrz .env.e
 import bot_gustaw_bramka
 import control
 import cost_tracker
-import document_builder
 import executor
 import heartbeat
 import kill_switch
 import poprawka_materialu
 import live_status_publisher
-import report_builder
+import output_decider
 import risk_classifier
 import risk_hint
 import skill_usage_logger
@@ -87,14 +86,14 @@ def _save_result_to_onedrive(task, status, comment, execution_result=None):
     zapis do SharePoint — bez potrzeby Microsoft Graph (patrz sharepoint_client.py,
     dziś zablokowany brakiem uprawnienia Sites.ReadWrite.All).
 
-    Gdy `execution_result` niesie dane tabelaryczne (`table_rows`, np. lista
-    kampanii MailerLite z integracje_worker.raport_mailerlite) — decyzja
-    właściciela 24.08.2026: obok wynik.md ma zawsze powstać analiza.xlsx,
-    bez osobnej zgody, ten sam standard co dla wynik.md.
+    Jaki DOKŁADNIE plik powstaje (md/docx/pdf/xlsx) decyduje `output_decider.py`
+    — Agent sterujący, per zadanie, na podstawie realnego wyniku — nie sztywna
+    reguła w tym kodzie (decyzja właściciela 24.08.2026: żadne "źródło X ->
+    format Y"). Dokładnie JEDEN plik `wynik.<format>` per zadanie.
 
-    Fail-soft: brak ONEDRIVE_TASKS_ROOT albo błąd zapisu NIE MOŻE zablokować
-    przetwarzania zadania — to dodatkowy ślad, nie krytyczny krok pipeline'u.
-    Zwraca ścieżkę folderu albo None, gdy nie zapisano.
+    Fail-soft: brak ONEDRIVE_TASKS_ROOT albo błąd zapisu (w tym błąd wywołania
+    modelu) NIE MOŻE zablokować przetwarzania zadania — to dodatkowy ślad, nie
+    krytyczny krok pipeline'u. Zwraca ścieżkę folderu albo None, gdy nie zapisano.
 
     Nazwa folderu: PEŁNE task_id na początku (decyzja właściciela 23.08.2026 —
     id jako przedrostek, żeby zadanie było łatwe do wyszukania po id), potem
@@ -110,15 +109,12 @@ def _save_result_to_onedrive(task, status, comment, execution_result=None):
             return None  # OneDrive nie zsynchronizowany na tej maszynie — nie twórz sierocego folderu
         data = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         folder = root_path / f"{task['task_id']}_{data}_{_slug(task.get('title', ''))}"
-        sections = [
-            {"heading": "Status", "text": status},
-            {"heading": "Wynik", "text": comment},
-        ]
-        document_builder.build_md(task.get("title") or "Zadanie", sections, folder / "wynik.md")
-        rows = execution_result.get("table_rows") if execution_result else None
-        if rows:
-            title = execution_result.get("table_title") or task.get("title") or "Analiza"
-            report_builder.write_xlsx_report(title, rows, folder / "analiza.xlsx")
+        acceptance_notes = (execution_result or {}).get("acceptance_notes") or comment
+        table_rows = (execution_result or {}).get("table_rows")
+        decision = output_decider.decide(task, status, comment, execution_result)
+        if decision["cost_usd"]:
+            cost_tracker.record_cost(task["task_id"], decision["cost_usd"])
+        output_decider.build_file(task, decision, acceptance_notes, table_rows, folder)
         return str(folder)
     except Exception:  # noqa: BLE001 — zapis dodatkowy, błąd nie może ubić przetwarzania zadania
         return None

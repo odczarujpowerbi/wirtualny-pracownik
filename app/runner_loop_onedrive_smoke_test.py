@@ -1,8 +1,9 @@
 """
-Test dymny runner_loop._save_result_to_onedrive — konkretnie eksportu
-analiza.xlsx obok wynik.md, gdy execution_result niesie table_rows (decyzja
-właściciela 24.08.2026, patrz docstring funkcji). Zero sieci, zero prawdziwego
-OneDrive — ONEDRIVE_TASKS_ROOT wskazuje na katalog tymczasowy.
+Test dymny runner_loop._save_result_to_onedrive — sprawdza, że dla każdego
+przetworzonego zadania powstaje DOKŁADNIE JEDEN plik wynik.<format> w
+per-zadaniowym folderze, gdzie format wybiera output_decider.decide()
+(Agent sterujący). Zero sieci — task_thinker.ask_model jest podmieniany
+atrapą, żeby test nie zależał od prawdziwego wywołania modelu.
 
 Użycie:
     python runner_loop_onedrive_smoke_test.py
@@ -14,6 +15,7 @@ import tempfile
 from pathlib import Path
 
 import runner_loop
+import task_thinker
 
 TASK = {"task_id": "T-XLSX", "title": "Zestawienie kampanii MailerLite"}
 TABLE_ROWS = [
@@ -22,57 +24,68 @@ TABLE_ROWS = [
 ]
 
 
+def _atrapa(text, available=True, source="claude_code"):
+    return lambda prompt, caller=None: {"available": available, "text": text,
+                                        "source": source, "detail": "OK"}
+
+
 def run():
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
     checks = []
     original_root = os.environ.get("ONEDRIVE_TASKS_ROOT")
+    original_ask_model = task_thinker.ask_model
 
     try:
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
 
-            # 1. Happy path: execution_result z table_rows -> wynik.md I analiza.xlsx.
+            # 1. Happy path: model wybiera xlsx, execution_result ma table_rows ->
+            #    dokładnie jeden plik, wynik.xlsx.
             os.environ["ONEDRIVE_TASKS_ROOT"] = str(tmp / "Zadania-Agenta")
-            execution_result = {"table_title": "Kampanie MailerLite", "table_rows": TABLE_ROWS}
+            task_thinker.ask_model = _atrapa('{"format": "xlsx", "reasoning": "Dane liczbowe."}')
+            execution_result = {"acceptance_notes": "Zestawienie kampanii.", "table_rows": TABLE_ROWS}
             folder = runner_loop._save_result_to_onedrive(TASK, "done", "Zrobione.", execution_result)
             checks.append(("Zwrócono ścieżkę folderu", folder is not None))
             folder_path = Path(folder) if folder else None
-            checks.append(("wynik.md istnieje", folder_path is not None and (folder_path / "wynik.md").exists()))
-            xlsx_path = folder_path / "analiza.xlsx" if folder_path else None
-            checks.append(("analiza.xlsx istnieje", xlsx_path is not None and xlsx_path.exists()))
-            checks.append(("analiza.xlsx nie jest pusty",
-                           xlsx_path is not None and xlsx_path.exists() and xlsx_path.stat().st_size > 0))
+            checks.append(("wynik.xlsx istnieje", folder_path is not None and (folder_path / "wynik.xlsx").exists()))
+            checks.append(("Dokładnie JEDEN plik wynik.* w folderze",
+                           folder_path is not None and len(list(folder_path.glob("wynik.*"))) == 1))
 
-            # 2. Regresja: bez table_rows (albo bez execution_result) -> tylko wynik.md,
-            #    zachowanie sprzed zmiany.
+            # 2. Model niedostępny -> fail-closed na PDF, wciąż dokładnie jeden plik.
+            task_thinker.ask_model = _atrapa(None, available=False)
             folder2 = runner_loop._save_result_to_onedrive(
-                {"task_id": "T-BEZ-XLSX", "title": "Zadanie bez danych tabelarycznych"}, "done", "Zrobione.")
+                {"task_id": "T-BEZ-MODELU", "title": "Zadanie bez modelu"}, "done", "Zrobione.",
+                {"acceptance_notes": "Wynik bez table_rows."})
             folder2_path = Path(folder2) if folder2 else None
-            checks.append(("Bez execution_result: wynik.md istnieje",
-                           folder2_path is not None and (folder2_path / "wynik.md").exists()))
-            checks.append(("Bez execution_result: brak analiza.xlsx",
-                           folder2_path is not None and not (folder2_path / "analiza.xlsx").exists()))
+            checks.append(("Brak modelu: wynik.pdf istnieje (fail-closed default)",
+                           folder2_path is not None and (folder2_path / "wynik.pdf").exists()))
+            checks.append(("Brak modelu: dokładnie JEDEN plik wynik.*",
+                           folder2_path is not None and len(list(folder2_path.glob("wynik.*"))) == 1))
 
+            # 3. Bez execution_result (np. wczesna eskalacja prompt injection) -> wciąż
+            #    powstaje plik, treść budowana z samego comment.
+            task_thinker.ask_model = _atrapa('{"format": "md", "reasoning": "Notatka techniczna."}')
             folder3 = runner_loop._save_result_to_onedrive(
-                {"task_id": "T-PUSTE-ROWS", "title": "Zadanie z puste table_rows"}, "done", "Zrobione.",
-                {"table_rows": []})
+                {"task_id": "T-BEZ-EXEC", "title": "Eskalacja bez execution_result"}, "needs_approval",
+                "Wykryto podejrzaną treść.")
             folder3_path = Path(folder3) if folder3 else None
-            checks.append(("table_rows=[] (puste) -> brak analiza.xlsx",
-                           folder3_path is not None and not (folder3_path / "analiza.xlsx").exists()))
+            checks.append(("Bez execution_result: plik i tak powstaje",
+                           folder3_path is not None and (folder3_path / "wynik.md").exists()))
 
-            # 3. Error case: katalog nadrzędny ONEDRIVE_TASKS_ROOT nie istnieje ->
-            #    fail-soft, zwraca None, nie rzuca.
+            # 4. Error case: katalog nadrzędny ONEDRIVE_TASKS_ROOT nie istnieje ->
+            #    fail-soft, zwraca None, nie rzuca (model nie jest nawet wołany).
             os.environ["ONEDRIVE_TASKS_ROOT"] = str(tmp / "brak_takiego_katalogu" / "Zadania-Agenta")
             folder_missing = runner_loop._save_result_to_onedrive(TASK, "done", "Zrobione.", execution_result)
             checks.append(("Brak zsynchronizowanego OneDrive -> None, bez wyjątku", folder_missing is None))
 
-            # 4. Error case: brak ONEDRIVE_TASKS_ROOT w env -> None.
+            # 5. Error case: brak ONEDRIVE_TASKS_ROOT w env -> None.
             del os.environ["ONEDRIVE_TASKS_ROOT"]
             folder_no_env = runner_loop._save_result_to_onedrive(TASK, "done", "Zrobione.", execution_result)
             checks.append(("Brak ONEDRIVE_TASKS_ROOT -> None, bez wyjątku", folder_no_env is None))
     finally:
+        task_thinker.ask_model = original_ask_model
         if original_root is None:
             os.environ.pop("ONEDRIVE_TASKS_ROOT", None)
         else:

@@ -21,6 +21,7 @@ poziomy:
 tiers:
   # --- mechanizm agenta (task_thinker.py) ---
   task_thinker.think: high              # analiza zadania (co rozumiem/plan/ryzyka) - runner_loop
+  output_decider.decide: high            # wybor formatu pliku wyniku (pdf/docx/md/xlsx) - decyzja per zadanie
   web_answer.answer: low                 # pisanie tresci z pobranych danych wg scisle opisanych regul
   poprawka_materialu.popraw: low         # naniesienie konkretnej listy zastrzezen na material
 

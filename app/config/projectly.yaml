@@ -47,6 +47,7 @@ poll:
   # (literówka nie może wyglądać jak "brak zadań").
   extra_accounts:
     - "AI - Marketing"
+    - "AI - Zarząd"
 
 # Status na żywo per rola (live_status_publisher.py, machine_status_reporter.py,
 # kacper_monitor.py, system_health_monitor.py — wszystkie przez
