@@ -58,7 +58,7 @@
 
   <h2><span class="n">4</span> Kontekst projektów</h2>
   <div class="card">
-    <p><code>app/kontekst/projekty/*.md</code> — jeden plik na projekt klienta z Projectly, z sekcjami <code>[do uzupełnienia]</code> tam, gdzie potrzebna jest wiedza właściciela (kto jest po drugiej stronie, jakie systemy, na czym stanęło). <code>kontekst_projektow_seed.py</code> generuje szkice z danych, które już są w Projectly (nazwa, marka, tematy zadań) — <b>nigdy nie nadpisuje</b> pliku już uzupełnionego, i pomija projekty prywatne.</p>
+    <p><code>app/kontekst/projekty/*.md</code> — głównie jeden plik na projekt klienta z Projectly (np. <code>dev-*.md</code>), z sekcjami <code>[do uzupełnienia]</code> tam, gdzie potrzebna jest wiedza właściciela (kto jest po drugiej stronie, jakie systemy, na czym stanęło). <code>kontekst_projektow_seed.py</code> generuje szkice z danych, które już są w Projectly (nazwa, marka, tematy zadań) — <b>nigdy nie nadpisuje</b> pliku już uzupełnionego, i pomija projekty prywatne. Obok plików per-klient leżą też pliki tematyczne/wewnętrzne (np. <code>administracyjne.md</code>, <code>szkolenia.md</code>, <code>sprzedaz-*.md</code>) — ten sam mechanizm dopasowania po treści, tylko temat nie jest jednym klientem.</p>
     <p>Plik projektu jest dobierany po nazwie z jego nagłówka, gdy pada w treści zadania ("popraw raport dla Magnapharm" → <code>dev-magnapharm.md</code>), i jest dokładany na końcu bloku kontekstu (najbardziej szczegółowy, więc bije ogólne zasady marki). Szkic z samymi znacznikami <code>[do uzupełnienia]</code> nie trafia do promptu — nie zajmuje miejsca bez treści.</p>
   </div>
 

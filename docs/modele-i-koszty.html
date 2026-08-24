@@ -61,11 +61,13 @@
   </table>
   <div class="callout warnc"><b>Nie istnieje:</b> "Sonnet 4.8" — zweryfikowane na żywo w tej sesji (<code>claude --model sonnet-4-8</code> → błąd "unrecognized model"). Częsta pomyłka z Sonnet 4.6, który realnie istnieje i działa.</div>
 
-  <h2><span class="n">4</span> Kto jest na jakim poziomie (11 miejsc)</h2>
+  <h2><span class="n">4</span> Kto jest na jakim poziomie (12 miejsc)</h2>
   <table>
     <thead><tr><th style="width:30%">Miejsce w kodzie</th><th>Rola</th><th style="width:12%">Poziom</th></tr></thead>
     <tbody>
       <tr><td><code>task_thinker.think</code></td><td>Analiza zadania (co rozumiem / plan / ryzyka / rekomendacja)</td><td><span class="tag err">high</span></td></tr>
+      <tr><td><code>task_decomposer.decide</code></td><td>Czy zadanie rozbić na podzadania (24.08.2026)</td><td><span class="tag err">high</span></td></tr>
+      <tr><td><code>output_decider.decide</code></td><td>Jaki format ma mieć plik wyniku — pdf/docx/md/xlsx (24.08.2026)</td><td><span class="tag err">high</span></td></tr>
       <tr><td><code>bot_oskar_wizja.review</code></td><td>Ocena zrzutu ekranu w bramce jakości</td><td><span class="tag err">high</span> ⬆</td></tr>
       <tr><td><code>validators.visual_review</code></td><td>Ocena zrzutu względem oczekiwanego rezultatu</td><td><span class="tag err">high</span> ⬆</td></tr>
       <tr><td><code>web_answer.answer</code></td><td>Pisanie treści z pobranych danych wg reguł</td><td><span class="tag ok">low</span></td></tr>

@@ -36,9 +36,9 @@
       <tr><td>Pętla + klasyfikacja + routing + audyt</td><td><span class="tag ok">działa</span></td><td>Pełny cykl, każda decyzja w <code>state.db</code> z uzasadnieniem.</td></tr>
       <tr><td>Realny Projectly (kolejka zadań)</td><td><span class="tag ok">działa</span></td><td>Agent pobiera i komentuje prawdziwe zadania na koncie AI Dev.</td></tr>
       <tr><td>Monitorowanie floty (status na żywo)</td><td><span class="tag ok">działa</span></td><td>MCP <code>post_agent_status</code> zweryfikowany na produkcji (22.08.2026, 4 role) — zakładka master „Monitorowanie agentów" w Projectly zastąpiła stary mechanizm strony dokumentacji. Zobacz <a href="panel-operatora.html">Panel operatora</a> sekcja 4.</td></tr>
-      <tr><td>Bramka jakości (5 botów)</td><td><span class="tag ok">działa</span></td><td>Powtarzalna: to samo zadanie daje ten sam werdykt (rozdział blokujące/sugestie).</td></tr>
+      <tr><td>Bramka jakości (4 boty)</td><td><span class="tag ok">działa</span></td><td>Powtarzalna: to samo zadanie daje ten sam werdykt (rozdział blokujące/sugestie). Gustaw + Bartek/Franek/Oskar — bot odbioru biznesowego (Bożena) usunięty 22.08.2026.</td></tr>
       <tr><td>Kontrakt uprawnień (pliki + domeny)</td><td><span class="tag ok">działa</span></td><td>Egzekwowany w ścieżce wykonania, fail-closed.</td></tr>
-      <tr><td>Rejestr modeli i poziomy (high/low)</td><td><span class="tag ok">działa</span></td><td>11 miejsc zmigrowanych, cennik naprawiony (był 3× zawyżony dla Opusa).</td></tr>
+      <tr><td>Rejestr modeli i poziomy (high/low)</td><td><span class="tag ok">działa</span></td><td>12 miejsc zmigrowanych (24.08.2026: +<code>task_decomposer.decide</code>, +<code>output_decider.decide</code>), cennik naprawiony (był 3× zawyżony dla Opusa).</td></tr>
       <tr><td>Worker: pobranie i pisanie treści z internetu</td><td><span class="tag ok">działa</span></td><td>Web fetch + odpowiedź na zadanie + samodzielna korekta/fallback źródła.</td></tr>
       <tr><td>Pętla poprawek (bez eskalacji za drobiazgi)</td><td><span class="tag ok">działa</span></td><td>Zweryfikowane: zadanie odrzucane 3× z rzędu przeszło po automatycznych poprawkach.</td></tr>
       <tr><td>Kontekst firmy (marki, projekty)</td><td><span class="tag ok">działa</span></td><td>Dobór po treści zadania, fail-closed przy niejednoznaczności.</td></tr>

@@ -39,7 +39,7 @@
       <tr><td>Ochrona sekretów <span class="tag ok">jest</span></td><td>Klucze nigdy w repo/logach/zrzutach; maskowanie pól. Sekrety w <code>app/secrets/</code> (poza gitem).</td></tr>
       <tr><td>Ślad audytowy <span class="tag ok">jest</span></td><td>Każda decyzja w SQLite: kto/co/dlaczego/model/koszt. Eksport CSV/JSONL do analizy.</td></tr>
       <tr><td>Kontrola prompt injection <span class="tag ok">jest</span></td><td>Treść zewnętrzna (z zadania i z internetu) sprawdzana przed klasyfikacją i przed podaniem do modelu; wykrycie zawsze eskaluje.</td></tr>
-      <tr><td>Kill switch kosztowy <span class="tag ok">jest</span></td><td><code>cost_tracker.py</code> sumuje koszt dzienny; po przekroczeniu limitu zatrzymuje pętlę. Limit: <code>config/daily_cost_limit_usd.txt</code> (dziś 3000 USD).</td></tr>
+      <tr><td>Kill switch kosztowy <span class="tag ok">jest</span></td><td><code>cost_tracker.py</code> sumuje koszt dzienny; po przekroczeniu limitu zatrzymuje pętlę. Limit: <code>config/daily_cost_limit_usd.txt</code> (dziś 3000 USD). Wcześniejszy, miękki próg (domyślnie 92% limitu, <code>budget_state()</code>) NIE przerywa trwającego zadania — tylko wstrzymuje zaczynanie nowych, samo-czyszczący się następnego dnia.</td></tr>
     </tbody>
   </table>
 

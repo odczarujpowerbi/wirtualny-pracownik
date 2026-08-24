@@ -37,9 +37,12 @@
     <div class="card"><h3><span>Bartek — dubler</span><span class="tag ok">działa</span></h3><p>Powtarza zadanie i porównuje sygnatury dwóch przebiegów — wychwytuje niedeterminizm. Bez sposobu na powtórkę (brak <code>rerun</code>) uczciwie zwraca "pominięto", nie zgaduje.</p></div>
     <div class="card"><h3><span>Franek — funkcjonalny</span><span class="tag ok">działa</span></h3><p>Twarde testy na realnym efekcie (plik istnieje, JSON się parsuje, struktura PBIP poprawna). Czysty kod, nie woła modelu.</p></div>
     <div class="card"><h3><span>Oskar — wizja</span><span class="tag ok">działa</span></h3><p>Ocena zrzutu ekranu modelem wizyjnym. Poziom <b>wysoki</b> (osąd, świadomie podniesiony z Sonnet 4.5 — wymaga pewności na cyfrach/detalach). Brak zrzutu = pominięcie, nie blokuje, gdy efekt nie jest z natury wizualny.</p></div>
+    <div class="card"><h3><span>Kacper — monitor</span><span class="tag ok">działa</span></h3><p>Czyta wspólny dziennik (<code>state_store.events</code> + historię schedulera), wykrywa POWTARZALNE awarie (job albo skill) i zakłada jedno zadanie naprawcze dziennie (dedup). Cyklicznie w schedulerze (<code>config/schedule.yaml</code>, <code>kacper_monitor.py</code>).</p></div>
   </div>
 
   <p class="lead"><b>Uwaga (22.08.2026):</b> bot odbioru biznesowego (Bożena) został usunięty z bramki na decyzję właściciela — zbyt często eskalował poprawnie wykonane zadania. Bramka dalej działa fail-closed przez pozostałe 3 boty; <code>gate.mandatory</code> jest dziś puste (żaden bot nie ma twardego weta), <code>required_approvals: 1</code>.</p>
+
+  <p class="lead"><b>Dodane 24.08.2026:</b> dwie kolejne decyzje Agenta sterującego, bez przyjaznych imion (nowe, jeszcze nienazwane role) — czy zadanie rozbić na podzadania (<code>task_decomposer.py</code>) i jaki format ma mieć plik wyniku (<code>output_decider.py</code>). Obie fail-closed, obie szczegółowo opisane w <a href="przeplyw-zadania.html">Przepływie zadania</a> (sekcje 5-6).</p>
 
   <h2><span class="n">2</span> Zaplanowane, jeszcze nie zbudowane</h2>
   <table>
@@ -48,7 +51,6 @@
       <tr><td><b>Aldona</b></td><td>Przeglądarka (Claude Desktop / Playwright) — zadania webowe wymagające klikania. <span class="tag warn">plan</span></td></tr>
       <tr><td><b>Asia</b></td><td>Klikacz (computer use) — sterowanie ekranem desktopowym poza przeglądarką. <span class="tag warn">plan</span></td></tr>
       <tr><td><b>Michał</b></td><td>Weryfikator/orkiestrator — podgląda innych, robi zrzuty, zarządza wieloma ekranami naraz. <span class="tag warn">plan</span></td></tr>
-      <tr><td><b>Kacper</b></td><td>Monitor i samo-naprawa — czyta wspólny dziennik, wykrywa nietypowe przebiegi, tworzy zadania naprawcze. <span class="tag warn">plan</span></td></tr>
     </tbody>
   </table>
 
