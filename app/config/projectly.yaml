@@ -56,15 +56,18 @@ poll:
 #   "documentation" (domyślny, dziś) — legacy: jedna strona dokumentacji per rola,
 #     nadpisywana (project/page_title_template niżej). Zostaw project puste, żeby
 #     wyłączyć publikację statusu (tryb tylko-log), bez zmiany transportu.
-#   "agent_status_tool" — docelowy: MCP post_agent_status, jeden nadpisywany
+#   "agent_status_tool" — docelowy: MCP zbot_post_agent_status, jeden nadpisywany
 #     wiersz (konto z tokenu, rola=roleLabel) + wpis w historii zdarzeń w Projectly.
 #     Przełącz DOPIERO po potwierdzeniu, że narzędzie działa na produkcji
 #     (PLAN-MONITOROWANIE-AGENTOW-WIRTUALNY-PRACOWNIK.md sekcja 3/11). Po
 #     ustabilizowaniu: usuń transport i project/page_title_template razem z
 #     kodem legacy w projectly_client.py._publish_status_via_documentation.
 live_status:
-  # Potwierdzone na żywo 22.08.2026: post_agent_status działa na produkcji
+  # Potwierdzone na żywo 22.08.2026: post_agent_status działał na produkcji
   # (4 kształty payloadu, patrz PLAN-MONITOROWANIE-AGENTOW-WIRTUALNY-PRACOWNIK.md).
+  # 24.08.2026: produkcja wystawiła też prefiksowany zbot_post_agent_status —
+  # stara nazwa nadal działa (alias wsteczny), ale kod woła już nową (patrz
+  # mcp_tool_usage.status_na_zywo niżej i projectly_client.py).
   transport: "agent_status_tool"
   project: "Administracyjne"
   page_title_template: "Status na żywo — {role}"
@@ -96,15 +99,21 @@ field_mapping:
 # Nic tego nie parsuje — to mapa dla człowieka i dla agenta pracującego nad
 # kodem, spójna z docstringami w skryptach.
 mcp_tool_usage:
-  pobierz_nowe_zadania: get_project_tasks   # status=todo, assigneeId=konto AI; get_active_tasks to skrót bez goal/effect/dueDate
-  zmien_status:         update_task          # taskId + status (todo|in_progress|done)
-  komentarz_dodaj:      add_task_comment     # główny kanał dialogu z człowiekiem
-  komentarze_odczyt:    get_task_comments    # odczyt decyzji człowieka (human_response_validator)
-  utworz_zadanie:       create_task          # projectId + assigneeIds; potem link_tasks dla powiązania
-  powiaz_zadania:       link_tasks           # ciąg oryginał->eskalacja->kontynuacja (type: eskalacja|kontynuacja|blokuje|duplikat)
-  powiazania_odczyt:    get_task_relations
-  feedback_po_zadaniu:  update_task          # feedback + actualHours + completedAt + status=done (samoocena/domknięcie)
-  bloker_dodaj:         add_task_blocker     # bloker zewnętrzny (wolny tekst); bloker=zadanie -> link_tasks typ "blokuje"
-  status_na_zywo:       post_agent_status    # docelowo (live_status.transport: agent_status_tool); legacy: update_documentation
-  raport_tygodniowy:    get_week_report      # completedAt/actualHours/odchylenie estymacji — digest/retro
-  baza_wiedzy:          get_knowledge
+  # Od ok. 24.08.2026 produkcja wystawia część narzędzi z prefiksem "zbot_"
+  # (kompatybilność wsteczna: stare, nieprefiksowane nazwy nadal działają jako
+  # alias — potwierdzone żywym wywołaniem, ale traktujemy to jako przejściowe,
+  # więc kod już woła nowe nazwy). CRUD zadań/projektów/dokumentacji zostały
+  # BEZ prefiksu — tylko narzędzia stricte "botowe" (komentarze, relacje,
+  # blokery, status na żywo, baza wiedzy) dostały "zbot_".
+  pobierz_nowe_zadania: get_project_tasks        # status=todo, assigneeId=konto AI; get_active_tasks to skrót bez goal/effect/dueDate
+  zmien_status:         update_task               # taskId + status (todo|in_progress|done)
+  komentarz_dodaj:      zbot_add_task_comment     # główny kanał dialogu z człowiekiem
+  komentarze_odczyt:    zbot_get_task_comments    # odczyt decyzji człowieka (human_response_validator)
+  utworz_zadanie:       create_task               # projectId + assigneeIds; potem zbot_link_tasks dla powiązania
+  powiaz_zadania:       zbot_link_tasks           # ciąg oryginał->eskalacja->kontynuacja (type: eskalacja|kontynuacja|blokuje|duplikat)
+  powiazania_odczyt:    zbot_get_task_relations
+  feedback_po_zadaniu:  update_task               # feedback + actualHours + completedAt + status=done (samoocena/domknięcie)
+  bloker_dodaj:         zbot_add_task_blocker     # bloker zewnętrzny (wolny tekst); bloker=zadanie -> zbot_link_tasks typ "blokuje"
+  status_na_zywo:       zbot_post_agent_status    # docelowo (live_status.transport: agent_status_tool); legacy: update_documentation
+  raport_tygodniowy:    get_week_report           # completedAt/actualHours/odchylenie estymacji — digest/retro
+  baza_wiedzy:          zbot_get_knowledge        # + zbot_get_knowledge_base, zbot_get_knowledge_attachment (nowe, nieużywane jeszcze w kodzie)

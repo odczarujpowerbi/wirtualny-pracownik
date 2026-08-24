@@ -150,10 +150,10 @@ def test_publish_status_calls_post_agent_status_when_transport_is_agent_status_t
     assert ok is True
     assert len(client._mcp.calls) == 1
     name, args = client._mcp.calls[0]
-    assert name == "post_agent_status"
+    assert name == "zbot_post_agent_status"
     assert args["roleLabel"] == "dev"
     assert args["currentTaskId"] == "T-9"
-    print("OK  transport agent_status_tool -> woła MCP post_agent_status z roleLabel + polami kontraktu")
+    print("OK  transport agent_status_tool -> woła MCP zbot_post_agent_status z roleLabel + polami kontraktu")
 
 
 def test_publish_status_falls_back_to_documentation_by_default():
@@ -164,7 +164,7 @@ def test_publish_status_falls_back_to_documentation_by_default():
     ok = client.publish_status("dev", {"health": "ok"})
 
     assert ok is False, "brak live_status.project w trybie legacy -> tylko log, brak wywołania MCP"
-    assert client._mcp.calls == [], "domyślny transport (documentation) nie może wołać post_agent_status"
+    assert client._mcp.calls == [], "domyślny transport (documentation) nie może wołać zbot_post_agent_status"
     print("OK  domyślny transport (documentation, brak project) -> tylko log, zero wywołań MCP")
 
 

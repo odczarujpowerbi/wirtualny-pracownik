@@ -12,8 +12,9 @@ digest_generator.py/weekly_team_report.py uzywaja do cotygodniowych podsumowan;
 tu wolane co godzine i per-konto (kazdy bot widzi SWOJ wiersz w perPerson +
 ogolny kontekst organizacji), zamiast raz w tygodniu i zbiorczo do komentarza.
 
-Zapis do bazy wiedzy: MCP create_knowledge/update_knowledge (potwierdzone na
-produkcji 22.08.2026). Każde konto pisze WYŁĄCZNIE do własnego zakresu
+Zapis do bazy wiedzy: MCP zbot_create_knowledge/zbot_update_knowledge (potwierdzone
+na produkcji 22.08.2026, nazwy z prefiksem od 24.08.2026 — stare nadal działają
+jako alias). Każde konto pisze WYŁĄCZNIE do własnego zakresu
 (scope="self", domyślne) - jeden, stały wpis per rola, NADPISYWANY co przebieg
 (update_knowledge), nie nowy wpis co godzinę - id utworzonego wpisu trzymamy
 lokalnie w runs/knowledge_entry_ids.json (nie ma narzędzia do usuwania wpisów,
@@ -130,7 +131,7 @@ def _save_entry_ids(entry_ids, path=ENTRY_IDS_PATH):
 
 def _publish_to_knowledge_base(client, role, title, content, entry_ids_path=ENTRY_IDS_PATH):
     """Upsert wpisu bazy wiedzy w zakresie WŁASNEGO konta (scope="self",
-    tożsamość = token — jak post_agent_status): pierwszy przebieg tworzy
+    tożsamość = token — jak zbot_post_agent_status): pierwszy przebieg tworzy
     (create_knowledge), kolejne NADPISUJĄ ten sam wpis (update_knowledge) po
     id zapamiętanym w entry_ids_path — bez tego co godzinę powstawałby nowy
     wpis, a nie ma narzędzia MCP do usuwania. Błąd MCP = tylko log, nie

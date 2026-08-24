@@ -7,11 +7,11 @@ prosi o feedback i daje zadania ludziom w Projectly" — NIE istniał.
 Najbliżej był `escalation.py`, ale to eskalacja DECYZJI przed wykonaniem,
 nie prośba o feedback PO fakcie.
 
-Narzędzia MCP (przez projectly_client): prośba o feedback to add_task_comment
+Narzędzia MCP (przez projectly_client): prośba o feedback to zbot_add_task_comment
 (pytanie w wątku) + create_task (osobne zadanie feedbackowe powiązane z
 oryginałem). Samą treść feedbacku człowiek/agent zapisuje potem w polu
 `feedback` zadania przez update_task (client.set_task_feedback) — komentarze i
-to pole są już dostępne w MCP (get_task_comments/add_task_comment,
+to pole są już dostępne w MCP (zbot_get_task_comments/zbot_add_task_comment,
 update_task.feedback), co potwierdzono na żywo w tej sesji.
 
 UCZCIWA GRANICA: Projectly nie ma pola "feedback POPROSZONY" (jest pole

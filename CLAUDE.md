@@ -34,6 +34,7 @@
 - Dokumentacja: docs/index.html — zestaw małych, samodzielnych stron (architektura, przepływ zadania, boty i persony, buyer persony, kontekst firmy, modele i koszty, bezpieczeństwo, panel operatora, skąd zadania, instalacja, mapa plików, stan i roadmapa). Jak dodać/zmienić stronę: docs/jak-edytowac.html. README.md w root = skrót o projekcie.
 - Instalacja i konfiguracja maszyny: folder instalacja/ (Przygotuj-srodowisko.bat, Zaloguj.bat, postaw-od-zera.ps1)
 - Stan kodu (co działa / czego brak): app/README.md
+- **Mapa skryptów — który skrypt do czego, kiedy wywołać, "chcę zrobić X → wywołaj Y": app/MAPA-SKRYPTOW.md. Sprawdź TO PIERWSZE, zanim zaczniesz grepować repo w poszukiwaniu właściwego skryptu.**
 - Stara dokumentacja (.md/PDF) usunięta z repo (jest w historii git). Nie odtwarzać bez potrzeby.
 
 > Standardy kodu, git, testy i bezpieczeństwo załadowane globalnie z ~/.claude/rules/

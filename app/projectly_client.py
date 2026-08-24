@@ -313,14 +313,14 @@ class ProjectlyClient:
         return tasks
 
     def post_comment(self, task_id, text):
-        """MCP: add_task_comment. Główny kanał komunikacji z człowiekiem."""
-        self._mcp.call_tool("add_task_comment", {"taskId": task_id, "body": text})
+        """MCP: zbot_add_task_comment. Główny kanał komunikacji z człowiekiem."""
+        self._mcp.call_tool("zbot_add_task_comment", {"taskId": task_id, "body": text})
         return True
 
     def get_comments(self, task_id):
-        """MCP: get_task_comments. Zwraca listę treści komentarzy (chronologicznie)
+        """MCP: zbot_get_task_comments. Zwraca listę treści komentarzy (chronologicznie)
         — human_response_validator parsuje z nich decyzję człowieka."""
-        result = self._mcp.call_tool("get_task_comments", {"taskId": task_id})
+        result = self._mcp.call_tool("zbot_get_task_comments", {"taskId": task_id})
         comments = result.get("comments", []) if isinstance(result, dict) else []
         return [c.get("body", "") if isinstance(c, dict) else c for c in comments]
 
@@ -342,7 +342,7 @@ class ProjectlyClient:
 
     def create_task(self, title, description, assigned_to, parent_task_id=None, project_id=None,
                     relation_type="eskalacja", expected_result=None, acceptance_criteria=None):
-        """MCP: create_task (+ link_tasks). Tworzy zadanie w projekcie project_id,
+        """MCP: create_task (+ zbot_link_tasks). Tworzy zadanie w projekcie project_id,
         przypisane do assigned_to (alias lub nazwa osoby), i — jeśli podano
         parent_task_id — łączy je z rodzicem relacją relation_type (buduje ciąg
         oryginał->eskalacja->kontynuacja, PLAN-WDROZENIA.md sekcja 4).
@@ -374,7 +374,7 @@ class ProjectlyClient:
             new_id = (result.get("task") or {}).get("id")
         if parent_task_id and new_id:
             self._mcp.call_tool(
-                "link_tasks",
+                "zbot_link_tasks",
                 {"fromTaskId": parent_task_id, "toTaskId": new_id, "type": relation_type},
             )
         return new_id
@@ -396,13 +396,13 @@ class ProjectlyClient:
         return True
 
     def get_task_relations(self, task_id):
-        """MCP: get_task_relations. Powiązania w obu kierunkach (ciąg eskalacji)."""
-        return self._mcp.call_tool("get_task_relations", {"taskId": task_id})
+        """MCP: zbot_get_task_relations. Powiązania w obu kierunkach (ciąg eskalacji)."""
+        return self._mcp.call_tool("zbot_get_task_relations", {"taskId": task_id})
 
     def publish_status(self, role, payload):
         """Status na żywo per rola-w-koncie (PLAN-MONITOROWANIE-AGENTOW-*.md).
         Transport wybierany przez config/projectly.yaml -> live_status.transport:
-        - "agent_status_tool" (docelowy): MCP post_agent_status — jeden nadpisywany
+        - "agent_status_tool" (docelowy): MCP zbot_post_agent_status — jeden nadpisywany
           wiersz (userId z tokenu, roleLabel=role) + wpis w historii zdarzeń.
         - "documentation" (domyślny, dopóki narzędzie MCP nie jest potwierdzone
           na produkcji Projectly): stare zachowanie — strona dokumentacji per rola.
@@ -414,13 +414,13 @@ class ProjectlyClient:
         return self._publish_status_via_documentation(role, payload, cfg)
 
     def _publish_status_via_tool(self, role, payload):
-        """MCP: post_agent_status. Transport docelowy — patrz publish_status()."""
+        """MCP: zbot_post_agent_status. Transport docelowy — patrz publish_status()."""
         try:
             args = {"roleLabel": role, **_map_status_payload(payload)}
-            self._mcp.call_tool("post_agent_status", args)
+            self._mcp.call_tool("zbot_post_agent_status", args)
             return True
         except MCPError as exc:
-            print(f"[Projectly] Publikacja statusu (post_agent_status) nie powiodła się (nie blokuję runnera): {exc}")
+            print(f"[Projectly] Publikacja statusu (zbot_post_agent_status) nie powiodła się (nie blokuję runnera): {exc}")
             return False
 
     def _publish_status_via_documentation(self, role, payload, cfg):
@@ -494,7 +494,7 @@ class ProjectlyClient:
         return self._mcp.call_tool("get_week_report", {"weekOffset": week_offset})
 
     def create_knowledge(self, title, content, scope="self", tags=None, links=None):
-        """MCP: create_knowledge. scope: "self" (własne konto, domyślne),
+        """MCP: zbot_create_knowledge. scope: "self" (własne konto, domyślne),
         "general" (firmowa — wymaga pełnego dostępu, master/admin) albo ID
         konta bota (jw). Zwraca dict z "id" nowego wpisu."""
         args = {"title": title, "content": content, "scope": scope}
@@ -502,10 +502,10 @@ class ProjectlyClient:
             args["tags"] = tags
         if links is not None:
             args["links"] = links
-        return self._mcp.call_tool("create_knowledge", args)
+        return self._mcp.call_tool("zbot_create_knowledge", args)
 
     def update_knowledge(self, knowledge_id, title=None, content=None, tags=None, links=None):
-        """MCP: update_knowledge. Podaj tylko pola do zmiany — content
+        """MCP: zbot_update_knowledge. Podaj tylko pola do zmiany — content
         ZASTĘPUJE całość, nie scala."""
         args = {"knowledgeId": knowledge_id}
         if title is not None:
@@ -516,7 +516,7 @@ class ProjectlyClient:
             args["tags"] = tags
         if links is not None:
             args["links"] = links
-        return self._mcp.call_tool("update_knowledge", args)
+        return self._mcp.call_tool("zbot_update_knowledge", args)
 
 
 class MockProjectlyClient:

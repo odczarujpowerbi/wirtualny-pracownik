@@ -6,11 +6,11 @@ w jednym module — w SKRYPTY.md to trzy osobne skrypty, tu trzymane razem,
 bo dzielą ten sam mały kontrakt danych i łatwiej je testować spójnie.
 
 Narzędzia MCP (przez projectly_client, config/projectly.yaml):
-    escalate_to_human       -> create_task + link_tasks (type "eskalacja")
+    escalate_to_human       -> create_task + zbot_link_tasks (type "eskalacja")
     human_response_validator -> get_comments (odczyt decyzji człowieka)
-    continuation_task_creator -> create_task + link_tasks (type "kontynuacja")
+    continuation_task_creator -> create_task + zbot_link_tasks (type "kontynuacja")
 Powiązania budują widoczny ciąg oryginał -> eskalacja -> kontynuacja
-(get_task_relations), zamiast trzech luźnych zadań. Wymaga project_id z
+(zbot_get_task_relations), zamiast trzech luźnych zadań. Wymaga project_id z
 zadania źródłowego (get_new_tasks niesie je w polu 'project_id').
 """
 
