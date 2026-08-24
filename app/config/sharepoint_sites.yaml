@@ -1,0 +1,65 @@
+# Rejestr wszystkich witryn SharePoint w tenancie odczarujlowcode.sharepoint.com,
+# do których aplikacja Graph (MS_GRAPH_CLIENT_ID w secrets/.env) ma potwierdzony
+# dostęp (Files.Read.All / Files.ReadWrite.All, app-only). Nie-sekret — same
+# adresy i opisy przeznaczenia, nie tokeny.
+#
+# Aplikacja NIE ma Sites.Read.All, więc nie umie wypisać wszystkich witryn
+# tenanta sama (GET /sites?search=* -> 403). site_path poniżej został ustalony
+# ręcznie (podany przez użytkownika + dopasowanie sluga URL próbami), nie
+# odkryty automatycznie — jeśli w tenancie pojawi się NOWA witryna, trzeba ją
+# dopisać tutaj ręcznie, agent sam jej nie znajdzie.
+#
+# Użycie w kodzie: sharepoint_client.SharePointClient(client_id, secret, tenant,
+# site_host, site_path, library=...) — ten sam klient co dla app/config/sharepoint.yaml,
+# tylko inny site_path/library z tego rejestru.
+
+site_host: odczarujlowcode.sharepoint.com
+
+sites:
+  wirtualny_pracownik:
+    display_name: "Wirtualny pracownik"
+    site_path: /sites/Wirtualny-pracownik
+    library: "Dokumenty"
+    purpose: >
+      Witryna robocza AGENTA. Tu agent zapisuje własne dokumenty/raporty
+      wygenerowane w ramach zadań (root_folder "Zadania-Agenta" — patrz
+      app/config/sharepoint.yaml, ten sam adres, to jest domyślna konfiguracja
+      zapisu używana przez document_builder.py/report_builder.py).
+
+  organizacja:
+    display_name: "Organizacja"
+    site_path: /sites/Organizacja
+    library: "Dokumenty"
+    extra_libraries: ["Pliki związane ze znakowaniem"]
+    purpose: >
+      Informacje organizacyjne firmy — urlopy, zasady działania, jak firma
+      funkcjonuje. To też root site tenanta (webUrl bez /sites/ prefiksu).
+
+  projekty_raportowania:
+    display_name: "Projekty Raportowania"
+    site_path: /sites/ProjektyRaportowania
+    library: "Dokumenty"
+    extra_libraries: ["Dokument"]  # UWAGA: druga biblioteka, liczba pojedyncza — inna nazwa niż wszędzie indziej
+    purpose: "Projekty klientów (raportowanie)."
+
+  aplikacje_claude:
+    display_name: "Aplikacje Claude"
+    site_path: /sites/AplikacjeClaude
+    library: "Dokumenty"
+    purpose: >
+      Wewnętrzne rozwiązania i projekty developerskie firmy (np. Projectly i
+      inne aplikacje robione wewnątrz organizacji) oraz strony internetowe.
+      Zadania typu "zmodyfikuj/stwórz stronę internetową" odnoszą się do
+      materiałów w tej witrynie.
+
+  sprzedaz_marketing:
+    display_name: "Sprzedaż i Marketing"
+    site_path: /sites/SprzedazMarketing
+    library: "Dokumenty"
+    purpose: "Materiały i informacje marketingowe/sprzedażowe."
+
+  administracja:
+    display_name: "Administracja"
+    site_path: /sites/Administracja
+    library: "Dokumenty"
+    purpose: "Zarządzanie administracją firmy."

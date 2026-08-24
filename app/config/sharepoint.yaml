@@ -5,7 +5,7 @@
 
 site_host: odczarujlowcode.sharepoint.com
 site_path: /sites/Wirtualny-pracownik
-library: "Shared Documents"
+library: "Dokumenty"
 
 # Folder główny dla wszystkich dokumentów wygenerowanych przez agenta —
 # jeden podfolder per zadanie (data + skrócony tytuł), żeby łatwo
