@@ -14,10 +14,8 @@ pętli (zwraca available=False, runner leci dalej na samej klasyfikacji).
 
 import json
 import os
-import re
 import shutil
 import subprocess
-import sys
 import tempfile
 import urllib.error
 import urllib.request
@@ -35,26 +33,6 @@ APP_DIR = Path(__file__).parent
 # czyta wtedy pliki zadania). Spójne z allowed_roots kontraktów — poza nimi
 # uruchamiamy w katalogu neutralnym (temp), żeby nie wciągać cudzego kontekstu.
 _SAFE_CWD_ROOTS = [(APP_DIR / r).resolve() for r in ("workspace", "mock_data")]
-
-# Folder per zadanie z widocznym oknem terminala (think() only) — patrz
-# _run_in_visible_terminal. Zawsze pod runs/, nigdy śledzone w gicie.
-TERMINAL_TASKS_DIR = APP_DIR / "runs" / "task_windows"
-
-
-def _terminal_visible_enabled():
-    """CLAUDE_TERMINAL_VISIBLE — domyślnie WŁĄCZONE (decyzja właściciela
-    24.08.2026: chce widzieć na żywo, jak bot myśli nad złożonym zadaniem,
-    do budowania zaufania na tym etapie projektu). '0'/'false' wyłącza na
-    konkretnej maszynie (np. bez zalogowanej sesji RDP, gdzie okno nie
-    wyświetli się nikomu)."""
-    return os.environ.get("CLAUDE_TERMINAL_VISIBLE", "1").strip().lower() not in ("0", "false", "nie", "")
-
-
-def _slug(text, limit=60):
-    """Kopia runner_loop._slug — nie importować z runner_loop (cykliczny
-    import: runner_loop już importuje task_thinker)."""
-    slug = re.sub(r"[^\w\-]+", "_", text or "", flags=re.UNICODE).strip("_")
-    return (slug[:limit] or "zadanie")
 
 # Lokalny model tekstowy (Ollama) jako ostatni fallback wołania modelu —
 # używany przez ask_model(), gdy nie ma ani Claude Code, ani klucza API.
@@ -94,69 +72,12 @@ def _safe_cwd(task):
     return tempfile.gettempdir()
 
 
-def _run_in_visible_terminal(claude_exe, prompt, model, folder, env):
-    """Odpala `claude -p` w NOWEJ, WIDOCZNEJ konsoli PowerShell (folder =
-    app/runs/task_windows/<task_id>_<slug>/), żeby właściciel mógł widzieć na
-    żywo, jak bot myśli nad złożonym zadaniem. Konsola zamyka się sama po
-    zakończeniu (bez -NoExit).
-
-    Zwraca dict jak _think_via_claude_code, albo None (fail-soft — wołający
-    ma wtedy spaść na dotychczasową ścieżkę headless, NIGDY nie blokujemy
-    przetworzenia zadania przez awarię samego okna).
-
-    Prompt NIGDY nie wchodzi do stringa komendy PowerShell (unika problemów
-    z cytowaniem/wstrzyknięciem znaków specjalnych typu $/`/") — zapisywany do
-    pliku, komenda go tylko CZYTA przez Get-Content. Encoding UTF-8 wymuszony
-    na konsoli i plikach — ten sam problem klasy, co env_bootstrap.py już raz
-    naprawiał dla stdout (domyślna strona kodowa Windows łamie polskie znaki)."""
-    try:
-        folder.mkdir(parents=True, exist_ok=True)
-        (folder / "prompt.txt").write_text(prompt, encoding="utf-8")
-        # Tee-Object w Windows PowerShell 5.1 NIE MA parametru -Encoding (błąd
-        # znaleziony i zweryfikowany ręcznie 24.08.2026: "ParameterBindingException" —
-        # cały pipeline padał po cichu, fail-soft spadał na headless bez odpowiedzi
-        # w oknie). Obejście: Tee-Object -Variable (przelotem do konsoli) + Out-File
-        # -Encoding utf8 osobno do pliku.
-        cmd = (
-            "chcp 65001 > $null; $OutputEncoding = [Console]::OutputEncoding = "
-            "[System.Text.Encoding]::UTF8; "
-            f"Get-Content -Raw -Encoding utf8 'prompt.txt' | & '{claude_exe}' -p --model {model} "
-            "| Tee-Object -Variable odp; $odp | Out-File -FilePath 'answer.txt' -Encoding utf8"
-        )
-        proc = subprocess.Popen(
-            ["powershell", "-NoProfile", "-Command", cmd],
-            cwd=str(folder),
-            creationflags=subprocess.CREATE_NEW_CONSOLE,
-            env=env,
-        )
-        try:
-            proc.wait(timeout=THINK_TIMEOUT_SECONDS)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            return None
-        answer_path = folder / "answer.txt"
-        if not answer_path.exists():
-            return None
-        text = answer_path.read_text(encoding="utf-8-sig").strip()
-    except OSError:
-        return None
-    cost = cost_estimator.estimate_call("claude_code")
-    return {"available": True, "ok": True, "reasoning": text,
-            "detail": "OK", "cost_usd": cost, "source": "claude_code", "model": model}
-
-
-def _think_via_claude_code(claude_exe, prompt, caller, cwd=None, visible_folder=None):
+def _think_via_claude_code(claude_exe, prompt, caller, cwd=None):
     """Wywołuje Claude Code headless. `caller` identyfikuje wywołanie w tabeli
     config/model_tiers.yaml (np. "task_thinker.think", "web_answer.answer") —
     stąd bierzemy poziom (high/low) i konkretny model (model_registry.resolve).
     cwd = repo zadania (kontekst) albo temp. Koszt subskrypcji szacowany proxy
     (cost_estimator), żeby kill switch liczył wolumen wywołań.
-
-    `visible_folder` (tylko think(), patrz decyzja właściciela 24.08.2026):
-    gdy podany i CLAUDE_TERMINAL_VISIBLE nie jest wyłączone i platforma to
-    Windows, próbujemy najpierw widocznej konsoli (_run_in_visible_terminal);
-    porażka (None) -> spadamy na dotychczasową ścieżkę headless poniżej, bez
-    żadnej zmiany zachowania. ask_model() nigdy nie przekazuje tego parametru.
 
     ANTHROPIC_API_KEY jest USUWANY ze środowiska podprocesu (znaleziony
     23.08.2026): `claude` CLI traktuje obecność klucza jako priorytet nad
@@ -170,13 +91,6 @@ def _think_via_claude_code(claude_exe, prompt, caller, cwd=None, visible_folder=
     role, model = model_registry.resolve(caller)
     cost = cost_estimator.estimate_call("claude_code")
     env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
-
-    if visible_folder is not None and _terminal_visible_enabled() and sys.platform == "win32":
-        widoczny = _run_in_visible_terminal(claude_exe, prompt, model, visible_folder, env)
-        if widoczny is not None:
-            return widoczny
-        # fail-soft: spadamy na ścieżkę headless poniżej, bez zmian
-
     result = subprocess.run(
         [claude_exe, "-p", "--model", model, prompt],
         cwd=cwd or tempfile.gettempdir(),
@@ -277,9 +191,8 @@ def think(task, caller="task_thinker.think"):
     prompt = build_prompt(task)
     claude_exe = _find_claude()
     if claude_exe:
-        folder = TERMINAL_TASKS_DIR / f"{task.get('task_id') or 'zadanie'}_{_slug(task.get('title', ''))}"
         try:
-            return _think_via_claude_code(claude_exe, prompt, caller, cwd=_safe_cwd(task), visible_folder=folder)
+            return _think_via_claude_code(claude_exe, prompt, caller, cwd=_safe_cwd(task))
         except (subprocess.TimeoutExpired, OSError) as exc:
             return {"available": True, "ok": False, "reasoning": None,
                     "detail": f"Claude Code niedostępny/timeout: {exc}", "cost_usd": 0.0, "source": "claude_code"}
