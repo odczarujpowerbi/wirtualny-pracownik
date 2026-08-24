@@ -94,6 +94,30 @@
     </tbody>
   </table>
 
+  <h3 class="sub">Eskalacja, feedback, monitorowanie floty</h3>
+  <table>
+    <tbody>
+      <tr><td style="width:26%"><code>escalation.py</code></td><td>Zadanie dla człowieka (nie tylko komentarz) → walidacja jednoznaczności odpowiedzi → zadanie kontynuacji.</td></tr>
+      <tr><td><code>task_feedback_requester.py</code></td><td>Po zamknięciu zadania: komentarz z pytaniem o feedback + zadanie feedbackowe + mail.</td></tr>
+      <tr><td><code>live_status_publisher.py</code> / <code>machine_status_reporter.py</code></td><td>Status bota (kolejka/koszt/zdrowie) i status maszyny (wersje narzędzi, RAM) na żywo do Projectly.</td></tr>
+      <tr><td><code>system_health_monitor.py</code></td><td>RAM + czy oczekiwane skrypty faktycznie działają, eskaluje przy problemie.</td></tr>
+      <tr><td><code>kacper_monitor.py</code></td><td>Wykrywa POWTARZALNE awarie (job/skill) we wspólnym dzienniku, zakłada jedno zadanie naprawcze dziennie (dedup). Patrz <a href="boty-i-persony.html">Boty i persony</a>.</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">Agent lokalny — wizja, UI, okna, przeglądarka</h3>
+  <table>
+    <tbody>
+      <tr><td style="width:26%"><code>browser_worker.py</code></td><td>Zadania webowe wymagające KLIKANIA (Playwright) — zamknięty słownik kroków, profile logowania trwałe w <code>secrets/browser_profiles/</code>. Działa na żywo (patrz <a href="stan-i-roadmapa.html">Stan i roadmapa</a>).</td></tr>
+      <tr><td><code>screenshot_capture.py</code></td><td>Zrzut ekranu/okna (PrintWindow/DWM, odporny na RDP) — karmi Oskara.</td></tr>
+      <tr><td><code>window_manager.py</code> / <code>multi_window.py</code></td><td>Listowanie/fokus/granice okien, praca na wielu oknach naraz.</td></tr>
+      <tr><td><code>ui_actions.py</code> / <code>ui_lock.py</code></td><td>Klik/wpisywanie przez UI Automation + serializacja sterowania ekranem.</td></tr>
+      <tr><td><code>ocr_extract.py</code></td><td>Twardy odczyt liczb/tekstu ze zrzutu (Tesseract → model wizyjny).</td></tr>
+      <tr><td><code>pbi_desktop_bridge.py</code></td><td>Otwiera PBIP w Power BI Desktop, zrzut okna raportu.</td></tr>
+      <tr><td><code>file_search.py</code></td><td>Szybkie przeszukiwanie plików dla skryptów deterministycznych.</td></tr>
+    </tbody>
+  </table>
+
   <h3 class="sub">Dashboard, harmonogram, bezpieczniki</h3>
   <table>
     <tbody>
