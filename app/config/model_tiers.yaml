@@ -23,6 +23,8 @@ tiers:
   task_thinker.think: high              # analiza zadania (co rozumiem/plan/ryzyka) - runner_loop
   output_decider.decide: high            # wybor formatu pliku wyniku (pdf/docx/md/xlsx) - decyzja per zadanie
   task_decomposer.decide: high           # czy rozbic zadanie na podzadania - osad, nie mechaniczne wykonanie
+  bot_content_check.review: high         # czy plan/wynik faktycznie odpowiada zadaniu - osad
+  agentic_worker.run: high                # realne wykonanie z Read/Write/Edit - realne skutki, nie mechaniczne
   web_answer.answer: low                 # pisanie tresci z pobranych danych wg scisle opisanych regul
   poprawka_materialu.popraw: low         # naniesienie konkretnej listy zastrzezen na material
 

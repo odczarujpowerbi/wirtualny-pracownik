@@ -173,6 +173,21 @@ tools:
         required: true
         type: path
 
+  agentic_task:
+    risk: yellow
+    description: >
+      Prawdziwy subagent Claude Code (Read/Write/Edit) dla zadań bez wąskiego
+      workera, uruchamiany dopiero gdy plan przeszedł ocenę bot_content_check.py.
+      Ograniczony do WŁASNEGO folderu zadania (runs/agentic_tasks/<task_id>_.../),
+      nigdy do reszty repo/maszyny (agentic_worker.py, --add-dir + --allowedTools
+      "Read Write Edit", BEZ --dangerously-skip-permissions).
+    allowed_roots:
+      - runs/agentic_tasks
+    params:
+      task_id:
+        required: true
+        type: string
+
   zanfia_query:
     risk: green
     description: >

@@ -92,6 +92,31 @@ def run():
     checks.append(("Gustaw: przekroczony budżet -> nie passed",
                    gate_cost["passed"] is False and any("budżet" in c.lower() for c in gate_cost["concerns"])))
 
+    # --- Regresja: bot wpisany w config/validation_gate.yaml musi mieć wpis w
+    # REGISTRY (inaczej wpis w YAML jest po cichu ignorowany, patrz docstring
+    # bot_gustaw_bramka.py) ---
+    checks.append(("REGISTRY zawiera 'content'", "content" in bot_gustaw_bramka.REGISTRY))
+    config_realny = bot_gustaw_bramka.load_gate_config()
+    order_realny = config_realny.get("gate", {}).get("order", [])
+    checks.append(("config/validation_gate.yaml: 'content' w order",
+                   "content" in order_realny))
+    checks.append(("Każdy bot z order ma wpis w REGISTRY (zero cichych pominięć)",
+                   all(name in bot_gustaw_bramka.REGISTRY for name in order_realny)))
+
+    # Funkcjonalnie: order z realnego configu faktycznie WOŁA bota 'content'.
+    original_ask_model = task_thinker.ask_model
+    try:
+        task_thinker.ask_model = lambda prompt, caller=None: {
+            "available": True, "text": '{"aligned": true, "reasoning": "Pasuje do zadania."}',
+            "source": "claude_code", "detail": "OK"}
+        gate_content = bot_gustaw_bramka.run_gate(
+            task, {"cost_usd": 0.1, "tool": "agentic_task", "acceptance_notes": "wynik"},
+            config=config_realny)
+    finally:
+        task_thinker.ask_model = original_ask_model
+    checks.append(("run_gate() z realnym configiem faktycznie wywołuje bota 'content'",
+                   any(v["bot"] == "content" for v in gate_content["verdicts"])))
+
     print("\n--- Wynik testu dymnego bramki jakości ---")
     all_passed = True
     for name, passed in checks:

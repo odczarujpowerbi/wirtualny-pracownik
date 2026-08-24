@@ -11,7 +11,7 @@
 
 gate:
   enabled: true
-  order: [bartek, franek, oskar]
+  order: [bartek, franek, oskar, content]
   # 1 z 3 — obniżone z 2 (na 4 boty) po usunięciu Bożeny (odbiór biznesowy).
   # Bartek/Oskar często `skipped` dla zadań bez rerun/zrzutu (np. browser_task
   # bez kroków) — przy required_approvals: 2 realnie NIE dało się osiągnąć progu
@@ -40,3 +40,9 @@ bots:
     # zastrzeżeniem. Przy efekcie tekstowym (pobranie danych, walidacja pliku)
     # "brak zrzutu" to szum, który zaniża ocenę odbioru biznesowego.
     visual_tools: [capture_screenshot, open_pbip_capture, browser_task]
+  content:
+    enabled: true
+    # Ocena treści (bot_content_check.py) ma sens tylko dla wyników prawdziwego
+    # subagenta (agentic_worker.py) — dla np. walidacji PBIP "czy treść
+    # odpowiada zadaniu" to szum, ten bot wtedy `skipped`.
+    relevant_tools: [agentic_task]

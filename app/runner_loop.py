@@ -26,6 +26,7 @@ from pathlib import Path
 
 import env_bootstrap  # noqa: F401  # wczytuje .env / secrets/.env (patrz .env.example, bootstrap_init_secrets.py)
 
+import agentic_worker
 import bot_gustaw_bramka
 import control
 import cost_tracker
@@ -229,8 +230,12 @@ def _process_task_core(task, policy, routing, client):
     thinking = task_thinker.think(task)
     state_store.record_event(task_id, "thinking", thinking.get("detail", ""), now_iso())
 
-    # Realny worker, jeśli istnieje dla tego typu zadania (dziś: walidacja PBIP).
-    # Gdy None — zostaje dotychczasowa ścieżka "sama klasyfikacja", nic nie udajemy.
+    # Realny worker, jeśli istnieje dla tego typu zadania (dziś: walidacja PBIP,
+    # fetch_url, browser_task, MailerLite/Zanfia...). Gdy None i mamy plan —
+    # prawdziwy subagent (agentic_worker.py) wykonuje zadanie NAPRAWDĘ, zamiast
+    # oddawać sam plan jako "wynik" (decyzja właściciela 24.08.2026: user ma
+    # dostawać rezultat, nie instrukcję jak go zrobić). Brak modelu w ogóle —
+    # zostaje dotychczasowa ścieżka "sama klasyfikacja", nic nie udajemy.
     real = executor.execute(task)
     if real is not None:
         execution_result = {**real, "thinking": thinking,
@@ -240,6 +245,15 @@ def _process_task_core(task, policy, routing, client):
             reason=real["acceptance_notes"], now=now_iso(),
             event_type="execution", cost_usd=real.get("cost_usd", 0.0),
         )
+    elif thinking.get("ok"):
+        agentic = agentic_worker.run(task, thinking)
+        execution_result = {**agentic, "thinking": thinking,
+                            "cost_usd": agentic.get("cost_usd", 0.0) + thinking.get("cost_usd", 0.0)}
+        state_store.log_decision(
+            task_id, agent="patrycja", decision=agentic["tool"],
+            reason=agentic["acceptance_notes"], now=now_iso(),
+            event_type="execution", cost_usd=agentic.get("cost_usd", 0.0),
+        )
     else:
         execution_result = {
             "cost_usd": thinking.get("cost_usd", 0.0),
@@ -248,11 +262,13 @@ def _process_task_core(task, policy, routing, client):
         }
     cost_tracker.record_cost(task_id, execution_result["cost_usd"])
 
-    # Worker odmówił wykonania (np. ścieżka poza dozwolonym katalogiem roboczym) —
-    # to zdarzenie bezpieczeństwa, eskalujemy wprost, nie przez bramkę jakości
-    # (nie podajemy podejrzanej ścieżki dalej do botów).
-    if real is not None and real.get("executed") is False:
-        reason = real["acceptance_notes"]
+    # Worker/subagent odmówił wykonania (np. ścieżka poza dozwolonym katalogiem
+    # roboczym, plan niedopasowany do zadania) — to zdarzenie bezpieczeństwa,
+    # eskalujemy wprost, nie przez bramkę jakości (nie podajemy podejrzanej
+    # treści dalej do botów). Sprawdzamy execution_result, NIE real — odmowa
+    # subagenta nie ustawia `real` (executor.execute() zwrócił None).
+    if execution_result.get("executed") is False:
+        reason = execution_result["acceptance_notes"]
         escalate_to_human(task, reason, client, assignee=_escalation_assignee())
         state_store.log_decision(task_id, agent="pawel", decision="escalate", reason=reason,
                                  now=now_iso(), event_type="escalation")
