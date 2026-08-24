@@ -65,17 +65,19 @@ def run():
         checks.append(("Error: model niedostępny -> domyślnie pdf", decyzja_brak["format"] == "pdf"))
         checks.append(("Error: model niedostępny -> koszt 0.0", decyzja_brak["cost_usd"] == 0.0))
 
-        # 6. build_file: xlsx tworzy wynik.xlsx (niepusty), pdf z tabelą tworzy wynik.pdf (niepusty).
+        # 6. build_file: nazwa niesie task_id (współdzielony folder rodzic+podzadania,
+        #    task_decomposer.py — bez tego kolejne zadania nadpisywałyby się nawzajem).
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
             xlsx_path = output_decider.build_file(TASK, {"format": "xlsx"}, "Wynik.", TABLE_ROWS, tmp)
-            checks.append(("build_file: xlsx -> wynik.xlsx niepusty",
-                           xlsx_path.name == "wynik.xlsx" and xlsx_path.stat().st_size > 0))
-            checks.append(("build_file: xlsx -> brak wynik.pdf obok", not (tmp / "wynik.pdf").exists()))
+            checks.append(("build_file: xlsx -> wynik_<task_id>.xlsx niepusty",
+                           xlsx_path.name == "wynik_T-OUT.xlsx" and xlsx_path.stat().st_size > 0))
+            checks.append(("build_file: xlsx -> brak wynik_<task_id>.pdf obok",
+                           not (tmp / "wynik_T-OUT.pdf").exists()))
 
             pdf_path = output_decider.build_file(TASK, {"format": "pdf"}, "Wynik.", TABLE_ROWS, tmp)
-            checks.append(("build_file: pdf z tabelą -> wynik.pdf niepusty",
-                           pdf_path.name == "wynik.pdf" and pdf_path.stat().st_size > 0))
+            checks.append(("build_file: pdf z tabelą -> wynik_<task_id>.pdf niepusty",
+                           pdf_path.name == "wynik_T-OUT.pdf" and pdf_path.stat().st_size > 0))
 
             md_path = output_decider.build_file(TASK, {"format": "md"}, "Sam tekst, bez tabeli.", None, tmp)
             md_text = md_path.read_text(encoding="utf-8")

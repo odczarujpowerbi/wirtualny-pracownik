@@ -102,20 +102,24 @@ def build_file(task, decision, acceptance_notes, table_rows, folder):
     ścieżkę pliku."""
     title = task.get("title") or "Zadanie"
     format_ = decision["format"]
+    # Nazwa pliku niesie task_id (zawsze unikalne) — od 24.08.2026 folder może być
+    # WSPÓLNY dla kilku zadań (podzadanie pisze do folderu rodzica, task_decomposer.py),
+    # więc stała nazwa "wynik.<format>" nadpisywałaby się między zadaniami.
+    nazwa = f"wynik_{task.get('task_id') or 'zadanie'}"
     # document_builder.build_* tworzą katalog nadrzędny samodzielnie (_ensure_parent),
     # report_builder.write_xlsx_report NIE — folder zadania jest nowy (jeszcze
     # nieutworzony), więc bez tego zapis xlsx do świeżego folderu wywala się.
     folder.mkdir(parents=True, exist_ok=True)
 
     if format_ == "xlsx":
-        return report_builder.write_xlsx_report(title, table_rows, folder / "wynik.xlsx")
+        return report_builder.write_xlsx_report(title, table_rows, folder / f"{nazwa}.xlsx")
 
     sections = [{"heading": "Wynik", "text": acceptance_notes or ""}]
     if table_rows:
         sections.append({"heading": "Dane", "table": {"rows": table_rows}})
 
     if format_ == "docx":
-        return document_builder.build_docx(title, sections, folder / "wynik.docx")
+        return document_builder.build_docx(title, sections, folder / f"{nazwa}.docx")
     if format_ == "md":
-        return document_builder.build_md(title, sections, folder / "wynik.md")
-    return document_builder.build_pdf(title, sections, folder / "wynik.pdf")
+        return document_builder.build_md(title, sections, folder / f"{nazwa}.md")
+    return document_builder.build_pdf(title, sections, folder / f"{nazwa}.pdf")

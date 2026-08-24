@@ -1,9 +1,11 @@
 """
 Test dymny runner_loop._save_result_to_onedrive — sprawdza, że dla każdego
-przetworzonego zadania powstaje DOKŁADNIE JEDEN plik wynik.<format> w
-per-zadaniowym folderze, gdzie format wybiera output_decider.decide()
-(Agent sterujący). Zero sieci — task_thinker.ask_model jest podmieniany
-atrapą, żeby test nie zależał od prawdziwego wywołania modelu.
+przetworzonego zadania powstaje DOKŁADNIE JEDEN plik wynik_<task_id>.<format>
+w per-zadaniowym folderze (gdzie format wybiera output_decider.decide(),
+Agent sterujący), oraz że podzadanie (parent_task_id ustawione, patrz
+task_decomposer.py) pisze do folderu RODZICA, nie tworzy własnego. Zero
+sieci — task_thinker.ask_model jest podmieniany atrapą, żeby test nie
+zależał od prawdziwego wywołania modelu.
 
 Użycie:
     python runner_loop_onedrive_smoke_test.py
@@ -42,16 +44,17 @@ def run():
             tmp = Path(tmp)
 
             # 1. Happy path: model wybiera xlsx, execution_result ma table_rows ->
-            #    dokładnie jeden plik, wynik.xlsx.
+            #    dokładnie jeden plik, wynik_<task_id>.xlsx.
             os.environ["ONEDRIVE_TASKS_ROOT"] = str(tmp / "Zadania-Agenta")
             task_thinker.ask_model = _atrapa('{"format": "xlsx", "reasoning": "Dane liczbowe."}')
             execution_result = {"acceptance_notes": "Zestawienie kampanii.", "table_rows": TABLE_ROWS}
             folder = runner_loop._save_result_to_onedrive(TASK, "done", "Zrobione.", execution_result)
             checks.append(("Zwrócono ścieżkę folderu", folder is not None))
             folder_path = Path(folder) if folder else None
-            checks.append(("wynik.xlsx istnieje", folder_path is not None and (folder_path / "wynik.xlsx").exists()))
-            checks.append(("Dokładnie JEDEN plik wynik.* w folderze",
-                           folder_path is not None and len(list(folder_path.glob("wynik.*"))) == 1))
+            checks.append(("wynik_T-XLSX.xlsx istnieje",
+                           folder_path is not None and (folder_path / "wynik_T-XLSX.xlsx").exists()))
+            checks.append(("Dokładnie JEDEN plik wynik_*.* w folderze",
+                           folder_path is not None and len(list(folder_path.glob("wynik_*.*"))) == 1))
 
             # 2. Model niedostępny -> fail-closed na PDF, wciąż dokładnie jeden plik.
             task_thinker.ask_model = _atrapa(None, available=False)
@@ -59,10 +62,10 @@ def run():
                 {"task_id": "T-BEZ-MODELU", "title": "Zadanie bez modelu"}, "done", "Zrobione.",
                 {"acceptance_notes": "Wynik bez table_rows."})
             folder2_path = Path(folder2) if folder2 else None
-            checks.append(("Brak modelu: wynik.pdf istnieje (fail-closed default)",
-                           folder2_path is not None and (folder2_path / "wynik.pdf").exists()))
-            checks.append(("Brak modelu: dokładnie JEDEN plik wynik.*",
-                           folder2_path is not None and len(list(folder2_path.glob("wynik.*"))) == 1))
+            checks.append(("Brak modelu: wynik_T-BEZ-MODELU.pdf istnieje (fail-closed default)",
+                           folder2_path is not None and (folder2_path / "wynik_T-BEZ-MODELU.pdf").exists()))
+            checks.append(("Brak modelu: dokładnie JEDEN plik wynik_*.*",
+                           folder2_path is not None and len(list(folder2_path.glob("wynik_*.*"))) == 1))
 
             # 3. Bez execution_result (np. wczesna eskalacja prompt injection) -> wciąż
             #    powstaje plik, treść budowana z samego comment.
@@ -72,7 +75,21 @@ def run():
                 "Wykryto podejrzaną treść.")
             folder3_path = Path(folder3) if folder3 else None
             checks.append(("Bez execution_result: plik i tak powstaje",
-                           folder3_path is not None and (folder3_path / "wynik.md").exists()))
+                           folder3_path is not None and (folder3_path / "wynik_T-BEZ-EXEC.md").exists()))
+
+            # 3b. Podzadanie (parent_task_id ustawione) pisze do folderu RODZICA
+            #     (glob po prefiksie task_id), nie tworzy własnego folderu — bez
+            #     lokalnego mapowania, źródłem prawdy jest samo Projectly.
+            task_thinker.ask_model = _atrapa('{"format": "pdf", "reasoning": "Do wysłania."}')
+            folder_child = runner_loop._save_result_to_onedrive(
+                {"task_id": "T-DZIECKO-1", "title": "Podzadanie 1", "parent_task_id": "T-XLSX"},
+                "done", "Podzadanie zrobione.", {"acceptance_notes": "Wynik podzadania."})
+            checks.append(("Podzadanie: folder taki sam jak rodzica (T-XLSX_*)",
+                           folder_child == folder))
+            checks.append(("Podzadanie: własny plik wynik_T-DZIECKO-1.* w folderze rodzica",
+                           folder_path is not None and (folder_path / "wynik_T-DZIECKO-1.pdf").exists()))
+            checks.append(("Współdzielony folder: pliki rodzica i dziecka NIE nadpisują się",
+                           folder_path is not None and len(list(folder_path.glob("wynik_*.*"))) == 2))
 
             # 4. Error case: katalog nadrzędny ONEDRIVE_TASKS_ROOT nie istnieje ->
             #    fail-soft, zwraca None, nie rzuca (model nie jest nawet wołany).

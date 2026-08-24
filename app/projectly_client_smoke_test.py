@@ -10,7 +10,7 @@ import json
 import tempfile
 from pathlib import Path
 
-from projectly_client import MAX_COMMENTS_PER_TASK, MockProjectlyClient
+from projectly_client import MAX_COMMENTS_PER_TASK, MockProjectlyClient, ProjectlyClient
 
 
 def _client_with(path):
@@ -70,9 +70,87 @@ def test_mock_has_default_admin_project_id():
     print("OK  MockProjectlyClient.default_admin_project_id() zwraca stały mockowy id")
 
 
+class _FakeMCPClient:
+    """Wzorzec z live_status_publisher_smoke_test.py — CELOWO BEZ SIECI."""
+
+    def __init__(self, create_task_id="CHILD-1"):
+        self.calls = []
+        self._create_task_id = create_task_id
+
+    def call_tool(self, name, arguments=None):
+        self.calls.append((name, arguments))
+        if name == "create_task":
+            return {"id": self._create_task_id}
+        return {}
+
+
+def test_create_task_subtask_of_sends_parent_task_id_not_zbot_link_tasks():
+    # subtask_of/order to PRAWDZIWA hierarchia (Task.parentTaskId, commit 261
+    # Projectly 24.08.2026) — inny mechanizm niż parent_task_id/relation_type
+    # (TaskRelation przez zbot_link_tasks, eskalacja/kontynuacja).
+    client = ProjectlyClient(api_key="fake-token", base_url="http://fake.local/mcp")
+    client._mcp = _FakeMCPClient(create_task_id="CHILD-1")
+
+    new_id = client.create_task("Podzadanie 1", "opis", assigned_to="bot",
+                                subtask_of="PARENT-1", order=0, project_id="PROJ-1")
+
+    assert new_id == "CHILD-1"
+    names = [c[0] for c in client._mcp.calls]
+    assert "zbot_link_tasks" not in names, "subtask_of nie powinno wołać zbot_link_tasks, tylko create_task"
+    create_calls = [c for c in client._mcp.calls if c[0] == "create_task"]
+    assert len(create_calls) == 1
+    args = create_calls[0][1]
+    assert args["parentTaskId"] == "PARENT-1"
+    assert args["order"] == 0
+    print("OK  create_task(subtask_of=..., order=...) wysyła parentTaskId/order w create_task, nie zbot_link_tasks")
+
+
+def test_create_task_parent_task_id_still_uses_zbot_link_tasks():
+    # Regresja: stary mechanizm (eskalacja/kontynuacja) MUSI zostać nietknięty.
+    client = ProjectlyClient(api_key="fake-token", base_url="http://fake.local/mcp")
+    client._mcp = _FakeMCPClient(create_task_id="CHILD-2")
+
+    client.create_task("Eskalacja", "opis", assigned_to="pawel",
+                       parent_task_id="ORIG-1", project_id="PROJ-1", relation_type="eskalacja")
+
+    create_args = next(a for n, a in client._mcp.calls if n == "create_task")
+    link_calls = [a for n, a in client._mcp.calls if n == "zbot_link_tasks"]
+    assert len(link_calls) == 1, "parent_task_id musi wołać zbot_link_tasks jak dotychczas"
+    assert link_calls[0] == {"fromTaskId": "ORIG-1", "toTaskId": "CHILD-2", "type": "eskalacja"}
+    assert "parentTaskId" not in create_args, "bez subtask_of, create_task nie może wysłać parentTaskId"
+    print("OK  create_task(parent_task_id=...) dalej woła zbot_link_tasks (eskalacja/kontynuacja nietknięte)")
+
+
+def test_map_task_exposes_parent_task_id_and_subtask_count():
+    client = ProjectlyClient(api_key="fake-token", base_url="http://fake.local/mcp")
+    mapped_parent = client._map_task({"id": "T-1", "title": "Rodzic", "parentTaskId": None, "subtaskCount": 3},
+                                     project_id="PROJ-1")
+    mapped_child = client._map_task({"id": "T-2", "title": "Dziecko", "parentTaskId": "T-1", "subtaskCount": 0},
+                                    project_id="PROJ-1")
+    assert mapped_parent["parent_task_id"] is None and mapped_parent["subtask_count"] == 3
+    assert mapped_child["parent_task_id"] == "T-1" and mapped_child["subtask_count"] == 0
+    print("OK  _map_task mapuje parentTaskId/subtaskCount na parent_task_id/subtask_count")
+
+
+def test_update_status_maps_przeniesione_literally():
+    client = ProjectlyClient(api_key="fake-token", base_url="http://fake.local/mcp")
+    client._mcp = _FakeMCPClient()
+
+    client.update_status("T-1", "przeniesione")
+
+    name, args = client._mcp.calls[0]
+    assert name == "update_task"
+    assert args["status"] == "przeniesione", "status przeniesione musi iść wprost, nie przez fallback in_progress"
+    print("OK  update_status('przeniesione') mapuje na Projectly status 'przeniesione', nie in_progress")
+
+
 if __name__ == "__main__":
     test_self_heal_from_corrupt_json()
     test_atomic_save_no_leftover_tmp()
     test_comments_rotate_and_cap()
     test_mock_has_default_admin_project_id()
+    test_create_task_subtask_of_sends_parent_task_id_not_zbot_link_tasks()
+    test_create_task_parent_task_id_still_uses_zbot_link_tasks()
+    test_map_task_exposes_parent_task_id_and_subtask_count()
+    test_update_status_maps_przeniesione_literally()
     print("\nWszystkie testy MockProjectlyClient przeszły.")

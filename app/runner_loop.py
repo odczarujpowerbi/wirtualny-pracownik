@@ -39,6 +39,7 @@ import risk_classifier
 import risk_hint
 import skill_usage_logger
 import state_store
+import task_decomposer
 import task_router
 import task_thinker
 import validator_prompt
@@ -89,7 +90,13 @@ def _save_result_to_onedrive(task, status, comment, execution_result=None):
     Jaki DOKŁADNIE plik powstaje (md/docx/pdf/xlsx) decyduje `output_decider.py`
     — Agent sterujący, per zadanie, na podstawie realnego wyniku — nie sztywna
     reguła w tym kodzie (decyzja właściciela 24.08.2026: żadne "źródło X ->
-    format Y"). Dokładnie JEDEN plik `wynik.<format>` per zadanie.
+    format Y"). Jeden plik `wynik_<task_id>.<format>` per zadanie.
+
+    Podzadanie (task["parent_task_id"] ustawione, patrz task_decomposer.py)
+    NIE dostaje własnego folderu — pisze do folderu RODZICA, wyszukanego po
+    prefiksie task_id w nazwie (task_id jest zawsze pierwszym segmentem, patrz
+    niżej) — bez potrzeby znać tytułu rodzica czy trzymać osobne mapowanie na
+    dysku; źródłem prawdy o hierarchii jest samo Projectly (parentTaskId).
 
     Fail-soft: brak ONEDRIVE_TASKS_ROOT albo błąd zapisu (w tym błąd wywołania
     modelu) NIE MOŻE zablokować przetwarzania zadania — to dodatkowy ślad, nie
@@ -107,8 +114,17 @@ def _save_result_to_onedrive(task, status, comment, execution_result=None):
         root_path = Path(root)
         if not root_path.parent.exists():
             return None  # OneDrive nie zsynchronizowany na tej maszynie — nie twórz sierocego folderu
-        data = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        folder = root_path / f"{task['task_id']}_{data}_{_slug(task.get('title', ''))}"
+        effective_id = task.get("parent_task_id") or task["task_id"]
+        istniejace = sorted(root_path.glob(f"{effective_id}_*")) if root_path.exists() else []
+        if istniejace:
+            folder = istniejace[0]
+        else:
+            # Rodzic bez własnego folderu jeszcze (normalny przypadek) albo
+            # podzadanie przetworzone PRZED rodzicem (rzadki wyścig) — w obu
+            # razach tworzymy folder pod effective_id, samo-naprawiający się
+            # brak blokady, nie wymaga specjalnej obsługi.
+            data = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            folder = root_path / f"{effective_id}_{data}_{_slug(task.get('title', ''))}"
         acceptance_notes = (execution_result or {}).get("acceptance_notes") or comment
         table_rows = (execution_result or {}).get("table_rows")
         decision = output_decider.decide(task, status, comment, execution_result)
@@ -125,7 +141,7 @@ def process_task(task, policy, routing, client):
     końcowym — to granica bezpiecznego resetu kontekstu: brief kolejnych zadań nie
     wciąga zamkniętego (task_brief_builder). Audyt zostaje, kontekst przestaje ciągnąć."""
     result = _process_task_core(task, policy, routing, client)
-    if result and result.get("status") in ("done", "needs_approval"):
+    if result and result.get("status") in ("done", "needs_approval", "przeniesione"):
         state_store.record_event(result["task_id"], "block_closed", result["status"], now_iso())
     return result
 
@@ -156,6 +172,33 @@ def _process_task_core(task, policy, routing, client):
         client.update_status(task_id, status)
         _save_result_to_onedrive(task, status, komentarz)
         return {"task_id": task_id, "risk": "red", "owner": owner, "status": status}
+
+    # Agent sterujący decyduje, czy to zadanie jest za duże/niejasne, żeby
+    # wykonać je wprost — TYLKO dla zadań bez rozpoznanego, gotowego workera
+    # (fetch_url/browser_task/mailerlite_report/... już same są "proste"),
+    # które NIE są już podzadaniem (bez fraktalnej dekompozycji) i które nie
+    # zostały już rozbite wcześniej (subtask_count>0 — redundancja z filtrem
+    # statusu "przeniesione" w pollingu, na wypadek gdyby update_status zawiódł
+    # po utworzeniu dzieci). Decyzja właściciela 24.08.2026, task_decomposer.py.
+    already_subtask = bool(task.get("parent_task_id"))
+    already_split = (task.get("subtask_count") or 0) > 0
+    if not already_subtask and not already_split and executor.rozpoznaj_narzedzie(task) is None:
+        decyzja = task_decomposer.decide(task)
+        if decyzja["cost_usd"]:
+            cost_tracker.record_cost(task_id, decyzja["cost_usd"])
+        state_store.log_decision(
+            task_id, agent="pawel", decision=f"split={decyzja['should_split']}",
+            reason=decyzja["reasoning"], now=now_iso(), event_type="decomposition")
+        if decyzja["should_split"]:
+            owner, _ = task_router.route_task(task["title"], routing)
+            wynik = task_decomposer.decompose(client, task, decyzja)
+            status = "przeniesione"
+            state_store.upsert_task(task_id, payload=task, status=status,
+                                    assigned_to=owner, risk_level="green", now=now_iso())
+            client.post_comment(task_id, wynik["comment"])
+            client.update_status(task_id, status)
+            _save_result_to_onedrive(task, status, wynik["comment"])
+            return {"task_id": task_id, "risk": "green", "owner": owner, "status": status}
 
     # Hint ryzyka: gdy źródło nie niesie własnego (albo niesie sztywny domyślny
     # 'yellow' z mapowania Projectly), wywnioskuj kolor Z TREŚCI zadania —

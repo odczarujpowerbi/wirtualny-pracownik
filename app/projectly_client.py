@@ -36,9 +36,11 @@ MOCK_TASKS_PATH = Path(__file__).parent / "mock_data" / "sample_tasks.json"
 MOCK_RUNS_DIR = Path(__file__).parent / "runs"
 MAX_COMMENTS_PER_TASK = 200  # rotacja mock_comments.json — patrz post_comment
 
-# Projectly zna tylko trzy statusy (todo|in_progress|done). Pipeline używa
-# szerszego zestawu wewnętrznego (planning, needs_approval, queued...) — tu je
-# mapujemy, żeby update_task nie dostał nieznanego statusu. Domyślnie in_progress.
+# Projectly zna cztery statusy (todo|in_progress|done|przeniesione — ostatni to
+# natywny status kontenera rozbitego na podzadania, potwierdzony przez właściciela
+# Projectly 24.08.2026, patrz task_decomposer.py). Pipeline używa szerszego zestawu
+# wewnętrznego (planning, needs_approval, queued...) — tu je mapujemy, żeby
+# update_task nie dostał nieznanego statusu. Domyślnie in_progress.
 _STATUS_TO_PROJECTLY = {
     "done": "done",
     "queued": "todo",
@@ -46,6 +48,7 @@ _STATUS_TO_PROJECTLY = {
     "in_progress": "in_progress",
     "planning": "in_progress",
     "needs_approval": "in_progress",
+    "przeniesione": "przeniesione",
 }
 
 
@@ -274,6 +277,8 @@ class ProjectlyClient:
             "stage_id": (raw.get("stage") or {}).get("id"),
             "assignee": assignee_name,
             "project_id": project_id,
+            "parent_task_id": raw.get("parentTaskId"),
+            "subtask_count": raw.get("subtaskCount", 0),
         }
 
     def _pollable_projects(self):
@@ -341,11 +346,20 @@ class ProjectlyClient:
         return self._project_id_by_name(name) if name else None
 
     def create_task(self, title, description, assigned_to, parent_task_id=None, project_id=None,
-                    relation_type="eskalacja", expected_result=None, acceptance_criteria=None):
+                    relation_type="eskalacja", expected_result=None, acceptance_criteria=None,
+                    subtask_of=None, order=None):
         """MCP: create_task (+ zbot_link_tasks). Tworzy zadanie w projekcie project_id,
         przypisane do assigned_to (alias lub nazwa osoby), i — jeśli podano
         parent_task_id — łączy je z rodzicem relacją relation_type (buduje ciąg
         oryginał->eskalacja->kontynuacja, PLAN-WDROZENIA.md sekcja 4).
+
+        `subtask_of`/`order` to INNY mechanizm niż `parent_task_id`/`relation_type` —
+        prawdziwa hierarchia rodzic->dziecko (Task.parentTaskId, widoczna w UI jako
+        "Podzadania" i w get_project_tasks jako parentTaskId/subtaskCount), nie
+        powiązanie TaskRelation. Potwierdzone przez właściciela Projectly 24.08.2026
+        (commit 261) — patrz task_decomposer.py. `parent_task_id`/`relation_type`
+        i `subtask_of`/`order` mogą być użyte niezależnie, nawet oba naraz, choć
+        w praktyce dziś nic tego nie robi.
 
         expected_result/acceptance_criteria (pola Projectly: goal/effect, patrz
         field_mapping w config/projectly.yaml) — BEZ NICH bramka jakości (Oskar)
@@ -368,6 +382,10 @@ class ProjectlyClient:
             args["goal"] = expected_result
         if acceptance_criteria is not None:
             args["effect"] = acceptance_criteria
+        if subtask_of is not None:
+            args["parentTaskId"] = subtask_of
+            if order is not None:
+                args["order"] = order
         result = self._mcp.call_tool("create_task", args)
         new_id = result.get("id") if isinstance(result, dict) else None
         if not new_id and isinstance(result, dict):
@@ -558,7 +576,8 @@ class MockProjectlyClient:
         return "MOCK-ADMIN-PROJECT"
 
     def create_task(self, title, description, assigned_to, parent_task_id=None, project_id=None,
-                    relation_type="eskalacja", expected_result=None, acceptance_criteria=None):
+                    relation_type="eskalacja", expected_result=None, acceptance_criteria=None,
+                    subtask_of=None, order=None):
         tasks = self._load(self._created_tasks_path, default=[])
         new_id = f"PRJ-ESC-{len(tasks) + 1:04d}"
         record = {
@@ -571,6 +590,8 @@ class MockProjectlyClient:
             "relation_type": relation_type if parent_task_id else None,
             "expected_result": expected_result,
             "acceptance_criteria": acceptance_criteria,
+            "subtask_of": subtask_of,
+            "order": order,
         }
         tasks.append(record)
         self._save(self._created_tasks_path, tasks)
