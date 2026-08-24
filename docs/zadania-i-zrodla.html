@@ -32,7 +32,7 @@
   <table>
     <thead><tr><th style="width:22%">Źródło</th><th>Opis</th></tr></thead>
     <tbody>
-      <tr><td><b>Projectly</b></td><td>Główna kolejka (API + MCP) — <b>realnie podłączona</b>. Agent pobiera zadania przypisane do konta AI swojej roli, komentuje i zamyka status. <code>projectly_client.py</code>.</td></tr>
+      <tr><td><b>Projectly</b></td><td>Główna kolejka (API + MCP) — <b>realnie podłączona</b>. Agent pobiera zadania przypisane do konta AI swojej roli ORAZ dodatkowych kont z <code>config/projectly.yaml → poll.extra_accounts</code> (jedna maszyna może obsługiwać kilka ról naraz, np. „AI - Dev" + „AI - Marketing" + „AI - Zarząd"), komentuje i zamyka status. <code>projectly_client.py</code>.</td></tr>
       <tr><td><b>Notatnik</b></td><td><code>app/inbox/zadania.txt</code> — jedna linia = jedno zadanie, dobre do testów lokalnych. Adres źródła po znaku <code>@</code>; tag ryzyka <code>!yellow</code>/<code>!red</code>.</td></tr>
       <tr><td><b>Dashboard</b></td><td>Formularz „Dodaj zadanie" — pisze do notatnika i od razu przetwarza.</td></tr>
     </tbody>

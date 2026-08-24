@@ -33,6 +33,8 @@
     <pre>zadanie (Projectly / notatnik / dashboard)
    │
    ▼  kontrola treści (prompt injection?) ── wykryto → eskalacja
+   ▼  Agent sterujący: za duże/niejasne? ── tak → rozbij na podzadania,
+   │      status zadania głównego „przeniesione"           [decyzja: task_decomposer]
    ▼  klasyfikacja ryzyka: zielone / żółte / czerwone            [decyzja: pawel]
    ▼  routing do właściciela
    ▼  wykonanie (executor) — tylko w granicach kontraktu          [decyzja: patrycja]
@@ -44,7 +46,9 @@
    │           • poprawka pomogła → done
    │           • zadanie źle postawione (brak danych) → zamknięte z feedbackiem, BEZ eskalacji
    │           • poprawka się nie udała → eskalacja jako zadanie dla człowieka   [decyzja: pawel]
-   ▼  każdy krok → dziennik decyzji (state.db) → widok „Zadania"/„Przepływy" w dashboardzie</pre>
+   ▼  każdy krok → dziennik decyzji (state.db) → widok „Zadania"/„Przepływy" w dashboardzie
+   ▼  zapis wyniku: Agent sterujący wybiera JEDEN plik (pdf/docx/md/xlsx)
+          → folder zadania w OneDrive → SharePoint             [decyzja: output_decider]</pre>
     <p><b>Fail-closed:</b> przy niepewności agent nie wykonuje działania nieodwracalnego — zapisuje stan i eskaluje. Czerwone (publikacja, budżet, usunięcie danych) zawsze do człowieka.</p>
   </div>
 
@@ -82,6 +86,21 @@
       <tr><td><b>Czerwona</b></td><td>Publikacja, zmiana budżetu, nadanie roli, masowa wiadomość, usunięcie danych.</td><td>Wymaga jawnej akceptacji człowieka.</td></tr>
     </tbody>
   </table>
+
+  <h2><span class="n">5</span> Dekompozycja dużych zadań — status „przeniesione"</h2>
+  <div class="card">
+    <p>Dla zadania, które nie ma rozpoznanego, gotowego workera (nie jest to zwykły fetch strony, MailerLite, zrzut czy walidacja PBIP) — i które nie jest już samo podzadaniem — Agent sterujący (<code>task_decomposer.py</code>) ocenia, czy zadanie jest za duże/niejasne, żeby wykonać je wprost. Żadna reguła w kodzie nie wymusza podziału po słowach z tytułu — decyzja jest per zadanie, na podstawie realnej treści.</p>
+    <p>Gdy decyduje się rozbić: tworzy 2-6 prostych podzadań, każde mające jednoznacznie mapować się na jedną znaną zdolność bota (pobranie strony, klikanie, zrzut, walidacja PBIP, MailerLite/Zanfia, albo wąski task tekstowy) — tak żeby bot wykonał je bezbłędnie. Podzadania to <b>prawdziwa hierarchia</b> w Projectly (<code>Task.parentTaskId</code>, widoczna w UI jako „Podzadania"), nie tylko powiązanie informacyjne. Zadanie główne dostaje status <code>przeniesione</code> — czwarty, natywny status Projectly dla kontenera rozbitego na podzadania (obok <code>todo</code>/<code>in_progress</code>/<code>done</code>) — i wypada z pollingu, więc nie jest już wykonywane samo.</p>
+    <div class="callout">Fail-closed w obie strony: brak modelu, nieparsowalna odpowiedź albo mniej niż 2 sensowne podzadania → zadanie idzie normalną ścieżką (bez podziału), tak jak dziś. Podzadanie nie jest dalej dzielone (bez fraktalnej dekompozycji).</div>
+    <p>Wynik KAŻDEGO podzadania (i samego zadania głównego) trafia do <b>jednego, wspólnego folderu</b> w OneDrive → SharePoint — bota nie trzeba do tego uczyć niczego dodatkowego: folder wyszukiwany jest po prefiksie ID zadania głównego, a hierarchia rodzic→dziecko to pole z samego Projectly (<code>parentTaskId</code>/<code>subtaskCount</code>), nie lokalny plik na dysku maszyny.</p>
+  </div>
+
+  <h2><span class="n">6</span> Agent decyduje o formacie wyniku (pdf/docx/md/xlsx)</h2>
+  <div class="card">
+    <p>Dla każdego przetworzonego zadania (niezależnie od statusu końcowego) powstaje dokładnie JEDEN plik z wynikiem — <code>output_decider.py</code> pyta model, jaki format najlepiej udokumentuje ten konkretny wynik: PDF (domyślna preferencja, czytelny, gotowy do wysłania dalej), DOCX (gdy dokument ma być dalej edytowany przez człowieka), MD (krótka techniczna notatka) albo XLSX (gdy wynik to głównie dane liczbowe/tabelaryczne do dalszej analizy — np. lista kampanii MailerLite). Żadne źródło zadania nie ma sztywno przypisanego formatu w kodzie.</p>
+    <p>Treść pliku jest zawsze budowana DETERMINISTYCZNIE z prawdziwego wyniku zadania (<code>acceptance_notes</code> + ewentualne dane tabelaryczne) — model wybiera tylko format, nigdy nie wymyśla treści dokumentu.</p>
+    <div class="callout">Fail-closed: brak modelu, nieparsowalna odpowiedź, albo wybór xlsx bez żadnych danych tabelarycznych → domyślnie PDF. „Ma powstać jakiś plik" nie zależy od dostępności modelu.</div>
+  </div>
 
   <div class="foot">Wirtualny Pracownik AI — dokumentacja. <a href="jak-edytowac.html">Jak edytować tę dokumentację</a> · <a href="boty-i-persony.html">Boty i persony →</a></div>
 </div>

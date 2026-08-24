@@ -60,8 +60,10 @@
   <h3 class="sub">Rdzeń pipeline'u</h3>
   <table>
     <tbody>
-      <tr><td style="width:26%"><code>runner_loop.py</code></td><td>Główna pętla: klasyfikacja → routing → wykonanie → poprawka → bramka → eskalacja/zamknięcie.</td></tr>
+      <tr><td style="width:26%"><code>runner_loop.py</code></td><td>Główna pętla: klasyfikacja → routing → wykonanie → poprawka → bramka → eskalacja/zamknięcie. <code>_save_result_to_onedrive</code> zapisuje wynik KAŻDEGO zadania (patrz <code>output_decider.py</code> niżej).</td></tr>
       <tr><td><code>executor.py</code></td><td>Rozpoznaje typ zadania i woła właściwego workera (PBIP, web fetch, MailerLite, Zanfia).</td></tr>
+      <tr><td><code>task_decomposer.py</code></td><td>Agent sterujący ocenia, czy zadanie bez rozpoznanego workera rozbić na proste podzadania (prawdziwa hierarchia <code>parentTaskId</code>, status <code>przeniesione</code>). Patrz <a href="przeplyw-zadania.html">Przepływ zadania</a> sekcja 5.</td></tr>
+      <tr><td><code>output_decider.py</code></td><td>Agent sterujący wybiera format pliku wyniku (pdf/docx/md/xlsx) per zadanie i buduje go deterministycznie z prawdziwej treści (<code>document_builder.py</code>/<code>report_builder.py</code>). Patrz <a href="przeplyw-zadania.html">Przepływ zadania</a> sekcja 6.</td></tr>
       <tr><td><code>task_thinker.py</code></td><td>Wołanie modelu (Claude Code → SDK → Ollama), z poziomem z <code>model_registry.py</code>.</td></tr>
       <tr><td><code>tool_registry.py</code></td><td>Kontrakt uprawnień — allowlisty plików i domen.</td></tr>
       <tr><td><code>model_registry.py</code></td><td>Rejestr modeli i poziomów (patrz <a href="modele-i-koszty.html">Modele i koszty</a>).</td></tr>
@@ -78,7 +80,7 @@
       <tr><td><code>web_answer.py</code></td><td>Odpowiedź na zadanie na podstawie pobranej treści.</td></tr>
       <tr><td><code>web_source_fixer.py</code></td><td>Samodzielna korekta/fallback adresu źródła.</td></tr>
       <tr><td><code>pbip_validate.py</code> / <code>pbi_desktop_bridge.py</code></td><td>Walidacja struktury PBIP / otwarcie w Power BI Desktop i zrzut.</td></tr>
-      <tr><td><code>projectly_client.py</code></td><td>Realny + mock klient kolejki zadań Projectly.</td></tr>
+      <tr><td><code>projectly_client.py</code></td><td>Realny + mock klient kolejki zadań Projectly. Cztery statusy (<code>todo</code>/<code>in_progress</code>/<code>done</code>/<code>przeniesione</code>), prawdziwa hierarchia podzadań (<code>parentTaskId</code>/<code>subtaskCount</code>) — patrz <code>task_decomposer.py</code>.</td></tr>
       <tr><td><code>integracje_worker.py</code></td><td>MailerLite (raporty kampanii) i Zanfia (zapytania kursowe przez MCP).</td></tr>
       <tr><td><code>ad_copy_generator.py</code> / <code>email_draft_generator.py</code> / <code>mailerlite_report_analyzer.py</code> / <code>weekly_team_report.py</code> / <code>ocr_extract.py</code></td><td>Generatory treści (poziom modelu: niski).</td></tr>
     </tbody>
