@@ -10,6 +10,14 @@
 #
 # Chcesz dodac nowy cykliczny skrypt do dystrybucji? Dopisz go TUTAJ (i zrob commit)
 # - trafi na wszystkie maszyny przy najblizszym uruchomieniu, bez konfliktow.
+#
+# max_duration_seconds (opcjonalne, domyslnie 1800 = 30 min, job_scheduler.
+# DEFAULT_MAX_DURATION_SECONDS): watchdog - jesli wątek joba zyje dluzej niz
+# ten limit, scheduler uznaje go za zawieszony i odpala nowy przebieg mimo
+# ze stary "wciaz zyje" (druga linia obrony po naprawie total-timeoutu w
+# mcp_client.py, zywy incydent 25.08.2026). Podwyzsz dla jobow, ktore legalnie
+# potrzebuja wiecej czasu (runner_loop moze przetwarzac zadania agentic_worker
+# do 600s KAZDE, do 5 na przebieg - patrz runner_loop.MAX_TASKS_PER_RUN).
 
 jobs:
 - name: runner_loop
@@ -18,6 +26,7 @@ jobs:
   module: runner_loop
   function: run_once
   interval_seconds: 30
+  max_duration_seconds: 3600
   enabled: true
 - name: system_health_monitor
   description: Kontrola zdrowia maszyny - zużycie RAM i czy oczekiwane skrypty faktycznie
@@ -128,10 +137,13 @@ jobs:
 - name: repo_auto_improver
   description: Po zakonczeniu zadania z sygnalem problemu (eskalacja do czlowieka,
     bramka jakosci odrzucila, podwojne wykonanie) analizuje kod w izolowanym git
-    worktree i otwiera PR z poprawka albo brakujaca umiejetnoscia. Domyslnie wylaczony
-    - tworzy branche/PR-y na GitHubie, wlacz swiadomie po przejrzeniu pierwszych
-    przebiegow (python repo_auto_improver.py recznie).
+    worktree i otwiera PR z poprawka albo brakujaca umiejetnoscia. Wlaczony na trwale
+    25.08.2026 (decyzja wlasciciela) - tworzy branche/PR-y na GitHubie. Kursor stanu
+    (runs/repo_improver_state.json) zresetowany do biezacego max_event_id przed
+    wlaczeniem, zeby pierwszy przebieg NIE dzialal retroaktywnie na starym szumie
+    testowym (~150 zdarzen z 19-24.08.2026, w tym powtarzajace sie zadanie mock
+    "PRJ-0001" i rekordy notebook_intake "NB-*" - test/dev, nie realne incydenty).
   module: repo_auto_improver
   function: run_repo_improvement_cycle
   interval_seconds: 120
-  enabled: false
+  enabled: true

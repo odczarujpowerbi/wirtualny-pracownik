@@ -82,19 +82,24 @@ def run():
         wynik_low = task_thinker._think_via_sdk("prompt", "web_answer.answer")
         checks.append(("SDK: wykonawca (low) woła model Sonnet 4.6",
                        fake_client.messages.ostatni_model == "claude-sonnet-4-6"))
-        checks.append(("SDK: koszt liczony wg cennika roli low (tańszy niż opus)",
+        checks.append(("SDK: koszt liczony wg cennika roli low (tańszy niż steering/fable)",
                        wynik_low["cost_usd"] < task_thinker._think_via_sdk("x" * 4000, "task_thinker.think")["cost_usd"]))
 
         wynik_high = task_thinker._think_via_sdk("prompt", "task_thinker.think")
-        checks.append(("SDK: analiza zadania (high) woła model Opus 5",
-                       fake_client.messages.ostatni_model == "claude-opus-5"))
-        checks.append(("SDK: wynik niesie użyty model", wynik_high.get("model") == "claude-opus-5"))
+        checks.append(("SDK: analiza zadania (agent sterujący) woła model Fable 5",
+                       fake_client.messages.ostatni_model == "claude-fable-5"))
+        checks.append(("SDK: wynik niesie użyty model", wynik_high.get("model") == "claude-fable-5"))
+
+        wynik_osad = task_thinker._think_via_sdk("prompt", "bot_oskar_wizja.review")
+        checks.append(("SDK: osąd wizualny (high, NIE agent sterujący) woła model Opus 5",
+                       fake_client.messages.ostatni_model == "claude-opus-5"
+                       and wynik_osad.get("model") == "claude-opus-5"))
     finally:
         del sys.modules["anthropic"]
 
     # --- domyślne callery think()/ask_model() ---
-    checks.append(("think() bez podania callera domyślnie idzie na wysoki poziom",
-                   model_registry.tier_for_caller("task_thinker.think") == "high"))
+    checks.append(("think() domyślny caller -> tier 'steering' (agent sterujący, Fable 5)",
+                   model_registry.tier_for_caller("task_thinker.think") == "steering"))
     checks.append(("ask_model() bez podania callera domyślnie idzie na wysoki poziom "
                    "(nieznany caller jest fail-closed)",
                    model_registry.tier_for_caller("task_thinker.ask_model") == "high"))

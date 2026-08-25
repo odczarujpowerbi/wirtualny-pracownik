@@ -56,6 +56,8 @@ def load_bootstrap_history(path=BOOTSTRAP_HISTORY_PATH):
 
 
 def build_machine_status():
+    import live_status_publisher
+
     snapshot = system_health_monitor.get_system_snapshot()
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -63,6 +65,8 @@ def build_machine_status():
         "last_bootstrap": load_bootstrap_history(),
         "ram_available_percent": snapshot["ram_available_percent"],
         "running_scripts": snapshot["running_scripts"],
+        "update_interval_seconds": live_status_publisher._skonfigurowany_interwal(
+            "machine_status_reporter", 3600),
     }
 
 

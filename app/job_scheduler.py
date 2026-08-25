@@ -49,6 +49,25 @@ import scheduler_lock
 # obcinamy, zeby pojedynczy zapyziaczony przebieg nie rozdal pliku historii.
 MAX_OUTPUT_CHARS = 200_000
 
+# WATCHDOG (żywy incydent 25.08.2026): runner_loop/notebook_intake/kacper_monitor/
+# system_health_monitor zawiesiły się na 2+ godziny na "ciekącym" połączeniu
+# sieciowym (naprawione osobno w mcp_client.py, patrz total timeout w _rpc) —
+# ale to jest DRUGA linia obrony na wypadek JAKIEJKOLWIEK innej przyszłej
+# przyczyny zawieszenia wątku (deadlock, inny hang sieciowy, cokolwiek).
+# `already_running` (nazwa_joba -> wątek wciąż `is_alive()`) normalnie blokuje
+# start nowego przebiegu, dopóki poprzedni nie skończy — bez limitu, zawieszony
+# wątek blokuje TEN JOB na zawsze. Domyślny limit jest generous (30 min) —
+# indywidualny job może go podwyższyć w schedule.yaml (`max_duration_seconds`),
+# jeśli legalnie potrzebuje więcej (np. runner_loop przy wielu zadaniach
+# agentic_worker, patrz agentic_worker.AGENTIC_TIMEOUT_SECONDS).
+DEFAULT_MAX_DURATION_SECONDS = 1800
+
+
+def _watchdog_timeout_exceeded(started_at, now, limit_seconds):
+    """Wyodrębnione z run_scheduler() dla testowalności bez realnej pętli/blokady
+    plikowej. True = wątek żyje dłużej niż limit, traktujemy go jako zawieszony."""
+    return started_at is not None and (now - started_at).total_seconds() > limit_seconds
+
 SCHEDULE_PATH = Path(__file__).parent / "config" / "schedule.yaml"
 # Szablon SLEDZONY w gicie. schedule.yaml (LIVE) jest poza gitem (.gitignore),
 # bo aplikacja go zapisuje w runtime (dashboard/CLI) - gdyby byl sledzony,
@@ -294,6 +313,7 @@ def run_scheduler(tick_seconds=5, schedule_path=SCHEDULE_PATH):
 
     state = _load_state()
     threads = {}
+    thread_started_at = {}
 
     print(f"job_scheduler.py wystartował — sprawdzanie harmonogramu co {tick_seconds}s (config: {schedule_path})")
     try:
@@ -316,11 +336,22 @@ def run_scheduler(tick_seconds=5, schedule_path=SCHEDULE_PATH):
                 name = job["name"]
                 last = state.get(name)
                 due = last is None or now >= datetime.fromisoformat(last["next_run_at"])
-                already_running = name in threads and threads[name].is_alive()
+                wątek = threads.get(name)
+                already_running = wątek is not None and wątek.is_alive()
+
+                if already_running:
+                    started = thread_started_at.get(name)
+                    limit = job.get("max_duration_seconds", DEFAULT_MAX_DURATION_SECONDS)
+                    if _watchdog_timeout_exceeded(started, now, limit):
+                        print(f"[{name}] WATCHDOG: wątek żyje {(now - started).total_seconds():.0f}s "
+                              f"(limit {limit}s) — traktuję jako zawieszony, odpalam nowy przebieg "
+                              "(stary wątek zostaje osierocony, daemon — nie blokuje procesu).")
+                        already_running = False
 
                 if due and not already_running:
                     t = threading.Thread(target=_run_job, args=(job, state), daemon=True)
                     threads[name] = t
+                    thread_started_at[name] = now
                     t.start()
 
             time.sleep(tick_seconds)

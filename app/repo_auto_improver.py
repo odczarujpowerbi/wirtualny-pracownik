@@ -36,6 +36,7 @@ Zasady bezpieczeństwa:
 """
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -43,6 +44,7 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+import model_registry
 import state_store
 import task_thinker
 
@@ -52,6 +54,10 @@ STATE_PATH = APP_DIR / "runs" / "repo_improver_state.json"
 BASE_BRANCH = "main"
 SUBAGENT_TIMEOUT_SECONDS = 900
 RESULT_FILENAME = "AUTO_FIX_SUMMARY.md"
+# Rozszerzenia plików wyniku, których treść da się dołożyć do promptu wprost
+# (tekst). Dla innych (.pdf/.docx/.xlsx) odnotowujemy tylko nazwę — bez nowej
+# zależności do parsowania, której dziś nie ma w requirements.txt.
+_ROZSZERZENIA_TEKSTOWE = (".md", ".txt")
 
 
 def _load_state(path=STATE_PATH):
@@ -142,7 +148,37 @@ def _posprzataj_worktree(worktree, branch):
     _run(["git", "-C", str(REPO_DIR), "branch", "-D", branch], timeout=60)
 
 
-def _zbuduj_prompt(task, powod, historia):
+def _plik_wyniku_tekst(task_id):
+    """Treść realnego pliku wyniku zadania z OneDrive (dowód, nie tylko log
+    zdarzeń) — ten sam folder, który zapisuje runner_loop._save_result_to_onedrive
+    (prefiks task_id w nazwie folderu). Pliki .md/.txt wchodzą wprost, dla
+    .pdf/.docx/.xlsx odnotowujemy tylko nazwę (bez nowej zależności do
+    parsowania). Fail-soft: brak ONEDRIVE_TASKS_ROOT/folderu/błąd -> ""."""
+    root = os.environ.get("ONEDRIVE_TASKS_ROOT")
+    if not root:
+        return ""
+    try:
+        foldery = sorted(Path(root).glob(f"{task_id}_*"))
+        if not foldery:
+            return ""
+        czesci = []
+        for plik in sorted(foldery[0].iterdir()):
+            if not plik.is_file():
+                continue
+            if plik.suffix.lower() in _ROZSZERZENIA_TEKSTOWE:
+                czesci.append(f"--- {plik.name} ---\n{plik.read_text(encoding='utf-8').strip()}")
+            else:
+                czesci.append(f"--- {plik.name} (binarny, nie odczytany) ---")
+        return "\n\n".join(czesci)
+    except OSError:
+        return ""
+
+
+def _zbuduj_prompt(task, powod, historia, plik_wyniku=""):
+    sekcja_pliku = (
+        f"\n\nPlik wyniku zadania (dowód, nie tylko log zdarzeń):\n{plik_wyniku}"
+        if plik_wyniku else ""
+    )
     return (
         "Jesteś agentem naprawiającym repozytorium 'wirtualny-pracownik' (Python, "
         "pipeline agenta AI). Poniższe PRAWDZIWE zadanie zakończyło się sygnałem "
@@ -157,7 +193,8 @@ def _zbuduj_prompt(task, powod, historia):
         f"Zadanie: {task.get('title', '')}\n"
         f"Cel: {task.get('expected_result', '')}\n"
         f"Kryteria akceptacji: {task.get('acceptance_criteria', '')}\n\n"
-        f"Co się stało (dziennik zdarzeń tego zadania):\n{historia}\n\n"
+        f"Co się stało (dziennik zdarzeń tego zadania):\n{historia}"
+        f"{sekcja_pliku}\n\n"
         f"Jeśli wprowadzisz zmiany, zapisz w pliku '{RESULT_FILENAME}' w katalogu "
         "głównym KRÓTKIE podsumowanie (co, dlaczego, jak to zweryfikować) — to "
         "trafi jako opis Pull Requesta."
@@ -168,10 +205,14 @@ def _uruchom_subagenta(worktree, prompt):
     claude_exe = task_thinker._find_claude()
     if not claude_exe:
         return {"executed": False, "powod": "Brak Claude Code (claude login) na tej maszynie."}
+    _, model = model_registry.resolve("repo_auto_improver.napraw_zadanie")
     try:
         result = _run(
-            [claude_exe, "-p", prompt, "--permission-mode", "acceptEdits",
-             "--allowedTools", "Read Write Edit", "--add-dir", str(worktree)],
+            # Prompt zaraz po --model, PRZED --allowedTools/--add-dir (te dwa są
+            # wariadyczne — konsumują każdy kolejny token bez "-" na początku,
+            # patrz agentic_worker.py dla tego samego wzorca/incydentu).
+            [claude_exe, "-p", "--model", model, prompt, "--permission-mode", "acceptEdits",
+             "--allowedTools", "Read Write Edit Skill", "--add-dir", str(worktree)],
             cwd=worktree, timeout=SUBAGENT_TIMEOUT_SECONDS,
         )
     except (subprocess.TimeoutExpired, OSError) as exc:
@@ -219,7 +260,8 @@ def napraw_zadanie(task_id, powod, historia):
         return {"task_id": task_id, "akcja": "brak_akcji", "powod": f"Przygotowanie worktree nie powiodło się: {exc}"}
 
     try:
-        wynik_subagenta = _uruchom_subagenta(worktree, _zbuduj_prompt(task, powod, historia))
+        plik_wyniku = _plik_wyniku_tekst(task_id)
+        wynik_subagenta = _uruchom_subagenta(worktree, _zbuduj_prompt(task, powod, historia, plik_wyniku))
         if not wynik_subagenta["executed"]:
             return {"task_id": task_id, "akcja": "brak_akcji", "powod": wynik_subagenta["powod"]}
 

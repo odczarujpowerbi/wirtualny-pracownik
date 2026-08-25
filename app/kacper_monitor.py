@@ -24,8 +24,10 @@ SYNCHRONICZNIE w runner_loop.py. Kacper tego nie duplikuje — widzi tylko
 wzorce w agregacie.
 
 Reszta (żadnego wzorca) trafia do statusu na żywo przez
-client.publish_status("kacper-monitor", ...) — ten sam mechanizm co
+client.publish_status("monitoring", ...) — ten sam mechanizm co
 system_health_monitor.py, osobna rola, nie nadpisuje statusu innych botów.
+roleLabel "monitoring", NIE "kacper-monitor" (decyzja właściciela 25.08.2026 —
+nazwa wewnętrzna zostaje w kodzie, na zewnątrz to generyczny "monitoring").
 Kształt tego payloadu (events_scanned/repair_tasks_created/checked_at) jest
 inny niż u pozostałych wywołujących publish_status — normalizacja do
 kontraktu MCP post_agent_status dzieje się centralnie w
@@ -168,8 +170,16 @@ def run_monitor_cycle(client=None, thresholds=None, state_path=STATE_PATH):
     state["last_event_id"] = new_last_id
     _save_state(state, state_path)
 
+    import live_status_publisher
+
     summary = {"events_scanned": len(events), "repair_tasks_created": repair_created}
-    client.publish_status("kacper-monitor", {**summary, "checked_at": datetime.now(timezone.utc).isoformat()})
+    # roleLabel "monitoring", NIE "kacper-monitor" (decyzja właściciela 25.08.2026 —
+    # nazwa wewnętrzna bota zostaje w kodzie/dokumentacji, ale na zewnątrz
+    # (Projectly) to ma się przedstawiać jako generyczny proces monitorujący).
+    client.publish_status("monitoring", {
+        **summary, "checked_at": datetime.now(timezone.utc).isoformat(),
+        "update_interval_seconds": live_status_publisher._skonfigurowany_interwal("kacper_monitor", 90),
+    })
     return summary
 
 

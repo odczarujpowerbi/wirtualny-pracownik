@@ -94,10 +94,14 @@ def run_health_check(client=None, thresholds=None):
     client = client or get_client()
     thresholds = thresholds or load_thresholds()
 
+    import live_status_publisher
+
     snapshot = get_system_snapshot()
     health = evaluate_health(snapshot, thresholds)
 
-    payload = {**snapshot, "status": health["status"], "issues": health["issues"]}
+    payload = {**snapshot, "status": health["status"], "issues": health["issues"],
+               "update_interval_seconds": live_status_publisher._skonfigurowany_interwal(
+                   "system_health_monitor", 120)}
     client.publish_status("system-health", payload)
 
     created_task_id = None

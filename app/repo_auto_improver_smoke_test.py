@@ -10,6 +10,7 @@ Użycie:
 """
 
 import json
+import os
 import shutil
 import sys
 import tempfile
@@ -200,6 +201,47 @@ def run():
         wynik_cyklu_3 = rai.run_repo_improvement_cycle(state_path=cyklowy_state_path, limit=1)
         checks.append(("cykl 3: te same zadania nie są naprawiane drugi raz",
                        len(wynik_cyklu_3["naprawiono"]) == 0))
+
+        # --- 8. _uruchom_subagenta: woła Claude Code z --model (Fable 5) i Skill ---
+        captured_cmd = {}
+
+        def _run_przechwytujacy(cmd, cwd=None, timeout=60, check=False):
+            captured_cmd["cmd"] = cmd
+            return _Wynik(0)
+        rai._run = _run_przechwytujacy
+        rai._uruchom_subagenta = original_uruchom  # implementacja realna, nie atrapa z kroku 5
+        rai._uruchom_subagenta(tmp, "prompt testowy")
+        checks.append(("_uruchom_subagenta: komenda ma --model claude-fable-5 (tier 'steering')",
+                       "--model" in captured_cmd["cmd"] and "claude-fable-5" in captured_cmd["cmd"]))
+        checks.append(("_uruchom_subagenta: prompt zaraz po --model, PRZED --allowedTools",
+                       captured_cmd["cmd"].index("prompt testowy") < captured_cmd["cmd"].index("--allowedTools")))
+        checks.append(("_uruchom_subagenta: --allowedTools zawiera Skill",
+                       "Read Write Edit Skill" in captured_cmd["cmd"]))
+
+        # --- 9. _plik_wyniku_tekst: czyta realny plik .md z OneDrive, fail-soft gdy brak ---
+        original_onedrive_root = os.environ.get("ONEDRIVE_TASKS_ROOT")
+        try:
+            onedrive_tmp = tmp / "onedrive"
+            folder_zadania = onedrive_tmp / "T-ONEDRIVE_2026-08-25_test"
+            folder_zadania.mkdir(parents=True)
+            (folder_zadania / "wynik_T-ONEDRIVE.md").write_text(
+                "Treść realnego wyniku zadania.", encoding="utf-8")
+            (folder_zadania / "wynik_T-ONEDRIVE.pdf").write_bytes(b"%PDF-fake")
+            os.environ["ONEDRIVE_TASKS_ROOT"] = str(onedrive_tmp)
+
+            tresc = rai._plik_wyniku_tekst("T-ONEDRIVE")
+            checks.append(("_plik_wyniku_tekst: treść .md dołączona wprost", "Treść realnego wyniku" in tresc))
+            checks.append(("_plik_wyniku_tekst: plik binarny tylko odnotowany z nazwy",
+                           "wynik_T-ONEDRIVE.pdf" in tresc and "%PDF-fake" not in tresc))
+
+            del os.environ["ONEDRIVE_TASKS_ROOT"]
+            checks.append(("_plik_wyniku_tekst: brak ONEDRIVE_TASKS_ROOT -> fail-soft ''",
+                           rai._plik_wyniku_tekst("T-ONEDRIVE") == ""))
+        finally:
+            if original_onedrive_root is None:
+                os.environ.pop("ONEDRIVE_TASKS_ROOT", None)
+            else:
+                os.environ["ONEDRIVE_TASKS_ROOT"] = original_onedrive_root
     finally:
         rai._run = original_run
         rai.shutil.which = original_which

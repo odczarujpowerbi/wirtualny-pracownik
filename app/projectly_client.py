@@ -81,6 +81,13 @@ _STATUS_KEY_RENAME = {
     "cost_limit_usd": "costLimitUsd",
     "machine": "machine",
     "message": "message",
+    # Dodane 25.08.2026 — jak "details" niżej: produkcyjny schemat post_agent_status
+    # może dziś TO pole ignorować (nierozpoznany klucz), wysyłamy mimo to, żeby
+    # zadziałało bez zmiany tego kodu, gdy Projectly rozpozna je po swojej stronie.
+    # Cel: freshness/"online" liczona wobec RZECZYWISTEGO interwału tej roli, nie
+    # jednego globalnego progu (żywy incydent 25.08.2026 — machine-status,
+    # interwał 3600s, wyglądał na "offline" pod progiem myślanym dla ról 30-120s).
+    "update_interval_seconds": "updateIntervalSeconds",
 }
 
 
@@ -121,7 +128,7 @@ def _map_status_payload(payload):
 
     # status (aktywnosc bota: working/idle/alert/paused/stopped) - NIE to samo co
     # health powyzej. Tylko live_status_publisher uzywa tego pola w tym sensie;
-    # role pomocnicze (machine-status/kacper-monitor/system-health) dostaja domyslnie
+    # role pomocnicze (machine-status/monitoring/system-health) dostaja domyslnie
     # "idle", bo ich wlasne 'status'/'health' znaczy cos innego (patrz wyzej).
     mapped["status"] = raw_status_field if raw_status_field in _STATUS_ENUM else "idle"
 
@@ -267,6 +274,17 @@ class ProjectlyClient:
                 return p["id"]
         return None
 
+    def project_name(self, project_id):
+        """Odwrotność _project_id_by_name — nazwa projektu po id, do kontekstu
+        promptu subagenta (agentic_worker.py). Fail-soft: brak/nieznany id -> None."""
+        if not project_id:
+            return None
+        self._ensure_directory()
+        for p in self._projects:
+            if p.get("id") == project_id:
+                return p.get("name")
+        return None
+
     @staticmethod
     def _as_task_list(result):
         if isinstance(result, list):
@@ -368,7 +386,7 @@ class ProjectlyClient:
 
     def create_task(self, title, description, assigned_to, parent_task_id=None, project_id=None,
                     relation_type="eskalacja", expected_result=None, acceptance_criteria=None,
-                    subtask_of=None, order=None):
+                    subtask_of=None, order=None, due_date=None):
         """MCP: create_task (+ zbot_link_tasks). Tworzy zadanie w projekcie project_id,
         przypisane do assigned_to (alias lub nazwa osoby), i — jeśli podano
         parent_task_id — łączy je z rodzicem relacją relation_type (buduje ciąg
@@ -403,6 +421,13 @@ class ProjectlyClient:
             args["goal"] = expected_result
         if acceptance_criteria is not None:
             args["effect"] = acceptance_criteria
+        if due_date is not None:
+            # Pole widziane przy ODCZYCIE (_map_task czyta raw.get("dueDate")) —
+            # nie potwierdzone, że create_task je PRZYJMUJE przy zapisie (MCP nie
+            # dokumentuje tego wprost). Jeśli serwer je zignoruje, to zadanie
+            # zostanie utworzone bez terminu — do zgłoszenia jako rozszerzenie
+            # MCP, nie do obchodzenia po stronie klienta.
+            args["dueDate"] = due_date
         if subtask_of is not None:
             args["parentTaskId"] = subtask_of
             if order is not None:
@@ -596,9 +621,14 @@ class MockProjectlyClient:
     def default_admin_project_id(self):
         return "MOCK-ADMIN-PROJECT"
 
+    def project_name(self, project_id):
+        """Mock: brak katalogu projektów lokalnie — tylko oznaczenie, że to
+        jest ID projektu mock, żeby test_build_prompt mógł pokryć tę ścieżkę."""
+        return f"[mock] {project_id}" if project_id else None
+
     def create_task(self, title, description, assigned_to, parent_task_id=None, project_id=None,
                     relation_type="eskalacja", expected_result=None, acceptance_criteria=None,
-                    subtask_of=None, order=None):
+                    subtask_of=None, order=None, due_date=None):
         tasks = self._load(self._created_tasks_path, default=[])
         new_id = f"PRJ-ESC-{len(tasks) + 1:04d}"
         record = {
@@ -613,6 +643,7 @@ class MockProjectlyClient:
             "acceptance_criteria": acceptance_criteria,
             "subtask_of": subtask_of,
             "order": order,
+            "due_date": due_date,
         }
         tasks.append(record)
         self._save(self._created_tasks_path, tasks)

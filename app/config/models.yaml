@@ -7,6 +7,15 @@
 # Przy nastepnej aktualizacji cennika sprawdz go ponownie zamiast zgadywac.
 
 anthropic:
+  fable_5:
+    # Model sterujacy (task_thinker.think / task_decomposer.decide /
+    # output_decider.decide) - decyzja wlasciciela 25.08.2026, po tym jak
+    # subagent LDIT trafil na dwie realne blokady (brak narzedzia sieciowego,
+    # domena spoza allowlisty) i poprawnie sam to zdiagnozowal. Cena zrodlo:
+    # skill claude-api, live lookup 25.08.2026 (nie z pamieci).
+    id: claude-fable-5
+    input_per_million: 10.00
+    output_per_million: 50.00
   opus_5:
     id: claude-opus-5
     input_per_million: 5.00

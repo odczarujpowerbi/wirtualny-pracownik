@@ -1,15 +1,31 @@
 """
 Prawdziwy subagent — gdy executor.py nie rozpoznaje wąskiego workera dla
 zadania (i task_decomposer.py zdecydował NIE dzielić go dalej), tu zadanie
-faktycznie się WYKONUJE: Claude Code z realnym Read/Write/Edit, ograniczony
-do WŁASNEGO folderu zadania (runs/agentic_tasks/<task_id>_<tytuł>/) — nigdy
-do reszty repo/maszyny.
+faktycznie się WYKONUJE: Claude Code z realnym Read/Write/Edit + Skill.
+
+Zapis plików ZOSTAJE ograniczony do WŁASNEGO folderu zadania
+(runs/agentic_tasks/<task_id>_<tytuł>/) — nigdy do reszty repo/maszyny. Od
+25.08.2026 (decyzja właściciela) subagent ma NATOMIAST swobodny dostęp do
+internetu (WebFetch/WebSearch, bez allowlisty domen) — to jest INNA oś
+ograniczeń niż zapis plików (potwierdzone: tool_registry.check_call dla
+"agentic_task" i tak sprawdza tylko `task_id`, żadnego parametru typu `url`,
+więc allowlista domen nie miała tu żadnego mechanizmu wymuszenia). Klikanie
+po ekranie/UI (computer use) zostaje WYŁĄCZNIE dla browser_worker.py, który
+ma własną, odrębną allowlistę i profile logowania — ten subagent jej nie
+dostaje.
 
 Plan (co i jak zrobić) dostarcza runner_loop.py z task_thinker.think() —
 BEZ zmian w tamtej funkcji, jej rola zostaje "analiza/plan", nie "finalny
 wynik". Plan jest sprawdzany przez bot_content_check.judge() PRZED
 wykonaniem: subagent dostaje zielone światło tylko dla podejścia, które
 faktycznie adresuje zadanie — zero zmarnowanego czasu/kosztu na złe podejście.
+
+Kontekst promptu (od 25.08.2026): kontekst firmy (kontekst_firmy.zbuduj —
+ta sama funkcja co w task_brief_builder.py, wcześniej NIE podłączona tutaj),
+nazwa projektu (client.project_name, gdy client podany) i — dla podzadań —
+tytuły/statusy innych podzadań tego samego zadania głównego
+(task["sibling_tasks"], ustawiane przez runner_loop.py). Każdy blok jest
+fail-soft: błąd/brak danych pomija TEN blok, nie blokuje wykonania.
 
 Fail-closed: brak planu / plan niedopasowany / brak Claude Code / błąd
 wykonania / brak pliku wyniku -> executed=False (albo "NIE WYKONANO"),
@@ -24,6 +40,7 @@ from pathlib import Path
 
 import bot_content_check
 import cost_estimator
+import kontekst_firmy
 import model_registry
 import task_thinker
 import tool_registry
@@ -51,25 +68,72 @@ def _nie_wykonano(powod, cost_usd=0.0, output=None):
             "acceptance_notes": "NIE WYKONANO — " + powod, "output": output or {}}
 
 
-def _build_prompt(task, plan_text, folder):
+def _kontekst_firmy_blok(task):
+    """Fail-soft: błąd/brak dopasowania -> pusty string, nie blokuje promptu."""
+    tekst_zadania = " ".join(str(task.get(k) or "") for k in ("title", "description"))
+    try:
+        return kontekst_firmy.zbuduj(tekst_zadania)
+    except Exception:  # noqa: BLE001 — kontekst jest dodatkiem, nie warunkiem wykonania
+        return ""
+
+
+def _kontekst_projektu_blok(task, client):
+    """Fail-soft: brak client/project_id albo błąd -> pusty string."""
+    if client is None or not task.get("project_id"):
+        return ""
+    try:
+        nazwa = client.project_name(task["project_id"])
+    except Exception:  # noqa: BLE001
+        return ""
+    return f"Projekt: {nazwa}" if nazwa else ""
+
+
+def _kontekst_rodzenstwa_blok(task):
+    """Inne podzadania tego samego zadania głównego — ustawiane przez
+    runner_loop.py w task["sibling_tasks"]. Fail-soft: brak/puste -> ''."""
+    rodzenstwo = task.get("sibling_tasks") or []
+    if not rodzenstwo:
+        return ""
+    linie = "\n".join(
+        f"- {s.get('title') or '?'} (status: {s.get('status') or '?'})" for s in rodzenstwo
+    )
+    return f"Inne podzadania tego samego zadania głównego:\n{linie}"
+
+
+def _build_prompt(task, plan_text, folder, client=None):
+    bloki_kontekstu = [
+        blok for blok in (
+            _kontekst_firmy_blok(task),
+            _kontekst_projektu_blok(task, client),
+            _kontekst_rodzenstwa_blok(task),
+        )
+        if blok
+    ]
+    kontekst = ("\n\n".join(bloki_kontekstu) + "\n\n") if bloki_kontekstu else ""
     return (
+        kontekst +
         f"Zadanie: {task.get('title', '')}\n"
         f"Cel: {task.get('expected_result', '')}\n"
         f"Kryteria akceptacji: {task.get('acceptance_criteria', '')}\n"
         f"Opis: {(task.get('description') or '')[:2000]}\n\n"
         f"Zatwierdzony plan podejścia:\n{plan_text}\n\n"
         "Wykonaj to zadanie NAPRAWDĘ w bieżącym katalogu — czytaj/pisz pliki, "
-        "uruchamiaj co potrzebne do realizacji planu. Finalną, czytelną dla "
-        f"człowieka odpowiedź zapisz w pliku '{RESULT_FILENAME}' (Markdown) w "
-        "bieżącym katalogu — to ma być PEŁNE ROZWIĄZANIE zadania, nie opis "
-        "planu ani streszczenie tego, co zamierzasz zrobić."
+        "szukaj i czytaj strony w internecie gdy to pomaga (masz do tego "
+        "narzędzia), uruchamiaj co potrzebne do realizacji planu. Finalną, "
+        f"czytelną dla człowieka odpowiedź zapisz w pliku '{RESULT_FILENAME}' "
+        "(Markdown) w bieżącym katalogu — to ma być PEŁNE ROZWIĄZANIE zadania, "
+        "nie opis planu ani streszczenie tego, co zamierzasz zrobić."
     )
 
 
-def run(task, thinking):
+def run(task, thinking, client=None):
     """Wykonuje zadanie przez prawdziwego subagenta. Zwraca execution_result
     (cost_usd, tool, executed, acceptance_notes, output, functional_checks).
-    Nigdy nie rzuca — każda awaria degraduje do odmowy/"NIE WYKONANO"."""
+    Nigdy nie rzuca — każda awaria degraduje do odmowy/"NIE WYKONANO".
+
+    client: opcjonalny ProjectlyClient/MockProjectlyClient — używany TYLKO do
+    dociągnięcia nazwy projektu do kontekstu promptu (project_name). Brak/błąd
+    -> fail-soft, ten fragment kontekstu jest po prostu pomijany."""
     plan_text = thinking.get("reasoning") if thinking else None
     if not plan_text:
         return _odmowa("Brak planu (task_thinker.think niedostępny) — nie mogę bezpiecznie "
@@ -92,7 +156,15 @@ def run(task, thinking):
     if not kontrakt["allowed"]:
         return _odmowa(kontrakt["reason"], cost_usd=ocena_planu["cost_usd"])
 
-    prompt = _build_prompt(task, plan_text, folder)
+    prompt = _build_prompt(task, plan_text, folder, client)
+    if prompt.startswith("-"):
+        # Żywy incydent 25.08.2026: kontekst firmy (kontekst_firmy.zbuduj) zaczyna
+        # się od "--- KONTEKST FIRMY ---", a CLI Claude Code parsuje pierwszy
+        # token argv zaczynający się od "-" jako NIEZNANĄ OPCJĘ, nie jako treść
+        # promptu ("error: unknown option ...") — subagent nigdy się nie
+        # wykonywał, tylko odmawiał kodem 1. Spacja na początku nic nie zmienia
+        # w tym, co czyta model, ale broni przed tym parsowaniem.
+        prompt = " " + prompt
     _, model = model_registry.resolve("agentic_worker.run")
     # ANTHROPIC_API_KEY usuwany ze środowiska podprocesu z tego samego powodu
     # co w task_thinker._think_via_claude_code: obecność klucza wyłącza
@@ -109,8 +181,12 @@ def run(task, thinking):
             # skille (Power BI/PBIP/DAX itd., globalne u właściciela), ale nie
             # wolno mu było ich wywołać (poza allowlistą), więc faktycznie
             # pracował bez nich mimo że istniały.
+            # "WebFetch WebSearch" dopisane 25.08.2026 — decyzja właściciela:
+            # subagent ma swobodny dostęp do internetu (czytanie/szukanie),
+            # bez allowlisty domen. Klikanie po UI zostaje wyłącznie dla
+            # browser_worker.py, który ma odrębną, ograniczoną allowlistę.
             [claude_exe, "-p", "--model", model, prompt, "--permission-mode", "acceptEdits",
-             "--allowedTools", "Read Write Edit Skill", "--add-dir", str(folder)],
+             "--allowedTools", "Read Write Edit Skill WebFetch WebSearch", "--add-dir", str(folder)],
             cwd=str(folder),
             capture_output=True,
             text=True,

@@ -155,3 +155,22 @@ def decompose(client, task, decyzja):
     linie = [f"Zadanie rozbite na {len(created)} podzadań ({decyzja['reasoning']}):"]
     linie += [f"- {c['title']} ({c['task_id']})" for c in created]
     return {"created_ids": [c["task_id"] for c in created], "comment": "\n".join(linie)}
+
+
+def sibling_tasks(client, task):
+    """Inne podzadania tego samego zadania głównego (task["parent_task_id"]) —
+    kontekst dla agenta wykonującego (decyzja właściciela 25.08.2026: subagenty
+    mają wiedzieć, co robią pozostałe podzadania). Żadne API nie filtruje tego
+    po stronie serwera — filtr po parent_task_id robimy tu, po liście zadań
+    całego projektu. Fail-soft: brak project_id/parent_task_id albo błąd -> []."""
+    parent_id = task.get("parent_task_id")
+    if not parent_id or not task.get("project_id"):
+        return []
+    try:
+        wszystkie = client.list_tasks(project_id=task["project_id"])
+    except Exception:  # noqa: BLE001 — kontekst jest dodatkiem, nie warunkiem wykonania
+        return []
+    return [
+        t for t in wszystkie
+        if t.get("parent_task_id") == parent_id and t.get("task_id") != task.get("task_id")
+    ]

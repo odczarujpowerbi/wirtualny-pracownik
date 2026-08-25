@@ -108,14 +108,49 @@ def run():
                        wynik_ok["functional_checks"][0]["target"].endswith("wynik.md")))
         checks.append(("Happy path: komenda ma --permission-mode acceptEdits",
                        "acceptEdits" in captured["cmd"]))
-        checks.append(("Happy path: komenda ma --allowedTools z Read/Write/Edit/Skill",
-                       "Read Write Edit Skill" in captured["cmd"]))
+        checks.append(("Happy path: komenda ma --allowedTools z Read/Write/Edit/Skill/WebFetch/WebSearch",
+                       "Read Write Edit Skill WebFetch WebSearch" in captured["cmd"]))
         checks.append(("Happy path: komenda ma --add-dir na folder zadania",
                        "--add-dir" in captured["cmd"] and captured["cwd"] in captured["cmd"]))
         checks.append(("Happy path: BRAK --dangerously-skip-permissions",
                        not any("dangerously-skip-permissions" in str(c) for c in captured["cmd"])))
         checks.append(("Happy path: cwd = folder zadania pod WORKSPACE_DIR",
                        str(tmp) in captured["cwd"] and "T-AGENT" in captured["cwd"]))
+
+        # 7. Kontekst firmy/projektu/rodzeństwa trafia do promptu (dokładany
+        # PRZED "Zadanie: ..."), gdy dostępny.
+        original_zbuduj = agentic_worker.kontekst_firmy.zbuduj
+        agentic_worker.kontekst_firmy.zbuduj = lambda tekst: "--- KONTEKST FIRMY ---\nFikcyjna treść firmowa."
+
+        class _FakeClient:
+            def project_name(self, project_id):
+                return "Projekt testowy"
+
+        task_z_kontekstem = {**TASK, "project_id": "PRJ-1", "parent_task_id": "T-RODZIC",
+                             "sibling_tasks": [{"title": "Inne podzadanie", "status": "todo"}]}
+        agentic_worker.subprocess.run = _fake_run_success
+        try:
+            agentic_worker.run(task_z_kontekstem, THINKING_OK, _FakeClient())
+            prompt_z_kontekstem = captured["cmd"][4]
+        finally:
+            agentic_worker.kontekst_firmy.zbuduj = original_zbuduj
+
+        checks.append(("Kontekst firmy trafia do promptu PRZED treścią zadania",
+                       "Fikcyjna treść firmowa" in prompt_z_kontekstem
+                       and prompt_z_kontekstem.index("Fikcyjna treść firmowa") < prompt_z_kontekstem.index("Zadanie:")))
+        checks.append(("Nazwa projektu (przez client.project_name) trafia do promptu",
+                       "Projekt testowy" in prompt_z_kontekstem))
+        checks.append(("Tytuł podzadania rodzeństwa trafia do promptu",
+                       "Inne podzadanie" in prompt_z_kontekstem))
+
+        # 8. Brak client / błąd project_name -> fail-soft, wykonanie się nie wywala.
+        agentic_worker.kontekst_firmy.zbuduj = lambda tekst: (_ for _ in ()).throw(RuntimeError("błąd kontekstu"))
+        try:
+            wynik_bez_klienta = agentic_worker.run(TASK, THINKING_OK, None)
+            checks.append(("Brak client / błąd kontekstu -> fail-soft, executed=True",
+                           wynik_bez_klienta["executed"] is True))
+        finally:
+            agentic_worker.kontekst_firmy.zbuduj = original_zbuduj
     finally:
         bot_content_check.judge = original_judge
         task_thinker._find_claude = original_find_claude

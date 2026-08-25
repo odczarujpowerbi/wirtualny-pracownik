@@ -176,11 +176,20 @@ tools:
   agentic_task:
     risk: yellow
     description: >
-      Prawdziwy subagent Claude Code (Read/Write/Edit) dla zadań bez wąskiego
-      workera, uruchamiany dopiero gdy plan przeszedł ocenę bot_content_check.py.
-      Ograniczony do WŁASNEGO folderu zadania (runs/agentic_tasks/<task_id>_.../),
-      nigdy do reszty repo/maszyny (agentic_worker.py, --add-dir + --allowedTools
-      "Read Write Edit", BEZ --dangerously-skip-permissions).
+      Prawdziwy subagent Claude Code (Read/Write/Edit/Skill/WebFetch/WebSearch)
+      dla zadań bez wąskiego workera, uruchamiany dopiero gdy plan przeszedł
+      ocenę bot_content_check.py. Zapis plików ograniczony do WŁASNEGO folderu
+      zadania (runs/agentic_tasks/<task_id>_.../), nigdy do reszty repo/maszyny
+      (agentic_worker.py, --add-dir + --allowedTools, BEZ
+      --dangerously-skip-permissions). Dostęp do internetu (czytanie/szukanie,
+      NIE klikanie UI) jest od 25.08.2026 SWOBODNY, bez allowlisty domen —
+      decyzja właściciela. `allowed_roots` poniżej pilnuje TYLKO zapisu plików;
+      allowlista domen nie ma tu żadnego mechanizmu wymuszenia (tool_registry.
+      check_call dla "agentic_task" sprawdza wyłącznie parametr `task_id`,
+      nigdy URL), więc nie jest deklarowana — dopisanie jej tutaj byłoby
+      wyłącznie dokumentacją, nie realnym ograniczeniem. Klikanie po UI
+      (computer use) zostaje WYŁĄCZNIE dla browser_task, z jego własną,
+      ograniczoną allowlistą.
     allowed_roots:
       - runs/agentic_tasks
     params:

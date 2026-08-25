@@ -17,6 +17,7 @@ import tempfile
 from pathlib import Path
 
 import agentic_worker
+import email_client
 import risk_classifier
 import runner_loop
 import state_store
@@ -51,6 +52,11 @@ def _fake_ask_model_factory(wynik_aligned=True):
     return _fake
 
 
+class _FakeEmailClient:
+    def send_email(self, to, subject, body_text, cc=None):
+        return {"status": "ok (test)"}
+
+
 def _fake_subprocess_run(cmd, **kwargs):
     # task_thinker.subprocess i agentic_worker.subprocess to TEN SAM obiekt
     # modułu (oba robią zwykłe "import subprocess") — jeden wspólny mock,
@@ -81,11 +87,16 @@ def run():
     original_find_claude = task_thinker._find_claude
     original_thinker_run = task_thinker.subprocess.run
     original_workspace = agentic_worker.WORKSPACE_DIR
+    original_get_email_client = email_client.get_email_client
 
     try:
         state_store.DB_PATH = tmp / "state.db"
         os.environ["ONEDRIVE_TASKS_ROOT"] = str(tmp / "Zadania-Agenta")
         task_thinker._find_claude = lambda: "claude"
+        # Scenariusz 2 poniżej eskaluje (needs_approval) -> escalation.py wysyła
+        # mail naprawdę. Bez tej atrapy ten test (wpięty w godzinowy self_check.py)
+        # wysyłałby PRAWDZIWY mail przy każdym przebiegu (żywy incydent 25.08.2026).
+        email_client.get_email_client = lambda: _FakeEmailClient()
         task_thinker.subprocess.run = _fake_subprocess_run
         agentic_worker.WORKSPACE_DIR = tmp / "agentic_tasks"
 
@@ -143,6 +154,7 @@ def run():
         task_thinker._find_claude = original_find_claude
         task_thinker.subprocess.run = original_thinker_run
         agentic_worker.WORKSPACE_DIR = original_workspace
+        email_client.get_email_client = original_get_email_client
         state_store.DB_PATH = original_db_path
         if original_root is None:
             os.environ.pop("ONEDRIVE_TASKS_ROOT", None)

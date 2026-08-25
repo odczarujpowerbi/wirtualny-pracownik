@@ -21,6 +21,11 @@ powtarzalnie", a dzienny koszt AI rósł bez realnej pracy):
     przetestowany w pełni: runner ma zdegradować się bez wywalenia pętli,
     gdy modelu nie ma — to jest droga, którą realnie przechodzi też każda
     świeżo postawiona maszyna przed `claude login`.
+  - email_client.get_email_client jest podłożony atrapą — żywy incydent
+    25.08.2026: escalation.py zaczął faktycznie wysyłać mail przy każdej
+    eskalacji, a fixture (PRJ-0001..0004) eskaluje WSZYSTKIE 4 zadania —
+    bez atrapy ten test wysyłał 4 PRAWDZIWE maile na skrzynkę Graph przy
+    każdym odpaleniu (na maszynie z realnymi sekretami MS_GRAPH_* + msal).
 
 Użycie:
     python bootstrap_smoke_test.py
@@ -31,6 +36,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+import email_client
 import kill_switch
 import runner_loop
 import state_store
@@ -49,6 +55,14 @@ _BRAK_MODELU_THINK = {
 }
 
 
+class _FakeEmailClient:
+    """Atrapa email_client — escalation.py woła send_email() przy każdej
+    eskalacji; ten test NIE MOŻE wysyłać prawdziwej poczty."""
+
+    def send_email(self, to, subject, body_text, cc=None):
+        return {"status": "ok (test)"}
+
+
 def run():
     checks = []
     tmp = Path(tempfile.mkdtemp())
@@ -56,12 +70,14 @@ def run():
     original_root = os.environ.get("ONEDRIVE_TASKS_ROOT")
     original_ask_model = task_thinker.ask_model
     original_think = task_thinker.think
+    original_get_email_client = email_client.get_email_client
 
     try:
         state_store.DB_PATH = tmp / "state.db"
         os.environ["ONEDRIVE_TASKS_ROOT"] = str(tmp / "Zadania-Agenta")
         task_thinker.ask_model = lambda prompt, caller=None: _BRAK_MODELU_ASK
         task_thinker.think = lambda task, caller=None: _BRAK_MODELU_THINK
+        email_client.get_email_client = lambda: _FakeEmailClient()
 
         # Test dymny sprawdza MECHANIZM na danych testowych (mock), więc wymuszamy
         # MockProjectlyClient — niezależnie od tego, czy maszyna ma już wpisany token
@@ -85,6 +101,7 @@ def run():
     finally:
         task_thinker.ask_model = original_ask_model
         task_thinker.think = original_think
+        email_client.get_email_client = original_get_email_client
         state_store.DB_PATH = original_db_path
         if original_root is None:
             os.environ.pop("ONEDRIVE_TASKS_ROOT", None)

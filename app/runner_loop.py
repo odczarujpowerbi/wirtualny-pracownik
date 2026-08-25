@@ -210,6 +210,12 @@ def _process_task_core(task, policy, routing, client):
     # po utworzeniu dzieci). Decyzja właściciela 24.08.2026, task_decomposer.py.
     already_subtask = bool(task.get("parent_task_id"))
     already_split = (task.get("subtask_count") or 0) > 0
+    if already_subtask:
+        # Kontekst rodzeństwa (inne podzadania tego samego zadania głównego) —
+        # dostępny i dla task_thinker.think() (przez task_brief_builder, który
+        # czyta dowolne pole z `task`), i dla agentic_worker.run() poniżej.
+        # sibling_tasks() jest fail-soft samo w sobie (błąd/brak -> []).
+        task["sibling_tasks"] = task_decomposer.sibling_tasks(client, task)
     if not already_subtask and not already_split and executor.rozpoznaj_narzedzie(task) is None:
         decyzja = task_decomposer.decide(task)
         if decyzja["cost_usd"]:
@@ -273,7 +279,7 @@ def _process_task_core(task, policy, routing, client):
             event_type="execution", cost_usd=real.get("cost_usd", 0.0),
         )
     elif thinking.get("ok"):
-        agentic = agentic_worker.run(task, thinking)
+        agentic = agentic_worker.run(task, thinking, client)
         execution_result = {**agentic, "thinking": thinking,
                             "cost_usd": agentic.get("cost_usd", 0.0) + thinking.get("cost_usd", 0.0)}
         state_store.log_decision(
@@ -307,7 +313,21 @@ def _process_task_core(task, policy, routing, client):
         _save_result_to_onedrive(task, "needs_approval", komentarz, execution_result)
         return {"task_id": task_id, "risk": risk, "owner": owner, "status": "needs_approval"}
 
-    if risk == "red":
+    if already_subtask:
+        # Decyzja właściciela 25.08.2026: podzadania z dekompozycji są z natury
+        # słabo opisane (jednoznaczny, wąski krok, nie samodzielne zadanie) —
+        # ocena bramki jakości/klasyfikacji ryzyka na gołej treści im nie
+        # służy. Wykonują się zawsze automatycznie — bramka ORAZ eskalacja
+        # czerwonego ryzyka pominięte z zasady. Zastrzeżenie: to bezpieczne
+        # tylko dopóki agentic_worker/executor nie mają narzędzia mogącego
+        # wykonać nieodwracalną akcję (dziś: brak Bash, brak API wysyłki/reklam) —
+        # rewizja wymagana, jeśli taki tool kiedyś powstanie.
+        state_store.log_decision(task_id, agent="pawel", decision="subtask_auto_done",
+                                 reason="Podzadanie — bramka i ryzyko pominięte z zasady.",
+                                 now=now_iso(), event_type="quality_gate")
+        status, comment = "done", _comment_subtask_done(owner, execution_result)
+
+    elif risk == "red":
         reason = "Czerwona akcja — poza zakresem tego szkieletu, brak jeszcze zdefiniowanej bounded_red do sprawdzenia."
         escalate_to_human(task, reason, client, assignee=_escalation_assignee())
         state_store.log_decision(task_id, agent="pawel", decision="escalate", reason=reason,
@@ -432,6 +452,16 @@ def _comment_escalated(owner, reason):
     return f"⚠️ needs_approval\nWymaga decyzji: tak — {reason}\nUtworzono osobne zadanie dla: {owner}\n"
 
 
+def _comment_subtask_done(owner, execution_result):
+    """Podzadanie z dekompozycji — bez bramki jakości/eskalacji czerwonego
+    ryzyka z zasady (decyzja właściciela 25.08.2026, patrz runner_loop.py
+    _process_task_core: podzadania są z natury słabo opisane, ocena samej
+    treści im nie służy)."""
+    notes = (execution_result or {}).get("acceptance_notes")
+    wynik = f"\n📄 Wynik:\n{notes}\n" if notes else ""
+    return f"✅ done (podzadanie — bez bramki jakości, z zasady)\nPrzypisano do: {owner}\n{wynik}"
+
+
 MAX_POPRAWEK = 2
 
 # Zwroty, po których poznajemy, że problemem jest ZADANIE, a nie redakcja materiału.
@@ -510,6 +540,28 @@ def _gate_failure_reason(gate):
     return f"Bramka jakości nie przepuściła zadania. {gate['summary']} Zastrzeżenia: {concerns}"
 
 
+# Flaga per PROCES (nie per przebieg) — True po pierwszym udanym pobraniu
+# kolejki, zeruje się na każdym realnym restarcie (job_scheduler.py albo
+# `python runner_loop.py --loop`), bo moduł jest importowany od nowa. Cel
+# (żądanie właściciela 25.08.2026): jasno widoczne "ile mam do zrobienia" w
+# logu ZARAZ po starcie bota, zanim jeszcze cokolwiek przetworzy — nie na
+# każdym z kolejnych 30-sekundowych przebiegów (to byłby szum w logach).
+_zalogowano_kolejke_przy_starcie = False
+
+
+def _zaloguj_kolejke_przy_starcie(tasks):
+    global _zalogowano_kolejke_przy_starcie
+    if _zalogowano_kolejke_przy_starcie:
+        return
+    _zalogowano_kolejke_przy_starcie = True
+    if not tasks:
+        print("[runner_loop] Start — kolejka zadań: pusto.")
+        return
+    tytuly = ", ".join((t.get("title") or "?")[:40] for t in tasks[:10])
+    wiecej = f" (+{len(tasks) - 10} więcej)" if len(tasks) > 10 else ""
+    print(f"[runner_loop] Start — kolejka zadań: {len(tasks)}: {tytuly}{wiecej}")
+
+
 def run_once(client=None):
     if kill_switch.is_active():
         print(f"Kill switch aktywny ({kill_switch.reason()}) — runner nie podejmuje akcji.")
@@ -537,6 +589,7 @@ def run_once(client=None):
     heartbeat.write_heartbeat(current_task_id=None)
 
     tasks = client.get_new_tasks()
+    _zaloguj_kolejke_przy_starcie(tasks)
     deferred = []
     if len(tasks) > MAX_TASKS_PER_RUN:
         print(f"{len(tasks)} nowych zadań — przetwarzam {MAX_TASKS_PER_RUN} w tym przebiegu, "
