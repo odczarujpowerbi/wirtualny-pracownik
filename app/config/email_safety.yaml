@@ -12,6 +12,7 @@
 # Zmień/rozszerz listę, kiedy świadomie zdecydujesz się na bezpośrednią
 # wysyłkę do konkretnych adresatów (per klient/proces, nie globalnie).
 
+# Tylko Paweł (decyzja właściciela 25.08.2026 — usunięto Aldonę, wszystkie
+# maile z tego mechanizmu mają iść wyłącznie do niego).
 review_recipients:
   - pawel@odczarujpowerbi.pl
-  - aldona.wawryniuk@odczarujpowerbi.pl

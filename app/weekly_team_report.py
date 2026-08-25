@@ -16,7 +16,7 @@ ma konkretne daty.
 
 Publikuje w Projectly (komentarz na stałym pseudo-zadaniu, jak
 `ad_test_report.py`) i wysyła mailem — zgodnie z `config/email_safety.yaml`
-dziś zawsze do człowieka wewnątrz firmy (Paweł/Aldona), nie do całego zespołu.
+dziś zawsze do człowieka wewnątrz firmy (Paweł), nie do całego zespołu.
 """
 
 import os

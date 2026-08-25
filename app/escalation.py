@@ -12,16 +12,42 @@ Narzędzia MCP (przez projectly_client, config/projectly.yaml):
 Powiązania budują widoczny ciąg oryginał -> eskalacja -> kontynuacja
 (zbot_get_task_relations), zamiast trzech luźnych zadań. Wymaga project_id z
 zadania źródłowego (get_new_tasks niesie je w polu 'project_id').
+
+Mail (decyzja właściciela 25.08.2026): escalate_to_human to JEDYNA sytuacja w
+całym pipeline, gdzie bot faktycznie czeka na decyzję człowieka — więc to
+JEDYNE miejsce, które wysyła mail (poprzednio żadne nie wysyłało; prośby o
+feedback po fakcie w task_feedback_requester.py mają send_email=False
+domyślnie, bo to nie jest sytuacja "czekam na akcję"). Adresat NIE jest
+zaszyty tutaj — jedyne jawne miejsce to config/email_safety.yaml
+(review_recipients), przez email_client.py; usunięcie/dodanie odbiorcy to
+zmiana JEDNEGO configu, nie kodu. Fail-soft: błąd wysyłki nie blokuje
+eskalacji (zadanie w Projectly to główny, trwały kanał — mail jest dodatkiem).
 """
 
+from datetime import datetime, timezone
+
+import email_client
 import state_store
+
+
+def _wyslij_powiadomienie_eskalacji(task, reason, new_task_id, assignee):
+    try:
+        subject = f"Decyzja potrzebna: {task.get('title', '')}"
+        body = (
+            f"Zadanie: {task.get('title', '')}\n"
+            f"Co jest potrzebne: {reason}\n\n"
+            f"Zadanie eskalacji w Projectly: {new_task_id}\n"
+            f"Zadanie źródłowe: {task.get('task_id', '')}"
+        )
+        email_client.get_email_client().send_email(to=f"decyzja dla: {assignee}", subject=subject, body_text=body)
+    except Exception as exc:  # noqa: BLE001 — powiadomienie dodatkowe, nie może ubić eskalacji
+        print(f"[escalation] Powiadomienie mailowe nie powiodło się (eskalacja i tak zapisana w Projectly): {exc}")
 
 
 def escalate_to_human(task, reason, client, options=None, assignee="pawel"):
     """Tworzy w Projectly osobne zadanie przypisane do człowieka — NIE tylko
-    komentarz (PLAN-WDROZENIA.md sekcja 4). Zwraca ID nowo utworzonego zadania."""
-    from datetime import datetime, timezone
-
+    komentarz (PLAN-WDROZENIA.md sekcja 4) — i wysyła mail powiadomienia
+    (adresaci: config/email_safety.yaml). Zwraca ID nowo utworzonego zadania."""
     title = f"Wymaga decyzji: {task['title']}"
     description_lines = [
         f"Zadanie źródłowe: {task['task_id']}",
@@ -41,6 +67,7 @@ def escalate_to_human(task, reason, client, options=None, assignee="pawel"):
     )
     now = datetime.now(timezone.utc).isoformat()
     state_store.record_event(task["task_id"], "escalated_to_human", f"{new_id}: {reason}", now)
+    _wyslij_powiadomienie_eskalacji(task, reason, new_id, assignee)
     return new_id
 
 
