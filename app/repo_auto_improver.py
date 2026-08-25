@@ -3,11 +3,16 @@ Autonomiczny "naprawiacz repozytorium" — stoi OBOK głównej pętli zadań (ni
 procesie runner_loop.py, jak kacper_monitor.py). Wyzwalany cyklicznie z
 job_scheduler.py: skanuje ZAKOŃCZONE zadania (state_store event "block_closed")
 i dla tych z KONKRETNYM sygnałem problemu — eskalacja do człowieka, bramka
-jakości odrzuciła (nawet jeśli ostatecznie zamknięte inaczej), podwójne
-wykonanie (runner_loop.DUPLICATE_GUARD_MINUTES) — uruchamia prawdziwego
-subagenta Claude Code z dostępem do CAŁEGO repo (nie do jednego folderu
-zadania jak agentic_worker.py), żeby zaproponował konkretną poprawkę kodu albo
-brakującą umiejętność (.claude/skills/).
+jakości odrzuciła, podwójne wykonanie (runner_loop.DUPLICATE_GUARD_MINUTES) —
+uruchamia prawdziwego subagenta Claude Code z dostępem do CAŁEGO repo (nie do
+jednego folderu zadania jak agentic_worker.py), żeby zaproponował konkretną
+poprawkę kodu albo brakującą umiejętność (.claude/skills/).
+
+Status "done" jest ODRZUCANY Z ZASADY (decyzja właściciela 25.08.2026) —
+NAWET gdy w historii był falstart (bramka odrzuciła, potem przeszła po
+poprawce) — zadanie już jest wykonane, użytkownik nie chce, żeby bot
+"weryfikował" coś, co już się skończyło. Sygnał liczy się tylko wtedy, gdy
+status końcowy WCIĄŻ nie jest rozwiązany (dziś: "needs_approval").
 
 Decyzja właściciela 25.08.2026 (po incydencie: zadanie "analiza nowych osób w
 MailerLite" dostało zestawienie kampanii — zły routing narzędzia, którego nic
@@ -87,9 +92,15 @@ def _historia_tekst(rows, limit=15):
 def sygnal_problemu(task_id):
     """Zwraca (powod, historia_tekstem) gdy zadanie ma konkretny sygnał
     problemu warty przejrzenia repo, albo (None, None) gdy zakończyło się
-    czysto — fail-closed w stronę NIE reagowania (brak sygnału = spokój)."""
+    czysto — fail-closed w stronę NIE reagowania (brak sygnału = spokój).
+
+    Status "done" jest ODRZUCANY z zasady (decyzja właściciela 25.08.2026),
+    NAWET jeśli w historii był falstart (np. bramka odrzuciła, ale potem
+    przeszła po poprawka_materialu.py) — zadanie już jest wykonane, nie ma
+    czego przeglądać. Sygnał liczy się TYLKO gdy końcowy status wciąż nie
+    jest rozwiązany (dziś: "needs_approval")."""
     task = state_store.get_task(task_id)
-    if task is None:
+    if task is None or task["status"] == "done":
         return None, None
     rows = _historia_zdarzen(task_id)
     historia = _historia_tekst(rows)

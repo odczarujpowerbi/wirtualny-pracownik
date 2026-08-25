@@ -35,16 +35,23 @@ def _zapisz_zdarzenia_needs_approval(task_id, now):
     state_store.record_event(task_id, "block_closed", "needs_approval", now)
 
 
-def _zapisz_zdarzenia_gate_failed(task_id, now):
-    state_store.upsert_task(task_id, payload={**TASK, "task_id": task_id}, status="done", now=now)
+def _zapisz_zdarzenia_gate_failed(task_id, now, status="in_progress"):
+    # status NIE "done" — status="done" jest ZAWSZE odrzucany (patrz test
+    # "sygnal_problemu: status='done' odrzucony ZAWSZE..." niżej), niezależnie
+    # od tego, co było w historii. "in_progress" jako placeholder na
+    # "cokolwiek innego niż done/needs_approval" — realnie taki stan po
+    # gate_failed dziś nie występuje (runner_loop kończy albo w "done", albo
+    # w "needs_approval"), ale test i tak musi pilnować, że sama PĘTLA
+    # wykrywania nie jest zepsuta, gdyby to się zmieniło.
+    state_store.upsert_task(task_id, payload={**TASK, "task_id": task_id}, status=status, now=now)
     state_store.record_event(task_id, "quality_gate", "Bramka: NIE przeszło.", now, decision="gate_failed")
-    state_store.record_event(task_id, "block_closed", "done", now)
+    state_store.record_event(task_id, "block_closed", status, now)
 
 
-def _zapisz_zdarzenia_duplicate(task_id, now):
-    state_store.upsert_task(task_id, payload={**TASK, "task_id": task_id}, status="done", now=now)
-    state_store.record_event(task_id, "duplicate_skip", "done", now)
-    state_store.record_event(task_id, "block_closed", "done", now)
+def _zapisz_zdarzenia_duplicate(task_id, now, status="in_progress"):
+    state_store.upsert_task(task_id, payload={**TASK, "task_id": task_id}, status=status, now=now)
+    state_store.record_event(task_id, "duplicate_skip", status, now)
+    state_store.record_event(task_id, "block_closed", status, now)
 
 
 def _zapisz_zdarzenia_czyste(task_id, now):
@@ -114,6 +121,16 @@ def run():
         _zapisz_zdarzenia_czyste("T-OK", now)
         checks.append(("sygnal_problemu: czyste 'done' -> brak sygnału", rai.sygnal_problemu("T-OK")[0] is None))
         checks.append(("sygnal_problemu: nieznane task_id -> brak sygnału", rai.sygnal_problemu("BRAK")[0] is None))
+
+        # status="done" jest ZAWSZE odrzucany (decyzja właściciela 25.08.2026),
+        # nawet jeśli w historii był falstart (bramka odrzuciła, potem przeszła
+        # po poprawce) — zadanie już jest wykonane, nic do przeglądania.
+        _zapisz_zdarzenia_gate_failed("T-GATE-ALE-DONE", now, status="done")
+        checks.append(("sygnal_problemu: status='done' odrzucony ZAWSZE, mimo bramka_odrzucila w historii",
+                       rai.sygnal_problemu("T-GATE-ALE-DONE")[0] is None))
+        _zapisz_zdarzenia_duplicate("T-DUP-ALE-DONE", now, status="done")
+        checks.append(("sygnal_problemu: status='done' odrzucony ZAWSZE, mimo duplicate_skip w historii",
+                       rai.sygnal_problemu("T-DUP-ALE-DONE")[0] is None))
 
         # --- 2. napraw_zadanie: pełna ścieżka szczęśliwa (zmiany + gh dostępne) ---
         rai.shutil.which = lambda name: "/usr/bin/gh"  # host testu może NIE mieć gh — nie polegamy na środowisku
