@@ -125,3 +125,13 @@ jobs:
   function: run_update
   interval_seconds: 1800
   enabled: false
+- name: repo_auto_improver
+  description: Po zakonczeniu zadania z sygnalem problemu (eskalacja do czlowieka,
+    bramka jakosci odrzucila, podwojne wykonanie) analizuje kod w izolowanym git
+    worktree i otwiera PR z poprawka albo brakujaca umiejetnoscia. Domyslnie wylaczony
+    - tworzy branche/PR-y na GitHubie, wlacz swiadomie po przejrzeniu pierwszych
+    przebiegow (python repo_auto_improver.py recznie).
+  module: repo_auto_improver
+  function: run_repo_improvement_cycle
+  interval_seconds: 120
+  enabled: false

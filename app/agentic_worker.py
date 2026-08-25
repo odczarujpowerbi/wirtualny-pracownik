@@ -105,8 +105,12 @@ def run(task, thinking):
             # PO nich zostałby połknięty jako kolejny "katalog"/"tool" zamiast
             # trafić do CLI jako właściwy prompt (znaleziony 24.08.2026 na
             # żywym teście — CLI kończył się "Input must be provided...").
+            # "Skill" dopisane 25.08.2026 — bez niego subagent MIAŁ dostępne
+            # skille (Power BI/PBIP/DAX itd., globalne u właściciela), ale nie
+            # wolno mu było ich wywołać (poza allowlistą), więc faktycznie
+            # pracował bez nich mimo że istniały.
             [claude_exe, "-p", "--model", model, prompt, "--permission-mode", "acceptEdits",
-             "--allowedTools", "Read Write Edit", "--add-dir", str(folder)],
+             "--allowedTools", "Read Write Edit Skill", "--add-dir", str(folder)],
             cwd=str(folder),
             capture_output=True,
             text=True,

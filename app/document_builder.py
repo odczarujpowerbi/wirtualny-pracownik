@@ -32,11 +32,65 @@ lista słowników, każdy jedno z:
   {"heading": "Nagłówek", "table": {"rows": [...], "columns": [...] | None}}
 """
 
+import re
 from pathlib import Path
 
 import report_builder as _rb
 
 DEFAULT_OUTPUT_DIR = Path(__file__).parent / "runs" / "documents"
+
+# reportlab bez rejestracji własnego fontu używa Helvetica/Times (14 fontów
+# bazowych PDF) — te NIE obejmują polskich znaków diakrytycznych (ą/ć/ę/ł/ń/
+# ó/ś/ź/ż), więc wychodzą jako puste kwadraty (żywy incydent 25.08.2026:
+# "Sprzeda■ Konferencji" w realnym raporcie MailerLite). Kandydaci fontów z
+# pełnym pokryciem Latin Extended-A, w kolejności prawdopodobieństwa
+# znalezienia na maszynie (Windows -> Linux z fontami DejaVu).
+_PDF_FONT_KANDYDACI = (
+    (Path(r"C:\Windows\Fonts\arial.ttf"), Path(r"C:\Windows\Fonts\arialbd.ttf")),
+    (Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+     Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")),
+)
+_PDF_FONT_NAME = "DokumentPL"
+
+# Emoji w tytułach kampanii (np. z MailerLite) nie mają odpowiednika w
+# zwykłym foncie tekstowym (kolorowe glify wymagają osobnego fontu bitmapowego,
+# którego reportlab nie renderuje) — wychodziłyby jako te same puste kwadraty
+# co brak polskich znaków. W PDF-ie po prostu je pomijamy; w .md/.docx
+# zostają, bo tam renderuje je czcionka systemowa czytelnika.
+_EMOJI_PATTERN = re.compile(
+    "["
+    "\U0001F300-\U0001FAFF"
+    "\U00002600-\U000027BF"
+    "\U0001F1E6-\U0001F1FF"
+    "\U00002190-\U000021FF"
+    "\U00002B00-\U00002BFF"
+    "\uFE0F"
+    "]+",
+    flags=re.UNICODE,
+)
+
+
+def _bez_emoji(text):
+    return _EMOJI_PATTERN.sub("", str(text)).strip()
+
+
+def _zarejestruj_font_pdf():
+    """Rejestruje pierwszy znaleziony font z kandydatów jako `_PDF_FONT_NAME`
+    (+ wariant Bold). Zwraca nazwę fontu do użycia w stylach, albo None, gdy
+    żadnego kandydata nie znaleziono — wtedy PDF i tak powstaje, tylko ze
+    zdegradowanymi polskimi znakami (fail-soft, jak reszta modułu)."""
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+
+    if _PDF_FONT_NAME in pdfmetrics.getRegisteredFontNames():
+        return _PDF_FONT_NAME
+    for regular, bold in _PDF_FONT_KANDYDACI:
+        if not regular.exists():
+            continue
+        pdfmetrics.registerFont(TTFont(_PDF_FONT_NAME, str(regular)))
+        pdfmetrics.registerFont(TTFont(_PDF_FONT_NAME + "-Bold", str(bold if bold.exists() else regular)))
+        return _PDF_FONT_NAME
+    return None
 
 
 def _ensure_parent(output_path):
@@ -118,19 +172,24 @@ def build_pdf(title, sections, output_path):
 
     output_path = _ensure_parent(output_path)
     styles = getSampleStyleSheet()
+    font = _zarejestruj_font_pdf()
+    if font:
+        styles["Title"].fontName = font + "-Bold"
+        styles["Heading2"].fontName = font + "-Bold"
+        styles["BodyText"].fontName = font
     doc = SimpleDocTemplate(str(output_path), pagesize=A4)
-    flowables = [Paragraph(title, styles["Title"]), Spacer(1, 12)]
+    flowables = [Paragraph(_bez_emoji(title), styles["Title"]), Spacer(1, 12)]
 
     for section in sections:
         heading = section.get("heading")
         if heading:
-            flowables.append(Paragraph(heading, styles["Heading2"]))
+            flowables.append(Paragraph(_bez_emoji(heading), styles["Heading2"]))
             flowables.append(Spacer(1, 6))
 
         text = section.get("text")
         if text:
             for paragraph in text.split("\n\n"):
-                flowables.append(Paragraph(paragraph.replace("\n", "<br/>"), styles["BodyText"]))
+                flowables.append(Paragraph(_bez_emoji(paragraph).replace("\n", "<br/>"), styles["BodyText"]))
                 flowables.append(Spacer(1, 6))
 
         table_spec = section.get("table")
@@ -138,13 +197,15 @@ def build_pdf(title, sections, output_path):
             rows = table_spec.get("rows", [])
             columns = table_spec.get("columns") or (list(rows[0].keys()) if rows else [])
             if columns:
-                data = [columns] + [[str(row.get(c, "")) for c in columns] for row in rows]
+                data = [[_bez_emoji(c) for c in columns]] + \
+                       [[_bez_emoji(row.get(c, "")) for c in columns] for row in rows]
                 table = Table(data, hAlign="LEFT")
                 table.setStyle(TableStyle([
                     ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2f3b52")),
                     ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                     ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
                     ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("FONTNAME", (0, 0), (-1, -1), font or "Helvetica"),
                 ]))
                 flowables.append(table)
                 flowables.append(Spacer(1, 12))

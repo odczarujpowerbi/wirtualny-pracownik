@@ -108,8 +108,8 @@ def run():
                        wynik_ok["functional_checks"][0]["target"].endswith("wynik.md")))
         checks.append(("Happy path: komenda ma --permission-mode acceptEdits",
                        "acceptEdits" in captured["cmd"]))
-        checks.append(("Happy path: komenda ma --allowedTools Read Write Edit",
-                       "Read Write Edit" in captured["cmd"]))
+        checks.append(("Happy path: komenda ma --allowedTools z Read/Write/Edit/Skill",
+                       "Read Write Edit Skill" in captured["cmd"]))
         checks.append(("Happy path: komenda ma --add-dir na folder zadania",
                        "--add-dir" in captured["cmd"] and captured["cwd"] in captured["cmd"]))
         checks.append(("Happy path: BRAK --dangerously-skip-permissions",

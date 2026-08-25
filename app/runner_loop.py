@@ -21,7 +21,7 @@ import os
 import re
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import env_bootstrap  # wczytuje .env / secrets/.env (patrz .env.example, bootstrap_init_secrets.py); też _current_role()
@@ -156,9 +156,27 @@ def process_task(task, policy, routing, client):
     return result
 
 
+# Jeśli to samo task_id wróci z get_new_tasks() z lokalnym statusem końcowym
+# sprzed mniej niż tylu minut — nie wykonuj drugi raz (żywy incydent
+# 24.08.2026: to samo zadanie wykonane i skomentowane DWA razy w ~65s, bo
+# update_status() do Projectly nie zdążył/nie doszedł, zanim kolejny poll
+# 30s później znów zobaczył zadanie jako "todo"). Okno celowo krótkie — to ma
+# łapać wyścig z pollingiem, nie blokować świadome, ludzkie przywrócenie
+# zadania do ponownego wykonania dużo później.
+DUPLICATE_GUARD_MINUTES = 15
+
+
 def _process_task_core(task, policy, routing, client):
     task_id = task["task_id"]
     now = now_iso()
+
+    existing = state_store.get_task(task_id)
+    if existing and existing["status"] in ("done", "needs_approval", "przeniesione"):
+        wiek = datetime.now(timezone.utc) - datetime.fromisoformat(existing["updated_at"])
+        if wiek < timedelta(minutes=DUPLICATE_GUARD_MINUTES):
+            state_store.record_event(task_id, "duplicate_skip", existing["status"], now)
+            return {"task_id": task_id, "risk": existing.get("risk_level"),
+                    "status": existing["status"], "duplicate": True}
 
     state_store.upsert_task(task_id, payload=task, status="planning", now=now)
     state_store.record_event(task_id, "task_received", task["title"], now)

@@ -42,7 +42,13 @@ bots:
     visual_tools: [capture_screenshot, open_pbip_capture, browser_task]
   content:
     enabled: true
-    # Ocena treści (bot_content_check.py) ma sens tylko dla wyników prawdziwego
-    # subagenta (agentic_worker.py) — dla np. walidacji PBIP "czy treść
-    # odpowiada zadaniu" to szum, ten bot wtedy `skipped`.
-    relevant_tools: [agentic_task]
+    # Ocena treści (bot_content_check.py) ma sens dla wyników, które są
+    # SWOBODNYM tekstem/raportem mogącym nie trafić w sedno zadania mimo że
+    # narzędzie "zadziałało" — dla np. walidacji PBIP "czy treść odpowiada
+    # zadaniu" to szum (wynik jest z definicji tym, o co proszono), ten bot
+    # wtedy `skipped`. mailerlite_report/zanfia_query DODANE 25.08.2026 (żywy
+    # incydent: zadanie "nowi subskrybenci wg grup" dostało zestawienie
+    # wysłanych kampanii — zły raport, bo narzędzie rozpoznane po słowie
+    # kluczowym umie zbudować TYLKO jeden rodzaj raportu, niezależnie od tego,
+    # o co naprawdę proszono; content=skipped nie miał szans tego złapać).
+    relevant_tools: [agentic_task, mailerlite_report, zanfia_query]
