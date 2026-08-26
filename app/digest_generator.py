@@ -21,6 +21,42 @@ from projectly_client import get_client
 DONE_STATUSES = {"done"}
 OPEN_STATUSES = {"todo", "in_progress"}
 
+# Adres biblioteki dokumentów agenta na SharePoint — ten sam, co w
+# config/sharepoint.yaml (site_host + site_path + library). Trzymany jako
+# osobna stała, żeby zmiana witryny/biblioteki była jedną podmianą, a nie
+# przepisywaniem każdego wpisu w mapowaniu niżej.
+SHAREPOINT_LIBRARY_URL = "https://odczarujlowcode.sharepoint.com/sites/Wirtualny-pracownik/Dokumenty"
+
+# Zadanie/kategoria -> folder SharePoint z materiałami, pokazywany przy pozycji
+# w sekcji "Zrobione".
+#
+# Klucz działa dwustopniowo (patrz sharepoint_folder_url):
+#   - dokładny `task_id` albo dokładny `title` — dopasowanie konkretnego zadania,
+#     ma pierwszeństwo,
+#   - słowo kluczowe kategorii (klient/obszar) szukane W TYTULE, bez względu na
+#     wielkość liter — te same słowa co w config/clients_routing.yaml, żeby dwa
+#     słowniki się nie rozjeżdżały.
+#
+# Zadanie bez dopasowania renderuje się BEZ linku — to normalna sytuacja, nie błąd.
+#
+# UCZCIWA GRANICA: zweryfikowana jest tylko część adresu do biblioteki włącznie
+# (SHAREPOINT_LIBRARY_URL, wprost z config/sharepoint.yaml) oraz folder
+# `Zadania-Agenta` (root_folder z tego samego pliku). Nazwy podfolderów klientów
+# poniżej to PROPOZYCJA wg struktury z reguł Power BI, NIE potwierdzony stan
+# biblioteki — przed pierwszym cyklem podmień je na adresy skopiowane z
+# przeglądarki (przycisk "Kopiuj link" w SharePoint) albo usuń wpis: zadanie bez
+# wpisu po prostu nie dostanie linku.
+SHAREPOINT_FOLDER_LINKS = {
+    "indeka": f"{SHAREPOINT_LIBRARY_URL}/Klienci/INDEKA",
+    "diverse": f"{SHAREPOINT_LIBRARY_URL}/Klienci/Diverse",
+    "magnapharm": f"{SHAREPOINT_LIBRARY_URL}/Klienci/Magnapharm",
+    "kajzerka": f"{SHAREPOINT_LIBRARY_URL}/Klienci/Kajzerka",
+    "kalkulator": f"{SHAREPOINT_LIBRARY_URL}/Okolosprzedazowe/Kalkulator",
+    # Archiwum wyników zadań agenta (config/sharepoint.yaml -> root_folder),
+    # jeden podfolder per zadanie zakładany przez runner_loop._save_result_to_onedrive.
+    "zadania agenta": f"{SHAREPOINT_LIBRARY_URL}/Zadania-Agenta",
+}
+
 
 def _parse_date(value):
     if not value:
@@ -29,6 +65,37 @@ def _parse_date(value):
         return datetime.strptime(value, "%Y-%m-%d").date()
     except ValueError:
         return None
+
+
+def sharepoint_folder_url(task, links=None):
+    """URL folderu SharePoint dla zadania albo None, gdy nic nie pasuje.
+
+    Kolejność: dokładny `task_id` -> dokładny `title` -> słowo kluczowe kategorii
+    zawarte w tytule. Brak dopasowania to poprawny wynik (None), nie wyjątek —
+    większość zadań nie ma dedykowanego folderu."""
+    links = SHAREPOINT_FOLDER_LINKS if links is None else links
+
+    for exact_key in (task.get("task_id"), task.get("title")):
+        if exact_key in links:
+            return links[exact_key]
+
+    title = (task.get("title") or "").lower()
+    if not title:
+        return None
+    for keyword, url in links.items():
+        if keyword.lower() in title:
+            return url
+    return None
+
+
+def format_done_task(task, links=None):
+    """Jedna pozycja sekcji 'Zrobione', z klikalnym linkiem Markdown do folderu
+    SharePoint, jeśli zadanie jest objęte mapowaniem."""
+    line = f"   - {task['title']} ({task.get('assignee', '?')})"
+    url = sharepoint_folder_url(task, links=links)
+    if url:
+        line += f" — [📁 materiały na SharePoint]({url})"
+    return line
 
 
 def split_tasks(tasks, today=None):
@@ -58,7 +125,7 @@ def build_digest(split, project_label="wszystkie projekty"):
     lines.append(f"✅ Zrobione ({len(split['done'])}):")
     if split["done"]:
         for t in split["done"]:
-            lines.append(f"   - {t['title']} ({t.get('assignee', '?')})")
+            lines.append(format_done_task(t))
     else:
         lines.append("   - brak")
 
