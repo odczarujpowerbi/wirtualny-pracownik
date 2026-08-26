@@ -31,6 +31,18 @@ class _Wynik:
         self.stderr = stderr
 
 
+class _FakeProjectlyClient:
+    """Atrapa dla _zaloguj_wynik/run_repo_improvement_cycle — bez niej test
+    sięgnąłby po prawdziwego projectly_client.get_client() (ta maszyna ma
+    realne poświadczenia) i wysłał realny komentarz do Projectly."""
+    def __init__(self):
+        self.komentarze = []
+
+    def post_comment(self, task_id, text):
+        self.komentarze.append((task_id, text))
+        return True
+
+
 def _zapisz_zdarzenia_needs_approval(task_id, now):
     state_store.upsert_task(task_id, payload={**TASK, "task_id": task_id}, status="needs_approval", now=now)
     state_store.record_event(task_id, "block_closed", "needs_approval", now)
@@ -183,6 +195,10 @@ def run():
         # state_path PRZEKAZANY JAWNIE (jak w kacper_monitor_smoke_test.py) — domyślny
         # parametr funkcji wiąże się z STATE_PATH raz, przy definicji modułu, więc samo
         # podmienienie `rai.STATE_PATH` (jak dla state_store.DB_PATH) by go nie podmieniło.
+        # client PRZEKAZANY JAWNIE (atrapa) — bez tego run_repo_improvement_cycle sam
+        # sięgnąłby po projectly_client.get_client() i próbował wysłać PRAWDZIWY
+        # komentarz do Projectly (ta maszyna ma realne poświadczenia w sekretach).
+        fake_client_logow = _FakeProjectlyClient()
         cyklowy_state_path = tmp / "cykl_state.json"
         cursor_przed = state_store.max_event_id()
         cyklowy_state_path.write_text(
@@ -190,15 +206,18 @@ def run():
         _zapisz_zdarzenia_gate_failed("T-CYKL-1", now)
         _zapisz_zdarzenia_gate_failed("T-CYKL-2", now)
 
-        wynik_cyklu_1 = rai.run_repo_improvement_cycle(state_path=cyklowy_state_path, limit=1)
+        wynik_cyklu_1 = rai.run_repo_improvement_cycle(state_path=cyklowy_state_path, limit=1, client=fake_client_logow)
         checks.append(("cykl 1: naprawia dokładnie `limit` zadań", len(wynik_cyklu_1["naprawiono"]) == 1))
         checks.append(("cykl 1: drugie zadanie zostaje w kolejce (nie ginie)", wynik_cyklu_1["w_kolejce"] == 1))
+        checks.append(("cykl 1: komentarz-log zapisany na zadaniu źródłowym (atrapa klienta)",
+                       len(fake_client_logow.komentarze) == 1 and fake_client_logow.komentarze[0][0] == "T-CYKL-1"))
 
-        wynik_cyklu_2 = rai.run_repo_improvement_cycle(state_path=cyklowy_state_path, limit=1)
+        wynik_cyklu_2 = rai.run_repo_improvement_cycle(state_path=cyklowy_state_path, limit=1, client=fake_client_logow)
         checks.append(("cykl 2: dobija zadanie zostawione w kolejce z cyklu 1",
                        len(wynik_cyklu_2["naprawiono"]) == 1 and wynik_cyklu_2["w_kolejce"] == 0))
+        checks.append(("cykl 2: kolejny komentarz-log dopisany (łącznie 2)", len(fake_client_logow.komentarze) == 2))
 
-        wynik_cyklu_3 = rai.run_repo_improvement_cycle(state_path=cyklowy_state_path, limit=1)
+        wynik_cyklu_3 = rai.run_repo_improvement_cycle(state_path=cyklowy_state_path, limit=1, client=fake_client_logow)
         checks.append(("cykl 3: te same zadania nie są naprawiane drugi raz",
                        len(wynik_cyklu_3["naprawiono"]) == 0))
 
@@ -242,6 +261,11 @@ def run():
                 os.environ.pop("ONEDRIVE_TASKS_ROOT", None)
             else:
                 os.environ["ONEDRIVE_TASKS_ROOT"] = original_onedrive_root
+
+        # --- 10. _zbuduj_prompt: zabrania usuwania plików ---
+        prompt_testowy = rai._zbuduj_prompt(TASK, "bramka_odrzucila", "historia")
+        checks.append(("_zbuduj_prompt: zabrania usuwania plików",
+                       "NIGDY nie usuwaj żadnego pliku" in prompt_testowy))
     finally:
         rai._run = original_run
         rai.shutil.which = original_which

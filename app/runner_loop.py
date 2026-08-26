@@ -44,7 +44,7 @@ import task_decomposer
 import task_router
 import task_thinker
 import validator_prompt
-from escalation import escalate_to_human
+from escalation import ESCALATION_TITLE_PREFIX, escalate_to_human
 from projectly_client import _load_config as _load_projectly_config
 from projectly_client import get_client
 
@@ -169,6 +169,22 @@ DUPLICATE_GUARD_MINUTES = 15
 def _process_task_core(task, policy, routing, client):
     task_id = task["task_id"]
     now = now_iso()
+
+    # Zadanie utworzone przez escalate_to_human (tytuł "Wymaga decyzji: ...")
+    # jest ZAWSZE dla człowieka — bot nigdy nie ma go dekomponować/wykonywać/
+    # eskalować dalej. Żywy bug 25-26.08.2026: takie zadania czasem trafiały z
+    # powrotem do kolejki bota (przypisanie po stronie Projectly nie zawsze
+    # trafiało do człowieka) i były przetwarzane jak zwykłe nowe zadanie, co
+    # mnożyło prefiks w kółko ("Wymaga decyzji: Wymaga decyzji: ..."), tworząc
+    # kolejne podzadania i kolejne eskalacje bez końca. Krótkie cięcie: bez
+    # względu na to, DLACZEGO bot to zobaczył, nigdy nie przetwarza dalej —
+    # tylko potwierdza status "needs_approval" i kończy.
+    if task["title"].startswith(ESCALATION_TITLE_PREFIX):
+        state_store.upsert_task(task_id, payload=task, status="needs_approval", now=now)
+        state_store.record_event(
+            task_id, "escalation_task_skipped",
+            "Zadanie eskalacyjne (dla człowieka) - bot go nie dekomponuje/wykonuje.", now)
+        return {"task_id": task_id, "risk": None, "status": "needs_approval", "escalation_skip": True}
 
     existing = state_store.get_task(task_id)
     if existing and existing["status"] in ("done", "needs_approval", "przeniesione"):

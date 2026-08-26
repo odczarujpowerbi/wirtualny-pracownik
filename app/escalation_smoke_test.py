@@ -73,6 +73,15 @@ def run():
                        "Brak dostępu do API." in fake_mail.wyslane[0]["body_text"]
                        and "ESK-1" in fake_mail.wyslane[0]["body_text"]))
 
+        # --- 1b. Anti-stacking: zadanie ŹRÓDŁOWE już ma prefiks -> NIE dokłada drugiego
+        # (żywy bug 25-26.08.2026: "Wymaga decyzji: Wymaga decyzji: Wymaga decyzji: ...").
+        projectly_stack = _FakeProjectlyClient()
+        already_escalated_task = {"task_id": "T-ESK-2", "title": "Wymaga decyzji: Zadanie testowe",
+                                  "project_id": "PROJ-1"}
+        escalation.escalate_to_human(already_escalated_task, "Kolejny powód.", projectly_stack, assignee="pawel")
+        checks.append(("escalate_to_human: BRAK podwójnego prefiksu, gdy zadanie już nim jest",
+                       projectly_stack.utworzone[0]["title"] == "Wymaga decyzji: Zadanie testowe"))
+
         # --- 2. event escalated_to_human zapisany w dzienniku ---
         conn = state_store.get_connection()
         row = conn.execute(

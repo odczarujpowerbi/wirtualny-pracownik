@@ -45,6 +45,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import model_registry
+import projectly_client
 import state_store
 import task_thinker
 
@@ -188,7 +189,9 @@ def _zbuduj_prompt(task, powod, historia, plik_wyniku=""):
         "(np. narzędzia dla konkretnej domeny), dodaj ją. Jeśli po analizie "
         "uznasz, że w kodzie nie ma nic do poprawienia (np. to był jednorazowy "
         "problem po stronie zewnętrznego API/danych) — NIE zmieniaj żadnych "
-        "plików i zakończ bez edycji.\n\n"
+        "plików i zakończ bez edycji. WOLNO Ci wyłącznie MODYFIKOWAĆ/EDYTOWAĆ "
+        "istniejące pliki i DODAWAĆ nowe — NIGDY nie usuwaj żadnego pliku "
+        "(decyzja właściciela repozytorium).\n\n"
         f"Sygnał problemu: {powod}\n"
         f"Zadanie: {task.get('title', '')}\n"
         f"Cel: {task.get('expected_result', '')}\n"
@@ -245,6 +248,37 @@ def _otworz_pr(branch, tytul, opis):
     return {"utworzono": True, "url": (result.stdout or "").strip()}
 
 
+def _opis_akcji_dla_czlowieka(wynik):
+    akcja = wynik.get("akcja")
+    if akcja == "pr_utworzony":
+        return f"Utworzono Pull Request: {wynik.get('url', '?')}"
+    if akcja == "branch_bez_pr":
+        return f"Branch wypchnięty ({wynik.get('branch', '?')}), ale PR NIE otwarty: {wynik.get('powod', '?')}"
+    if akcja == "commit_nieudany":
+        return f"Commit/push nie powiódł się: {wynik.get('powod', '?')}"
+    if akcja == "brak_zmian":
+        return "Przeanalizowano kod, ale nie znaleziono nic do poprawienia."
+    if akcja == "brak_akcji":
+        return f"Nie udało się uruchomić naprawy: {wynik.get('powod', '?')}"
+    return f"Nieznana akcja: {akcja}"
+
+
+def _zaloguj_wynik(client, task_id, wynik):
+    """Zapisuje, co repo_auto_improver zrobił dla tego zadania — komentarz na
+    zadaniu ŹRÓDŁOWYM w Projectly (kanał, który właściciel już obserwuje), nie
+    tylko wpis w runs/repo_improver_state.json. Decyzja właściciela 26.08.2026:
+    bez tego nie było żadnej widocznej informacji o działaniu agenta poza
+    stanem lokalnym na dysku. Fail-soft: brak klienta/błąd zapisu komentarza
+    NIE MOŻE ubić cyklu naprawy — to dodatkowy ślad, nie krytyczny krok."""
+    if client is None:
+        return
+    tresc = f"🔧 repo_auto_improver: {_opis_akcji_dla_czlowieka(wynik)}"
+    try:
+        client.post_comment(task_id, tresc)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[repo_auto_improver] Nie udało się zapisać komentarza z logiem: {exc}")
+
+
 def napraw_zadanie(task_id, powod, historia):
     """Pełny cykl: worktree -> subagent -> commit/push -> PR. Zwraca
     {"task_id", "akcja", ...} — akcja jedna z: brak_akcji (subagent
@@ -284,13 +318,23 @@ def napraw_zadanie(task_id, powod, historia):
         _posprzataj_worktree(worktree, branch)
 
 
-def run_repo_improvement_cycle(state_path=STATE_PATH, limit=1):
+def run_repo_improvement_cycle(state_path=STATE_PATH, limit=1, client=None):
     """Dwa niezależne kroki, żeby rate-limit (`limit` na przebieg) nigdy nie
     gubił zadania: (1) WYKRYWANIE — kursor po evencie 'block_closed' zawsze
     idzie do przodu, każde nowe zadanie trafia do reviewed (brak sygnału) albo
     do trwałej kolejki `kolejka` (sygnał jest, jeszcze nie naprawione);
     (2) NAPRAWA — zdejmuje z `kolejka` co najwyżej `limit` zadań, kolejka
-    persystuje w stanie między przebiegami, więc nic rate-limitowane nie ginie."""
+    persystuje w stanie między przebiegami, więc nic rate-limitowane nie ginie.
+
+    `client`: opcjonalny ProjectlyClient — do zapisania komentarza z logiem
+    działania na zadaniu źródłowym (_zaloguj_wynik). Brak podania -> próba
+    projectly_client.get_client(), fail-soft do None (bez klienta logowanie
+    po prostu jest pomijane, cykl naprawy działa dalej)."""
+    if client is None:
+        try:
+            client = projectly_client.get_client()
+        except Exception:  # noqa: BLE001 — logowanie jest dodatkiem, nie warunkiem naprawy
+            client = None
     state = _load_state(state_path)
     events = state_store.get_events_since(state.get("last_event_id", 0))
     zamkniete = [e for e in events if e["event_type"] == "block_closed"]
@@ -317,6 +361,7 @@ def run_repo_improvement_cycle(state_path=STATE_PATH, limit=1):
             reviewed[task_id] = "brak_sygnalu"
             continue
         wynik = napraw_zadanie(task_id, powod, historia)
+        _zaloguj_wynik(client, task_id, wynik)
         reviewed[task_id] = wynik.get("akcja", "?")
         naprawiono.append(wynik)
 

@@ -116,6 +116,8 @@ def run():
                        not any("dangerously-skip-permissions" in str(c) for c in captured["cmd"])))
         checks.append(("Happy path: cwd = folder zadania pod WORKSPACE_DIR",
                        str(tmp) in captured["cwd"] and "T-AGENT" in captured["cwd"]))
+        checks.append(("Happy path: prompt zabrania usuwania plików",
+                       "NIGDY nie usuwaj żadnego pliku" in captured["cmd"][4]))
 
         # 7. Kontekst firmy/projektu/rodzeństwa trafia do promptu (dokładany
         # PRZED "Zadanie: ..."), gdy dostępny.

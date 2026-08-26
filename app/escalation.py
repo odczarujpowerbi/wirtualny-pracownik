@@ -44,11 +44,23 @@ def _wyslij_powiadomienie_eskalacji(task, reason, new_task_id, assignee):
         print(f"[escalation] Powiadomienie mailowe nie powiodło się (eskalacja i tak zapisana w Projectly): {exc}")
 
 
+ESCALATION_TITLE_PREFIX = "Wymaga decyzji: "
+
+
 def escalate_to_human(task, reason, client, options=None, assignee="pawel"):
     """Tworzy w Projectly osobne zadanie przypisane do człowieka — NIE tylko
     komentarz (PLAN-WDROZENIA.md sekcja 4) — i wysyła mail powiadomienia
-    (adresaci: config/email_safety.yaml). Zwraca ID nowo utworzonego zadania."""
-    title = f"Wymaga decyzji: {task['title']}"
+    (adresaci: config/email_safety.yaml). Zwraca ID nowo utworzonego zadania.
+
+    Nie dokłada prefiksu drugi raz, gdy zadanie źródłowe JUŻ jest eskalacją
+    (żywy bug 25-26.08.2026: tytuł narastał z każdą rundą — "Wymaga decyzji:
+    Wymaga decyzji: Wymaga decyzji: ..." — bo poprzednia wersja zawsze
+    doklejała prefiks bez sprawdzenia)."""
+    original_title = task["title"]
+    if original_title.startswith(ESCALATION_TITLE_PREFIX):
+        title = original_title
+    else:
+        title = f"{ESCALATION_TITLE_PREFIX}{original_title}"
     description_lines = [
         f"Zadanie źródłowe: {task['task_id']}",
         f"Co jest potrzebne: {reason}",

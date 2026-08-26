@@ -122,7 +122,9 @@ def _build_prompt(task, plan_text, folder, client=None):
         "narzędzia), uruchamiaj co potrzebne do realizacji planu. Finalną, "
         f"czytelną dla człowieka odpowiedź zapisz w pliku '{RESULT_FILENAME}' "
         "(Markdown) w bieżącym katalogu — to ma być PEŁNE ROZWIĄZANIE zadania, "
-        "nie opis planu ani streszczenie tego, co zamierzasz zrobić."
+        "nie opis planu ani streszczenie tego, co zamierzasz zrobić. WOLNO Ci "
+        "wyłącznie MODYFIKOWAĆ/EDYTOWAĆ istniejące pliki i DODAWAĆ nowe — "
+        "NIGDY nie usuwaj żadnego pliku (decyzja właściciela repozytorium)."
     )
 
 
