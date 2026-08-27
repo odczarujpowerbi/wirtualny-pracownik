@@ -128,12 +128,13 @@ def _nazwa_brancha(task_id):
     return f"auto-fix/{slug}-{znacznik}"
 
 
-def _run(cmd, cwd=None, timeout=60, check=False):
-    """Jedyne miejsce wołające subprocess.run dla operacji git/gh — testy
+def _run(cmd, cwd=None, timeout=60, check=False, env=None):
+    """Jedyne miejsce wołające subprocess.run dla operacji git/gh/claude — testy
     dymne podmieniają TĘ funkcję jedną atrapą zamiast łatać każde wywołanie
-    osobno."""
+    osobno. `env=None` -> dziedziczy środowisko procesu (git/gh); subagent
+    Claude Code dostaje env JAWNIE, patrz _uruchom_subagenta."""
     return subprocess.run(cmd, cwd=str(cwd) if cwd else None, capture_output=True,
-                          text=True, encoding="utf-8", timeout=timeout, check=check)
+                          text=True, encoding="utf-8", timeout=timeout, check=check, env=env)
 
 
 def _przygotuj_worktree(branch):
@@ -209,6 +210,14 @@ def _uruchom_subagenta(worktree, prompt):
     if not claude_exe:
         return {"executed": False, "powod": "Brak Claude Code (claude login) na tej maszynie."}
     _, model = model_registry.resolve("repo_auto_improver.napraw_zadanie")
+    # ANTHROPIC_API_KEY usuwany ze środowiska podprocesu z tego samego powodu co
+    # w agentic_worker.py/task_thinker._think_via_claude_code: obecność klucza
+    # wyłącza connectory `claude login`, `claude -p` kończy się błędem "claude.ai
+    # connectors are disabled...". Żywy bug 25-26.08.2026: repo_auto_improver
+    # NIGDY nie wykonał realnej naprawy od chwili włączenia — każde ze 129+
+    # uruchomień kończyło się dokładnie tym błędem, bo ta poprawka (już dawno
+    # zrobiona w agentic_worker.py) nie została tu zastosowana.
+    env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
     try:
         result = _run(
             # Prompt zaraz po --model, PRZED --allowedTools/--add-dir (te dwa są
@@ -216,7 +225,7 @@ def _uruchom_subagenta(worktree, prompt):
             # patrz agentic_worker.py dla tego samego wzorca/incydentu).
             [claude_exe, "-p", "--model", model, prompt, "--permission-mode", "acceptEdits",
              "--allowedTools", "Read Write Edit Skill", "--add-dir", str(worktree)],
-            cwd=worktree, timeout=SUBAGENT_TIMEOUT_SECONDS,
+            cwd=worktree, timeout=SUBAGENT_TIMEOUT_SECONDS, env=env,
         )
     except (subprocess.TimeoutExpired, OSError) as exc:
         return {"executed": False, "powod": f"Subagent nie powiódł się: {exc}"}

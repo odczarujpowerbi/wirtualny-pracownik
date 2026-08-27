@@ -78,7 +78,7 @@ def _fake_run_factory(git_status_stdout="", gh_dostepne=True):
     dało się do niego coś zapisać jak prawdziwy subagent), 'worktree remove'
     faktycznie go kasuje (żeby dało się sprawdzić sprzątanie), 'git status'
     zwraca zadaną treść, 'gh' symuluje dostępność/brak CLI."""
-    def _run(cmd, cwd=None, timeout=60, check=False):
+    def _run(cmd, cwd=None, timeout=60, check=False, env=None):
         if cmd[:1] == ["git"] and "worktree" in cmd and "add" in cmd:
             Path(cmd[-2]).mkdir(parents=True, exist_ok=True)
             return _Wynik(0)
@@ -181,10 +181,10 @@ def run():
         utworzone_katalogi = []
         oryginalny_run = rai._run
 
-        def _run_ze_sledzeniem(cmd, cwd=None, timeout=60, check=False):
+        def _run_ze_sledzeniem(cmd, cwd=None, timeout=60, check=False, env=None):
             if cmd[:1] == ["git"] and "worktree" in cmd and "add" in cmd:
                 utworzone_katalogi.append(Path(cmd[-2]))
-            return oryginalny_run(cmd, cwd=cwd, timeout=timeout, check=check)
+            return oryginalny_run(cmd, cwd=cwd, timeout=timeout, check=check, env=env)
 
         rai._run = _run_ze_sledzeniem
         rai.napraw_zadanie("T-GATE", "bramka_odrzucila", "historia")
@@ -223,19 +223,29 @@ def run():
 
         # --- 8. _uruchom_subagenta: woła Claude Code z --model (Fable 5) i Skill ---
         captured_cmd = {}
+        captured_env = {}
 
-        def _run_przechwytujacy(cmd, cwd=None, timeout=60, check=False):
+        def _run_przechwytujacy(cmd, cwd=None, timeout=60, check=False, env=None):
             captured_cmd["cmd"] = cmd
+            captured_env["env"] = env
             return _Wynik(0)
         rai._run = _run_przechwytujacy
         rai._uruchom_subagenta = original_uruchom  # implementacja realna, nie atrapa z kroku 5
-        rai._uruchom_subagenta(tmp, "prompt testowy")
+        rai.os.environ["ANTHROPIC_API_KEY"] = "sk-test-nie-prawdziwy"
+        try:
+            rai._uruchom_subagenta(tmp, "prompt testowy")
+        finally:
+            del rai.os.environ["ANTHROPIC_API_KEY"]
         checks.append(("_uruchom_subagenta: komenda ma --model claude-fable-5 (tier 'steering')",
                        "--model" in captured_cmd["cmd"] and "claude-fable-5" in captured_cmd["cmd"]))
         checks.append(("_uruchom_subagenta: prompt zaraz po --model, PRZED --allowedTools",
                        captured_cmd["cmd"].index("prompt testowy") < captured_cmd["cmd"].index("--allowedTools")))
         checks.append(("_uruchom_subagenta: --allowedTools zawiera Skill",
                        "Read Write Edit Skill" in captured_cmd["cmd"]))
+        checks.append(("_uruchom_subagenta: ANTHROPIC_API_KEY usunięty ze środowiska subprocesu "
+                       "(żywy bug 25-26.08.2026: bez tego KAŻDE uruchomienie kończyło się błędem "
+                       "'claude.ai connectors are disabled')",
+                       captured_env["env"] is not None and "ANTHROPIC_API_KEY" not in captured_env["env"]))
 
         # --- 9. _plik_wyniku_tekst: czyta realny plik .md z OneDrive, fail-soft gdy brak ---
         original_onedrive_root = os.environ.get("ONEDRIVE_TASKS_ROOT")
