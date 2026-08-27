@@ -75,7 +75,19 @@ def _save_state(state, path):
 
 
 def _skill_failures(events):
-    """{skill_name: count} z eventów 'skill_usage:{skill}:failure' w partii."""
+    """{skill_name: count} z eventów 'skill_usage:{skill}:failure' w partii.
+
+    TODO(ograniczenie, świadomie NIE naprawione — wymaga decyzji właściciela
+    co do trade-offu czułość/szum): próg (skill_failure_threshold) liczy się
+    per PARTIA zdarzeń od ostatniego checkpointu (cykl job_schedulera co
+    ~90s, patrz update_interval_seconds), nie per dzień łącznie. Powolny
+    wyciek awarii (np. 1-2 niepowodzenia na cykl) może NIGDY nie przekroczyć
+    progu 3 w pojedynczej partii, mimo że ten sam skill zawodzi wielokrotnie
+    w ciągu całego dnia — bo licznik zeruje się przy każdym nowym oknie
+    zdarzeń (state["last_event_id"] przesuwa się po każdym przebiegu).
+    Zobacz test_slow_leak_across_cycles_not_detected w
+    kacper_monitor_smoke_test.py — dema ten przypadek brzegowy.
+    """
     counts = {}
     for ev in events:
         et = ev["event_type"] or ""

@@ -73,8 +73,14 @@ def build_machine_status():
 def run_machine_status_report(client=None):
     client = client or get_client()
     status = build_machine_status()
-    client.publish_status("machine-status", status)
-    return status
+    published = client.publish_status("machine-status", status)
+    if not published:
+        print("[machine_status_reporter] OSTRZEZENIE: publikacja statusu maszyny "
+              "do Projectly nie powiodla sie (publish_status zwrocilo False).")
+    # "published" dodawane PO wyslaniu payloadu, zeby nie zmienic ksztaltu
+    # danych faktycznie wyslanych do Projectly - widoczne tylko w wartosci
+    # zwracanej (job_scheduler pokazuje ja w result_summary przebiegu).
+    return {**status, "published": bool(published)}
 
 
 def main():

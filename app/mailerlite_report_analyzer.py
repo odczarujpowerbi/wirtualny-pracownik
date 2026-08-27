@@ -75,7 +75,12 @@ def _fmt_pct(value):
 def ai_feedback(subject, body_text):
     """Subiektywna ocena tonu/jakości tytułu — wymaga modelu. Bez klucza:
     jasny stub, nie zmyślona opinia (fail-closed, ten sam wzorzec co
-    validators.py i ad_copy_generator.py)."""
+    validators.py i ad_copy_generator.py). Samo wywołanie API jest owinięte
+    w try/except (anthropic.AnthropicError) — błąd modelu (np. "insufficient
+    credit balance", limit, przerwane połączenie) degraduje TĘ jedną sekcję
+    (feedback jednej kampanii) do jasnej adnotacji zamiast wywalać całą
+    funkcję run_weekly_report(), tak jak jedno realne uruchomienie tego joba
+    zakończyło się błędem API."""
     if not os.environ.get("ANTHROPIC_API_KEY"):
         return "Brak ANTHROPIC_API_KEY — pomięto subiektywną ocenę tonu/tytułu (dostępna tylko statystyka i heurystyka czytelności)."
 
@@ -89,10 +94,13 @@ def ai_feedback(subject, body_text):
         "Oceń w 2-3 zdaniach: czy tytuł zachęca do otwarcia, czy treść jest "
         "klarowna i angażująca, i jedną konkretną rzecz do poprawy następnym razem."
     )
-    client = anthropic.Anthropic()
-    _, model = model_registry.resolve("mailerlite_report_analyzer.analyze")
-    response = client.messages.create(model=model, max_tokens=250, messages=[{"role": "user", "content": prompt}])
-    return response.content[0].text.strip()
+    try:
+        client = anthropic.Anthropic()
+        _, model = model_registry.resolve("mailerlite_report_analyzer.analyze")
+        response = client.messages.create(model=model, max_tokens=250, messages=[{"role": "user", "content": prompt}])
+        return response.content[0].text.strip()
+    except anthropic.AnthropicError as exc:
+        return f"Ocena AI niedostępna (błąd API modelu: {exc}) — dostępna tylko statystyka i heurystyka czytelności."
 
 
 def build_report(campaigns):

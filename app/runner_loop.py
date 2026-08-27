@@ -45,7 +45,6 @@ import task_router
 import task_thinker
 import validator_prompt
 from escalation import ESCALATION_TITLE_PREFIX, escalate_to_human
-from projectly_client import _load_config as _load_projectly_config
 from projectly_client import get_client
 
 HINT_TO_ACTION = {
@@ -66,21 +65,6 @@ MAX_TASKS_PER_RUN = 5
 
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
-
-
-def _escalation_assignee():
-    """Kto ma dostać zadanie eskalacji w Projectly — config/projectly.yaml
-    `escalation_default_assignee`, NIGDY 'owner' z task_router.route_task().
-    'owner' jest routing biznesowy/klienta (do jakiego klienta należy zadanie),
-    nie osoba do powiadomienia — dla nierozpoznanego tytułu route_task zwraca
-    'unassigned_pool', co przez people_aliases mapuje się na "" (brak
-    przypisania). Skutek namacalny 23.08.2026: WSZYSTKIE eskalacje (nowe i
-    historyczne) trafiały do Projectly z assignees=[] — niewidoczne dla
-    człowieka, nikt nie wiedział, że czekają na decyzję."""
-    try:
-        return _load_projectly_config().get("escalation_default_assignee", "pawel")
-    except Exception:  # noqa: BLE001 — config nieczytelny nie może zablokować eskalacji
-        return "pawel"
 
 
 def _slug(text, limit=60):
@@ -204,8 +188,7 @@ def _process_task_core(task, policy, routing, client):
     state_store.record_event(task_id, "prompt_safety_check", str(prompt_check), now_iso())
     if not prompt_check["safe"]:
         owner, _ = task_router.route_task(task["title"], routing)
-        escalate_to_human(task, f"Wykryto podejrzaną treść: {prompt_check['detail']}", client,
-                          assignee=_escalation_assignee())
+        escalate_to_human(task, f"Wykryto podejrzaną treść: {prompt_check['detail']}", client)
         state_store.log_decision(
             task_id, agent="pawel", decision="escalate",
             reason=f"prompt injection: {prompt_check['detail']}", now=now_iso(), event_type="escalation")
@@ -318,7 +301,7 @@ def _process_task_core(task, policy, routing, client):
     # subagenta nie ustawia `real` (executor.execute() zwrócił None).
     if execution_result.get("executed") is False:
         reason = execution_result["acceptance_notes"]
-        escalate_to_human(task, reason, client, assignee=_escalation_assignee())
+        escalate_to_human(task, reason, client)
         state_store.log_decision(task_id, agent="pawel", decision="escalate", reason=reason,
                                  now=now_iso(), event_type="escalation")
         state_store.upsert_task(task_id, payload=task, status="needs_approval",
@@ -345,7 +328,7 @@ def _process_task_core(task, policy, routing, client):
 
     elif risk == "red":
         reason = "Czerwona akcja — poza zakresem tego szkieletu, brak jeszcze zdefiniowanej bounded_red do sprawdzenia."
-        escalate_to_human(task, reason, client, assignee=_escalation_assignee())
+        escalate_to_human(task, reason, client)
         state_store.log_decision(task_id, agent="pawel", decision="escalate", reason=reason,
                                  now=now_iso(), event_type="escalation")
         status, comment = "needs_approval", _comment_escalated(owner, reason)
@@ -387,7 +370,7 @@ def _process_task_core(task, policy, routing, client):
             skill_usage_logger.log_usage(task_id, "quality_gate", "failure", reason)
         else:
             reason = _gate_failure_reason(gate)
-            escalate_to_human(task, reason, client, assignee=_escalation_assignee())
+            escalate_to_human(task, reason, client)
             state_store.log_decision(task_id, agent="pawel", decision="escalate", reason=reason,
                                      now=now_iso(), event_type="escalation")
             status, comment = "needs_approval", _comment_escalated(owner, reason)

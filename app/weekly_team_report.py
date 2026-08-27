@@ -28,7 +28,7 @@ from email_client import get_email_client
 from projectly_client import get_client
 
 
-def build_team_report(split, stale_grouped, invalid_dates=0, ai_summary=None):
+def build_team_report(split, stale_grouped, invalid_dates=0, ai_summary=None, ai_error=None):
     lines = ["📅 Raport tygodniowy zespołu", ""]
 
     lines.append(f"✅ Zrobione (stan na dziś, status w Projectly): {len(split['done'])}")
@@ -49,6 +49,10 @@ def build_team_report(split, stale_grouped, invalid_dates=0, ai_summary=None):
     if ai_summary:
         lines.append("\n🧠 Obserwacje i słabe strony (ocena modelu na podstawie powyższych danych):")
         lines.append(ai_summary)
+    elif ai_error:
+        lines.append(
+            f"\n(Analiza AI niedostępna: {ai_error} — raport zawiera tylko surowe liczby powyżej.)"
+        )
     else:
         lines.append(
             "\n(Brak ANTHROPIC_API_KEY — pominięto interpretację słabych stron, dostępne tylko surowe liczby powyżej.)"
@@ -61,13 +65,16 @@ def ai_weaknesses_summary(split, stale_grouped):
     """Interpretacja wzorców ("dlaczego to jest problem", nie tylko "ile") —
     jedyna część tego raportu, która wymaga oceny, nie tylko zliczania
     (sekcja 12 planu: Python liczy, AI ocenia to, co niejednoznaczne).
-    Fail-closed: bez klucza nie zmyślamy obserwacji."""
+    Fail-closed: bez klucza nie zmyślamy obserwacji. Błąd API (np. brak
+    środków na koncie) też ma degradować do braku interpretacji, a nie
+    wywalać cały raport — żywy bug 23.08.2026: raport nigdy nie docierał do
+    Projectly/maila, mimo że surowe dane (zadania, godziny) były gotowe."""
     if not os.environ.get("ANTHROPIC_API_KEY"):
-        return None
+        return None, None
     try:
         import anthropic
     except ImportError:
-        return None
+        return None, None
 
     overdue_titles = [t["title"] for t in split["overdue"]]
     stale_summary = {owner: data["total_hours"] for owner, data in stale_grouped.items()}
@@ -78,10 +85,15 @@ def ai_weaknesses_summary(split, stale_grouped):
         f"Przeterminowane zadania: {overdue_titles}\n"
         f"Godziny zalogowane jako 'otwarte' bez domknięcia wg osoby: {stale_summary}\n"
     )
-    client = anthropic.Anthropic()
-    _, model = model_registry.resolve("weekly_team_report.generate")
-    response = client.messages.create(model=model, max_tokens=400, messages=[{"role": "user", "content": prompt}])
-    return response.content[0].text.strip()
+    try:
+        client = anthropic.Anthropic()
+        _, model = model_registry.resolve("weekly_team_report.generate")
+        response = client.messages.create(
+            model=model, max_tokens=400, messages=[{"role": "user", "content": prompt}]
+        )
+        return response.content[0].text.strip(), None
+    except anthropic.AnthropicError as exc:
+        return None, str(exc)
 
 
 def run_weekly_team_report(client=None, time_entries_csv=None, today=None, send_email_copy=True):
@@ -97,8 +109,10 @@ def run_weekly_team_report(client=None, time_entries_csv=None, today=None, send_
         stale_grouped = {k: {"count": v["count"], "total_hours": v["total_hours"]} for k, v in grouped.items()}
         invalid_dates = len(invalid)
 
-    ai_summary = ai_weaknesses_summary(split, stale_grouped)
-    text = build_team_report(split, stale_grouped, invalid_dates=invalid_dates, ai_summary=ai_summary)
+    ai_summary, ai_error = ai_weaknesses_summary(split, stale_grouped)
+    text = build_team_report(
+        split, stale_grouped, invalid_dates=invalid_dates, ai_summary=ai_summary, ai_error=ai_error
+    )
 
     client.post_comment("WEEKLY-TEAM-REPORT", text)
 

@@ -52,9 +52,9 @@ jobs:
 - name: knowledge_digest_publisher
   description: Cogodzinny digest "ostatnia aktywność" (zadania z tego tygodnia,
     per konto) do bazy wiedzy Projectly, po jednym wpisie na konto AI (dev/
-    marketing/zarzad). Zapis wymaga narzędzia MCP jeszcze nieskonfigurowanego
-    (config/projectly.yaml -> knowledge_digest.mcp_tool) - do tego czasu tylko
-    czyta i loguje, bezpieczny do włączenia od razu.
+    marketing/zarzad). Realnie działa (audyt 27.08.2026, 4/4 przebiegów sukces) -
+    zapis przez MCP create_knowledge/update_knowledge, publikuje po jednym wpisie
+    per rola.
   module: knowledge_digest_publisher
   function: run_knowledge_digest
   interval_seconds: 3600

@@ -9,11 +9,14 @@ Użycie:
     python escalation_smoke_test.py
 """
 
+import contextlib
+import io
 import sys
 import tempfile
 from pathlib import Path
 
 import escalation
+import projectly_client
 import state_store
 
 TASK = {"task_id": "T-ESK-1", "title": "Zadanie testowe", "project_id": "PROJ-1"}
@@ -29,6 +32,19 @@ class _FakeProjectlyClient:
                               "parent_task_id": parent_task_id, "project_id": project_id,
                               "relation_type": relation_type})
         return f"ESK-{len(self.utworzone)}"
+
+
+class _FakeMCPClientKatalog:
+    """Atrapa MCP: tylko list_projects, do testu _resolve_person_id bez sieci
+    (wzorzec z projectly_client_smoke_test.py)."""
+
+    def __init__(self, people):
+        self._people = people
+
+    def call_tool(self, name, arguments=None):
+        if name == "list_projects":
+            return {"people": self._people, "projects": []}
+        return {}
 
 
 class _FakeEmailClient:
@@ -106,6 +122,51 @@ def run():
                        escalation.human_response_validator("Zatwierdzam, proszę kontynuować.")["sufficient"] is True))
         checks.append(("human_response_validator: dopytanie bez decyzji -> niewystarczający",
                        escalation.human_response_validator("A o co dokładnie chodzi?")["sufficient"] is False))
+
+        # --- 5. _resolve_person_id: nierozpoznana nazwa musi WYRAŹNIE ostrzec w
+        # logu (żywy, niezdiagnozowany do końca incydent 23.08.2026: eskalacje
+        # lądowały bez przypisania, cicho) — a celowo puste unassigned_pool NIE. ---
+        real_client = projectly_client.ProjectlyClient(api_key="fake-token", base_url="http://fake.local/mcp")
+        real_client._mcp = _FakeMCPClientKatalog([{"id": "U1", "name": "Paweł"}])
+
+        buf_typo = io.StringIO()
+        with contextlib.redirect_stdout(buf_typo):
+            resolved_typo = real_client._resolve_person_id("Paweł Literowka")
+        checks.append(("_resolve_person_id: nierozpoznana nazwa -> None", resolved_typo is None))
+        checks.append(("_resolve_person_id: nierozpoznana nazwa -> WYRAŹNE ostrzeżenie w logu z nazwą",
+                       "[projectly_client]" in buf_typo.getvalue() and "Paweł Literowka" in buf_typo.getvalue()))
+
+        buf_pool = io.StringIO()
+        with contextlib.redirect_stdout(buf_pool):
+            resolved_pool = real_client._resolve_person_id("unassigned_pool")
+        checks.append(("_resolve_person_id: unassigned_pool (celowo bez przypisania) -> None BEZ ostrzeżenia",
+                       resolved_pool is None and buf_pool.getvalue() == ""))
+
+        buf_ok = io.StringIO()
+        with contextlib.redirect_stdout(buf_ok):
+            resolved_ok = real_client._resolve_person_id("Paweł")
+        checks.append(("_resolve_person_id: nazwa rozpoznana -> id, bez ostrzeżenia",
+                       resolved_ok == "U1" and buf_ok.getvalue() == ""))
+
+        # --- 6. escalate_to_human bez podania assignee używa wartości z
+        # config/projectly.yaml (escalation_default_assignee), NIE hardcoded
+        # "pawel" w sygnaturze (żywy bug 23.08.2026, patrz _escalation_default_assignee). ---
+        oryginalny_load_config = escalation._load_projectly_config
+        try:
+            escalation._load_projectly_config = lambda: {"escalation_default_assignee": "Zenon Testowy"}
+            checks.append(("_escalation_default_assignee: czyta z config/projectly.yaml (nie hardcoded)",
+                           escalation._escalation_default_assignee() == "Zenon Testowy"))
+
+            projectly_bez_assignee = _FakeProjectlyClient()
+            escalation.escalate_to_human(TASK, "Powód bez jawnego assignee.", projectly_bez_assignee)
+            checks.append(("escalate_to_human bez assignee: przypisuje wg configu, NIE hardcoded 'pawel'",
+                           projectly_bez_assignee.utworzone[0]["assigned_to"] == "Zenon Testowy"))
+
+            escalation._load_projectly_config = lambda: (_ for _ in ()).throw(RuntimeError("config uszkodzony"))
+            checks.append(("_escalation_default_assignee: config nieczytelny -> fail-closed fallback 'pawel'",
+                           escalation._escalation_default_assignee() == "pawel"))
+        finally:
+            escalation._load_projectly_config = oryginalny_load_config
     finally:
         escalation.email_client.get_email_client = original_get_email_client
         state_store.DB_PATH = original_db_path

@@ -149,6 +149,90 @@ def test_recurring_job_failure_creates_repair_task(monkeypatch=None):
     print("OK  praca cykliczna zawodzaca powtarzalnie (4/4 error) -> jedno zadanie naprawcze")
 
 
+def test_recurring_job_failure_deduplicated_same_day():
+    # Wzorzec "job" nie jest chroniony kursorem zdarzen (job_health liczy sie
+    # zawsze od nowa z load_history) — dedup opiera sie WYLACZNIE na kluczu
+    # "job:{nazwa}:{dzien}" w state["repair_tasks"]. Ten test sprawdza, ze
+    # DRUGI przebieg z ta sama historia bledow NIE dubluje zadania.
+    _use_temp_db()
+    import job_scheduler
+    history = [
+        {"id": f"r{i}", "name": "runner_loop", "run_at": NOW, "status": "error",
+         "error": "boom", "duration_seconds": 1.0, "trigger": "schedule", "result": None}
+        for i in range(4)
+    ]
+    original_load_history = job_scheduler.load_history
+    job_scheduler.load_history = lambda limit=100, include_output=False: history
+    try:
+        client = _FakeClient()
+        state_path = _temp_state_path()
+        kacper_monitor.run_monitor_cycle(client=client, thresholds=THRESHOLDS, state_path=state_path)
+        kacper_monitor.run_monitor_cycle(client=client, thresholds=THRESHOLDS, state_path=state_path)
+    finally:
+        job_scheduler.load_history = original_load_history
+
+    assert len(client.created_tasks) == 1, "drugi przebieg tego samego dnia nie powinien dublowac zadania dla joba"
+    print("OK  wzorzec job: deduplikacja per dzien chroni przed powtornym zadaniem")
+
+
+def test_job_failure_below_threshold_does_not_escalate():
+    # Logika progowa _job_health: 2/10 bledow < job_failure_threshold=3 ->
+    # brak zadania naprawczego.
+    _use_temp_db()
+    import job_scheduler
+    history = [
+        {"id": "ok1", "name": "runner_loop", "run_at": NOW, "status": "ok",
+         "error": None, "duration_seconds": 1.0, "trigger": "schedule", "result": None},
+        {"id": "err1", "name": "runner_loop", "run_at": NOW, "status": "error",
+         "error": "boom", "duration_seconds": 1.0, "trigger": "schedule", "result": None},
+        {"id": "err2", "name": "runner_loop", "run_at": NOW, "status": "error",
+         "error": "boom", "duration_seconds": 1.0, "trigger": "schedule", "result": None},
+    ]
+    original_load_history = job_scheduler.load_history
+    job_scheduler.load_history = lambda limit=100, include_output=False: history
+    try:
+        client = _FakeClient()
+        kacper_monitor.run_monitor_cycle(client=client, thresholds=THRESHOLDS, state_path=_temp_state_path())
+    finally:
+        job_scheduler.load_history = original_load_history
+
+    assert client.created_tasks == [], "2 bledy na 3 przebiegi ponizej progu 3 nie powinny tworzyc zadania"
+    print("OK  wzorzec job: 2 bledy < prog 3 -> brak zadania naprawczego")
+
+
+def test_slow_leak_across_cycles_not_detected():
+    # Znane, udokumentowane ograniczenie (patrz TODO w kacper_monitor._skill_failures):
+    # prog liczony jest per PARTIA zdarzen od ostatniego checkpointu, nie per
+    # dzien lacznie. Powolny wyciek (1-2 niepowodzenia na cykl) przez wiele
+    # cykli monitorowania moze NIGDY nie przekroczyc progu 3 w pojedynczej
+    # partii, mimo ze w sumie tego dnia skill zawiodl znacznie wiecej razy
+    # niz prog. Ten test SWIADOMIE demonstruje, ze zadanie naprawcze NIE
+    # powstaje w takim scenariuszu — to nie jest bug do naprawienia w tym
+    # zadaniu, tylko udokumentowany trade-off czulosc/szum.
+    _use_temp_db()
+    state_path = _temp_state_path()
+    client = _FakeClient()
+
+    total_failures_injected = 0
+    for cycle in range(4):
+        # 2 nowe niepowodzenia na cykl -> ponizej progu 3 w KAZDEJ partii,
+        # ale 4 cykle x 2 = 8 niepowodzen tego samego skilla w ciagu dnia.
+        for i in range(2):
+            state_store.record_event(
+                f"LEAK-{cycle}-{i}", "skill_usage:pbip_validate:failure", "wolny wyciek", NOW,
+            )
+            total_failures_injected += 1
+        kacper_monitor.run_monitor_cycle(client=client, thresholds=THRESHOLDS, state_path=state_path)
+
+    assert total_failures_injected == 8, "8 niepowodzen tego samego skilla w ciagu dnia, znacznie powyzej progu 3"
+    assert client.created_tasks == [], (
+        "znane ograniczenie: powolny wyciek (2 na cykl) nigdy nie przekracza progu "
+        "3 w pojedynczej partii, wiec zadanie naprawcze NIE powstaje mimo 8 "
+        "niepowodzen tego samego skilla w ciagu dnia"
+    )
+    print("OK  udokumentowane ograniczenie: powolny wyciek awarii (2/cykl) NIE wykryty mimo 8 niepowodzen dziennie")
+
+
 if __name__ == "__main__":
     test_first_run_seeds_cursor_at_now_not_backlog()
     test_no_admin_project_fails_closed_no_task_created()
@@ -156,4 +240,7 @@ if __name__ == "__main__":
     test_single_failure_does_not_escalate()
     test_idempotent_cursor_does_not_reprocess()
     test_recurring_job_failure_creates_repair_task()
+    test_recurring_job_failure_deduplicated_same_day()
+    test_job_failure_below_threshold_does_not_escalate()
+    test_slow_leak_across_cycles_not_detected()
     print("\nWszystkie testy Kacpra przeszły.")

@@ -256,7 +256,14 @@ class ProjectlyClient:
 
     def _resolve_person_id(self, alias_or_name):
         """Alias z config (pawel/bot/unassigned_pool) albo wprost nazwa osoby
-        -> id osoby w Projectly. Zwraca None, gdy nieznana/celowo bez przypisania."""
+        -> id osoby w Projectly. Zwraca None w dwóch różnych sytuacjach:
+        - celowo bez przypisania (np. unassigned_pool mapuje się na "") — cicho,
+          to zamierzone zachowanie;
+        - nazwa nierozpoznana w katalogu Projectly (literówka, rozjazd nazw) —
+          GŁOŚNO, bo inaczej create_task tworzy zadanie z assigneeIds=[],
+          niewidoczne dla człowieka, bez żadnego śladu w logach (żywy,
+          niezdiagnozowany do końca incydent 23.08.2026 — eskalacje lądowały
+          bez przypisania; to jeden z podejrzanych mechanizmów)."""
         self._ensure_directory()
         aliases = self._cfg.get("people_aliases", {})
         name = aliases.get(alias_or_name, alias_or_name)
@@ -265,7 +272,13 @@ class ProjectlyClient:
             name = account_name
         if not name:
             return None
-        return self._people_by_name.get(str(name).lower())
+        person_id = self._people_by_name.get(str(name).lower())
+        if person_id is None:
+            print(f"[projectly_client] Nie znaleziono osoby '{name}' (wejście: '{alias_or_name}') w katalogu "
+                  f"Projectly — zadanie zostanie utworzone BEZ przypisania (assigneeIds=[]), niewidoczne dla "
+                  f"człowieka. Sprawdź pisownię nazwy w Projectly albo w config/projectly.yaml (people_aliases "
+                  f"/ role_to_account / escalation_default_assignee).")
+        return person_id
 
     def _project_id_by_name(self, project_name):
         self._ensure_directory()

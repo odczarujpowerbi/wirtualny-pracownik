@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 
 import email_client
 import state_store
+from projectly_client import _load_config as _load_projectly_config
 
 
 def _wyslij_powiadomienie_eskalacji(task, reason, new_task_id, assignee):
@@ -47,15 +48,39 @@ def _wyslij_powiadomienie_eskalacji(task, reason, new_task_id, assignee):
 ESCALATION_TITLE_PREFIX = "Wymaga decyzji: "
 
 
-def escalate_to_human(task, reason, client, options=None, assignee="pawel"):
+def _escalation_default_assignee():
+    """Kto ma dostać zadanie eskalacji, gdy escalate_to_human nie dostanie
+    assignee wprost — config/projectly.yaml `escalation_default_assignee`,
+    NIGDY 'owner' z task_router.route_task(). 'owner' to routing biznesowy/
+    klienta (do jakiego klienta należy zadanie), nie osoba do powiadomienia —
+    dla nierozpoznanego tytułu route_task zwraca 'unassigned_pool', co przez
+    people_aliases mapuje się na "" (brak przypisania).
+
+    Przeniesione z runner_loop.py (23.08.2026, ten sam incydent): domyślny
+    parametr assignee="pawel" wprost w sygnaturze escalate_to_human omijał
+    ten config całkowicie, więc gdy ktoś wywoływał escalate_to_human bez
+    jawnego assignee, trafiał zawsze hardcoded "pawel" zamiast wartości z
+    configu. Jedno miejsce zamiast dwóch kopii tej samej logiki."""
+    try:
+        return _load_projectly_config().get("escalation_default_assignee", "pawel")
+    except Exception:  # noqa: BLE001 — config nieczytelny nie może zablokować eskalacji
+        return "pawel"
+
+
+def escalate_to_human(task, reason, client, options=None, assignee=None):
     """Tworzy w Projectly osobne zadanie przypisane do człowieka — NIE tylko
     komentarz (PLAN-WDROZENIA.md sekcja 4) — i wysyła mail powiadomienia
     (adresaci: config/email_safety.yaml). Zwraca ID nowo utworzonego zadania.
+
+    assignee: alias (patrz people_aliases) albo wprost nazwa osoby. Gdy
+    pominięty (None), używa config/projectly.yaml escalation_default_assignee
+    — patrz _escalation_default_assignee.
 
     Nie dokłada prefiksu drugi raz, gdy zadanie źródłowe JUŻ jest eskalacją
     (żywy bug 25-26.08.2026: tytuł narastał z każdą rundą — "Wymaga decyzji:
     Wymaga decyzji: Wymaga decyzji: ..." — bo poprzednia wersja zawsze
     doklejała prefiks bez sprawdzenia)."""
+    assignee = assignee or _escalation_default_assignee()
     original_title = task["title"]
     if original_title.startswith(ESCALATION_TITLE_PREFIX):
         title = original_title
