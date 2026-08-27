@@ -29,6 +29,7 @@ Wymaga pakietu `psutil` (dodany do requirements.txt) — to jedyny sposób,
 osobnego kodu na każdy system.
 """
 
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -38,11 +39,30 @@ import yaml
 from projectly_client import get_client
 
 THRESHOLDS_PATH = Path(__file__).parent / "config" / "health_thresholds.yaml"
+STATE_PATH = Path(__file__).parent / "runs" / "system_health_state.json"
 
 
 def load_thresholds(path=THRESHOLDS_PATH):
     with open(path, encoding="utf-8") as f:
         return yaml.safe_load(f)
+
+
+def _today_key():
+    return datetime.now(timezone.utc).date().isoformat()
+
+
+def _load_state(path):
+    if path.exists():
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            pass
+    return {"alert_tasks": {}}
+
+
+def _save_state(state, path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def list_running_scripts():
@@ -90,9 +110,10 @@ def evaluate_health(snapshot, thresholds):
     return {"status": "critical" if issues else "ok", "issues": issues}
 
 
-def run_health_check(client=None, thresholds=None):
+def run_health_check(client=None, thresholds=None, state_path=STATE_PATH):
     client = client or get_client()
     thresholds = thresholds or load_thresholds()
+    state = _load_state(state_path)
 
     import live_status_publisher
 
@@ -105,7 +126,13 @@ def run_health_check(client=None, thresholds=None):
     client.publish_status("system-health", payload)
 
     created_task_id = None
-    if health["status"] == "critical":
+    # Deduplikacja PER DZIEŃ (ten sam wzorzec co kacper_monitor.py) — żywy bug
+    # 26.08.2026, znaleziony w audycie: bez tego KAŻDY przebieg ze status=critical
+    # tworzył NOWE zadanie w Projectly, nawet gdy poprzednie jeszcze nie zostało
+    # obsłużone — 10 prawie identycznych "Alert: stan maszyny..." w 20 minut,
+    # podczas gdy RAM spadał do wyczerpania (maszyna finalnie padła).
+    dedup_key = f"critical:{_today_key()}"
+    if health["status"] == "critical" and dedup_key not in state["alert_tasks"]:
         # create_task w realnym Projectly wymaga project_id; ten alert nie ma
         # naturalnego projektu źródłowego, więc bierzemy skonfigurowany
         # default_admin_project. Fail-closed: bez niego NIE zgadujemy projektu,
@@ -118,8 +145,15 @@ def run_health_check(client=None, thresholds=None):
                 assigned_to=thresholds.get("alert_assignee", "pawel"),
                 project_id=admin_project_id,
             )
+            state["alert_tasks"][dedup_key] = created_task_id
+            _save_state(state, state_path)
         else:
             print("[system_health_monitor] Brak default_admin_project — NIE tworzę zadania w Projectly.")
+    elif health["status"] == "ok" and dedup_key in state["alert_tasks"]:
+        # Zdrowie wróciło do normy — kolejny epizod critical (nawet tego samego
+        # dnia) ma prawo dostać NOWE zadanie, nie zlewać się z poprzednim.
+        del state["alert_tasks"][dedup_key]
+        _save_state(state, state_path)
 
     return {"snapshot": snapshot, "health": health, "created_task_id": created_task_id}
 

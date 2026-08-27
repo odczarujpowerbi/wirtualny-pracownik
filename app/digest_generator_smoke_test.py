@@ -8,7 +8,9 @@ Bez sieci i bez Projectly — testowane są czyste funkcje renderujące
 (sharepoint_folder_url / format_done_task / build_digest), nie klient MCP.
 """
 
+import tempfile
 from datetime import date
+from pathlib import Path
 
 import digest_generator
 from digest_generator import build_digest, format_done_task, sharepoint_folder_url, split_tasks
@@ -91,6 +93,89 @@ def test_production_mapping_has_only_absolute_https_urls():
     print(f"OK  wszystkie {len(digest_generator.SHAREPOINT_FOLDER_LINKS)} wpisów mapowania to poprawne adresy https bez spacji")
 
 
+class _FakeClient:
+    """Atrapa Projectly — śledzi create_task/post_comment, żeby sprawdzić GDZIE
+    realnie ląduje digest (żywy bug 26.08.2026, znaleziony w audycie 27.08.2026:
+    generate_digest publikował komentarz na zmyślonym task_id "DIGEST-ALL",
+    który nigdy nie był tworzony jako realne zadanie — digest nigdy nie docierał
+    do człowieka, mimo że kod nie rzucał żadnego wyjątku)."""
+    def __init__(self, admin_project_id="ADMIN-PROJ"):
+        self.created_tasks = []
+        self.comments = []
+        self._admin_project_id = admin_project_id
+
+    def list_tasks(self, project_id=None):
+        return []
+
+    def create_task(self, title, description, assigned_to=None, project_id=None, **kwargs):
+        task_id = f"DIGEST-TASK-{len(self.created_tasks) + 1:03d}"
+        self.created_tasks.append({"task_id": task_id, "title": title, "project_id": project_id})
+        return task_id
+
+    def default_admin_project_id(self):
+        return self._admin_project_id
+
+    def post_comment(self, task_id, text):
+        self.comments.append((task_id, text))
+        return True
+
+
+def _temp_ids_path():
+    return Path(tempfile.mkdtemp()) / "digest_task_ids.json"
+
+
+def test_generate_digest_posts_to_a_real_created_task_not_a_made_up_id():
+    client = _FakeClient()
+    path = _temp_ids_path()
+    original = digest_generator.DIGEST_TASK_IDS_PATH
+    digest_generator.DIGEST_TASK_IDS_PATH = path
+    try:
+        digest_generator.generate_digest(client=client, today=date(2026, 8, 17))
+    finally:
+        digest_generator.DIGEST_TASK_IDS_PATH = original
+
+    assert len(client.created_tasks) == 1, "pierwsze wywołanie musi utworzyć REALNE zadanie-kanał"
+    real_task_id = client.created_tasks[0]["task_id"]
+    assert not real_task_id.startswith("DIGEST-ALL"), "task_id musi pochodzić z create_task, nie być zmyślony"
+    assert len(client.comments) == 1
+    assert client.comments[0][0] == real_task_id, "komentarz z digestem musi trafić na TO SAMO realne zadanie"
+    print("OK  generate_digest publikuje na realnym zadaniu utworzonym przez create_task, nie na zmyślonym ID")
+
+
+def test_digest_task_created_once_then_reused():
+    client = _FakeClient()
+    path = _temp_ids_path()
+    original = digest_generator.DIGEST_TASK_IDS_PATH
+    digest_generator.DIGEST_TASK_IDS_PATH = path
+    try:
+        digest_generator.generate_digest(client=client, today=date(2026, 8, 17))
+        digest_generator.generate_digest(client=client, today=date(2026, 8, 18))
+        digest_generator.generate_digest(client=client, today=date(2026, 8, 19))
+    finally:
+        digest_generator.DIGEST_TASK_IDS_PATH = original
+
+    assert len(client.created_tasks) == 1, "zadanie-kanał tworzone RAZ, kolejne przebiegi tylko komentują"
+    assert len(client.comments) == 3, "każdy przebieg dopisuje komentarz na tym samym zadaniu"
+    assert all(tid == client.created_tasks[0]["task_id"] for tid, _ in client.comments)
+    print("OK  zadanie-kanał digestu tworzone raz, kolejne przebiegi tylko komentują (nie mnożą zadań)")
+
+
+def test_digest_fails_soft_without_any_project():
+    client = _FakeClient(admin_project_id=None)
+    path = _temp_ids_path()
+    original = digest_generator.DIGEST_TASK_IDS_PATH
+    digest_generator.DIGEST_TASK_IDS_PATH = path
+    try:
+        text = digest_generator.generate_digest(client=client, today=date(2026, 8, 17))
+    finally:
+        digest_generator.DIGEST_TASK_IDS_PATH = original
+
+    assert len(client.created_tasks) == 0
+    assert len(client.comments) == 0
+    assert text, "digest jako tekst musi się nadal wygenerować, nawet gdy nie ma gdzie go opublikować"
+    print("OK  brak project_id i default_admin_project -> fail-soft, digest zwrócony ale nie opublikowany")
+
+
 if __name__ == "__main__":
     test_exact_task_id_wins_over_keyword()
     test_exact_title_match()
@@ -100,4 +185,7 @@ if __name__ == "__main__":
     test_format_done_task_without_mapping_has_no_link()
     test_build_digest_uses_production_mapping()
     test_production_mapping_has_only_absolute_https_urls()
-    print("\nWszystkie testy mapowania SharePoint w digeście przeszły.")
+    test_generate_digest_posts_to_a_real_created_task_not_a_made_up_id()
+    test_digest_task_created_once_then_reused()
+    test_digest_fails_soft_without_any_project()
+    print("\nWszystkie testy digest_generator przeszły.")

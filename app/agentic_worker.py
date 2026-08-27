@@ -64,7 +64,15 @@ def _odmowa(powod, cost_usd=0.0):
 
 
 def _nie_wykonano(powod, cost_usd=0.0, output=None):
-    return {"cost_usd": cost_usd, "tool": "agentic_task", "executed": True,
+    """executed=False (nie True) — zgodnie z kontraktem modułu (patrz docstring
+    na górze pliku): błąd wykonania subagenta / brak pliku wyniku to awaria
+    TOOLINGU (subprocess padł, albo nic nie zapisał), nie brak danych źródłowych
+    (to inna kategoria niż np. integracje_worker._nie_wykonano dla "źródło nie
+    ma odpowiedzi" — tam executed=True jest celowe). Realny bug 27.08.2026,
+    znaleziony w audycie: executed=True tutaj wyłączało eskalację w
+    runner_loop.py (`execution_result.get("executed") is False`), więc
+    prawdziwe awarie subagenta mogły cicho zamykać się jako "done"."""
+    return {"cost_usd": cost_usd, "tool": "agentic_task", "executed": False,
             "acceptance_notes": "NIE WYKONANO — " + powod, "output": output or {}}
 
 

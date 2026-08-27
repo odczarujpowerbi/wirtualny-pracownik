@@ -69,10 +69,16 @@ def run():
             return _Wynik()
         agentic_worker.subprocess.run = _fake_run_error
         wynik_blad = agentic_worker.run(TASK, THINKING_OK)
-        checks.append(("subprocess zwraca kod 1 -> executed=True, 'NIE WYKONANO'",
-                       wynik_blad["executed"] is True and "NIE WYKONANO" in wynik_blad["acceptance_notes"]))
+        # executed=False (NIE True) — zgodnie z kontraktem modułu (docstring: "błąd
+        # wykonania ... -> executed=False ... runner_loop.py eskaluje wprost").
+        # Realny bug 27.08.2026 (znaleziony w audycie): ten test wcześniej asercjował
+        # executed=True, czyli UTRWALAŁ złe zachowanie zamiast je złapać — awaria
+        # subagenta (zły kod wyjścia) mogła cicho zamknąć się jako "done" zamiast
+        # trafić do człowieka.
+        checks.append(("subprocess zwraca kod 1 -> executed=False (eskalacja w runner_loop), 'NIE WYKONANO'",
+                       wynik_blad["executed"] is False and "NIE WYKONANO" in wynik_blad["acceptance_notes"]))
 
-        # 5. Sukces, ale subagent nie zostawił wynik.md -> NIE WYKONANO.
+        # 5. Sukces, ale subagent nie zostawił wynik.md -> NIE WYKONANO, executed=False.
         def _fake_run_no_file(cmd, **kwargs):
             class _Wynik:
                 returncode = 0
@@ -81,8 +87,8 @@ def run():
             return _Wynik()
         agentic_worker.subprocess.run = _fake_run_no_file
         wynik_brak_pliku = agentic_worker.run(TASK, THINKING_OK)
-        checks.append(("Kod 0 ale brak wynik.md -> 'NIE WYKONANO'",
-                       "NIE WYKONANO" in wynik_brak_pliku["acceptance_notes"]))
+        checks.append(("Kod 0 ale brak wynik.md -> executed=False, 'NIE WYKONANO'",
+                       wynik_brak_pliku["executed"] is False and "NIE WYKONANO" in wynik_brak_pliku["acceptance_notes"]))
 
         # 6. Happy path: subprocess "tworzy" wynik.md w cwd, komenda ma właściwe flagi.
         captured = {}

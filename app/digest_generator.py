@@ -14,12 +14,19 @@ digest (naprawdę "co zrobiono w ostatnim tygodniu") wymaga pola
 completedAt z tamtego dokumentu.
 """
 
+import json
 from datetime import date, datetime, timezone
+from pathlib import Path
 
 from projectly_client import get_client
 
 DONE_STATUSES = {"done"}
 OPEN_STATUSES = {"todo", "in_progress"}
+
+# Mapowanie project_id ("ALL" dla wszystkich projektów naraz) -> id REALNEGO
+# zadania w Projectly, na którym digest jest publikowany jako komentarz.
+# Zadanie jest tworzone RAZ (patrz _digest_task_id) i zapamiętywane tu trwale.
+DIGEST_TASK_IDS_PATH = Path(__file__).parent / "runs" / "digest_task_ids.json"
 
 # Adres biblioteki dokumentów agenta na SharePoint — ten sam, co w
 # config/sharepoint.yaml (site_host + site_path + library). Trzymany jako
@@ -150,14 +157,67 @@ def build_digest(split, project_label="wszystkie projekty"):
     return "\n".join(lines)
 
 
+def _wczytaj_id_zadan_digestu(path=None):
+    # path=None -> DIGEST_TASK_IDS_PATH odczytane TERAZ, nie przy definicji
+    # funkcji — wartość domyślna parametru wiąże się RAZ, przy imporcie modułu,
+    # więc podmiana digest_generator.DIGEST_TASK_IDS_PATH w teście (ten sam
+    # wzorzec co state_store.DB_PATH) inaczej by nie zadziałała.
+    path = path or DIGEST_TASK_IDS_PATH
+    if path.exists():
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            pass
+    return {}
+
+
+def _zapisz_id_zadan_digestu(mapowanie, path=None):
+    path = path or DIGEST_TASK_IDS_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(mapowanie, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _digest_task_id(client, project_id, path=None):
+    """ID REALNEGO zadania w Projectly, na którym publikowany jest digest dla
+    danego project_id ("ALL" = wszystkie projekty naraz) — tworzone RAZ, potem
+    tylko aktualizowane komentarzem. Bez tego post_comment() celował w
+    zmyślony, nigdy nie istniejący task_id (żywy bug 26.08.2026, znaleziony w
+    audycie 27.08.2026: digest nigdy realnie nie docierał do człowieka, mimo
+    że job_scheduler zawsze raportował status=ok).
+
+    Fail-soft: brak project_id I brak default_admin_project -> None (digest
+    zostaje tylko zwróconą wartością/logiem, nie próbujemy zgadywać projektu)."""
+    klucz = project_id or "ALL"
+    mapowanie = _wczytaj_id_zadan_digestu(path)
+    if klucz in mapowanie:
+        return mapowanie[klucz]
+
+    docelowy_projekt = project_id or client.default_admin_project_id()
+    if not docelowy_projekt:
+        print(f"[digest_generator] Brak project_id i default_admin_project dla '{klucz}' "
+              "— NIE tworzę zadania-kanału w Projectly.")
+        return None
+
+    nowy_id = client.create_task(
+        f"Digest aktywności — {klucz}",
+        "Cykliczny digest aktywności (digest_generator.py) — aktualizowany komentarzami, "
+        "nie zadanie do wykonania.",
+        assigned_to="unassigned_pool", project_id=docelowy_projekt,
+    )
+    mapowanie[klucz] = nowy_id
+    _zapisz_id_zadan_digestu(mapowanie, path)
+    return nowy_id
+
+
 def generate_digest(client=None, project_id=None, project_label=None, today=None):
     client = client or get_client()
     tasks = client.list_tasks(project_id=project_id)
     split = split_tasks(tasks, today=today)
     text = build_digest(split, project_label=project_label or (project_id or "wszystkie projekty"))
 
-    digest_task_id = f"DIGEST-{(project_id or 'ALL').upper()}"
-    client.post_comment(digest_task_id, text)
+    digest_task_id = _digest_task_id(client, project_id)
+    if digest_task_id:
+        client.post_comment(digest_task_id, text)
     return text
 
 

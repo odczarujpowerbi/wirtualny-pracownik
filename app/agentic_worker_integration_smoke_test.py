@@ -149,6 +149,38 @@ def run():
                        and ("zastrzeże" in tekst_komentarzy.lower() or "eskal" in tekst_komentarzy.lower()
                             or "brak" in tekst_komentarzy.lower() or "zabrak" in tekst_komentarzy.lower()
                             or result2.get("status") == "needs_approval")))
+
+        # --- Scenariusz 3: subagent DOSTAJE zielone światło (plan zaakceptowany),
+        # ale sam subprocess Claude Code pada (zły kod wyjścia) -> MUSI eskalować,
+        # nie zamknąć się cicho jako 'done'. Realny bug 27.08.2026 (znaleziony w
+        # audycie): agentic_worker._nie_wykonano() ustawiał executed=True dla
+        # tego przypadku, więc runner_loop.py NIGDY nie wchodził w gałąź
+        # `execution_result.get("executed") is False` — zadanie leciało dalej
+        # normalną ścieżką (żółte -> bramka, albo zielone bez efektu -> auto-done)
+        # z mylącym komentarzem "zielone bez efektu", tracąc informację, że
+        # subagent w ogóle nie wykonał zadania.
+        def _fake_subprocess_run_subagent_pada(cmd, **kwargs):
+            class _Wynik:
+                returncode = 0
+                stdout = PLAN_TEXT
+                stderr = ""
+            if "--permission-mode" in cmd:
+                wynik = _Wynik()
+                wynik.returncode = 1
+                wynik.stderr = "błąd wykonania (symulowany)"
+                return wynik
+            return _Wynik()
+        task_thinker.ask_model = _fake_ask_model_factory(wynik_aligned=True)
+        task_thinker.subprocess.run = _fake_subprocess_run_subagent_pada
+        client3 = MockProjectlyClient()
+        client3._created_tasks_path = tmp / "created3.json"
+        client3._comments_path = tmp / "comments3.json"
+        client3._feedback_path = tmp / "feedback3.json"
+        client3._agent_status_path = tmp / "agent_status3.json"
+        task3 = dict(TASK, task_id="T-SUBAGENT-PADA")
+        result3 = runner_loop.process_task(task3, policy, routing, client3)
+        checks.append(("Subagent pada (zły exit code) -> needs_approval, NIGDY cichy 'done'",
+                       result3.get("status") == "needs_approval"))
     finally:
         task_thinker.ask_model = original_ask_model
         task_thinker._find_claude = original_find_claude
