@@ -211,8 +211,12 @@ def run(task, thinking, client=None):
     cost_wykonania = cost_estimator.estimate_call("claude_code") + ocena_planu["cost_usd"]
 
     if result.returncode != 0:
-        return _nie_wykonano(f"subagent zwrócił kod {result.returncode}: "
-                             f"{(result.stderr or '').strip()[:300]}",
+        # stderr I stdout — niektóre błędy CLI (np. wyczerpane usage credits)
+        # trafiają na stdout, nie stderr (ten sam wzorzec naprawiony 27.08.2026
+        # w task_thinker.py i repo_auto_improver.py — bez tego prawdziwa
+        # przyczyna awarii bywa całkowicie niewidoczna w logu).
+        tresc_bledu = (result.stderr or "").strip() or (result.stdout or "").strip()
+        return _nie_wykonano(f"subagent zwrócił kod {result.returncode}: {tresc_bledu[:300]}",
                              cost_usd=cost_wykonania)
 
     wynik_path = folder / RESULT_FILENAME

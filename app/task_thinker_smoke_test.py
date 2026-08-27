@@ -50,6 +50,20 @@ def run():
         task_thinker._think_via_claude_code("claude", "prompt", "nieznany.caller")
         checks.append(("CLI: nieznany caller -> fail-closed na opus-5",
                        "claude-opus-5" in captured["cmd"]))
+
+        # Błąd CLI trafia na stdout, nie stderr (żywy bug 27.08.2026: "You're out
+        # of usage credits..." było całkowicie niewidoczne, bo detail sprawdzał
+        # tylko stderr — KAŻDE zadanie degradowało się bez śladu przyczyny).
+        def _fake_run_blad_na_stdout(cmd, **kwargs):
+            class _Wynik:
+                returncode = 1
+                stdout = "You're out of usage credits."
+                stderr = ""
+            return _Wynik()
+        task_thinker.subprocess.run = _fake_run_blad_na_stdout
+        wynik_bledu = task_thinker._think_via_claude_code("claude", "prompt", "task_thinker.think")
+        checks.append(("CLI: błąd na stdout (pusty stderr) trafia do detail, nie ginie",
+                       "usage credits" in wynik_bledu["detail"]))
     finally:
         task_thinker.subprocess.run = original_run
 

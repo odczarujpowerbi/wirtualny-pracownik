@@ -78,6 +78,19 @@ def run():
         checks.append(("subprocess zwraca kod 1 -> executed=False (eskalacja w runner_loop), 'NIE WYKONANO'",
                        wynik_blad["executed"] is False and "NIE WYKONANO" in wynik_blad["acceptance_notes"]))
 
+        # 4b. Błąd trafia na stdout, nie stderr (żywy bug 27.08.2026 — "You're out
+        # of usage credits..." było niewidoczne, bo powód sprawdzał tylko stderr).
+        def _fake_run_error_stdout(cmd, **kwargs):
+            class _Wynik:
+                returncode = 1
+                stdout = "You're out of usage credits."
+                stderr = ""
+            return _Wynik()
+        agentic_worker.subprocess.run = _fake_run_error_stdout
+        wynik_blad_stdout = agentic_worker.run(TASK, THINKING_OK)
+        checks.append(("Błąd na stdout (pusty stderr) trafia do acceptance_notes, nie ginie",
+                       "usage credits" in wynik_blad_stdout["acceptance_notes"]))
+
         # 5. Sukces, ale subagent nie zostawił wynik.md -> NIE WYKONANO, executed=False.
         def _fake_run_no_file(cmd, **kwargs):
             class _Wynik:

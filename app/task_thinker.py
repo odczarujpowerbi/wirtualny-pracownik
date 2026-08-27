@@ -101,8 +101,14 @@ def _think_via_claude_code(claude_exe, prompt, caller, cwd=None):
         env=env,
     )
     if result.returncode != 0:
+        # stderr I stdout — niektóre błędy CLI (np. wyczerpane usage credits)
+        # trafiają na stdout, nie stderr. Żywy bug 27.08.2026: prawdziwa
+        # przyczyna ("You're out of usage credits...") była całkowicie
+        # niewidoczna w logu (tylko stderr sprawdzany, puste), przez co KAŻDE
+        # zadanie od restartu schedulera degradowało się bez śladu przyczyny.
+        tresc_bledu = (result.stderr or "").strip() or (result.stdout or "").strip()
         return {"available": True, "ok": False, "reasoning": None,
-                "detail": f"claude -p zwrócił kod {result.returncode}: {(result.stderr or '').strip()[:300]}",
+                "detail": f"claude -p zwrócił kod {result.returncode}: {tresc_bledu[:300]}",
                 "cost_usd": cost, "source": "claude_code", "model": model}
     return {"available": True, "ok": True, "reasoning": (result.stdout or "").strip(),
             "detail": "OK", "cost_usd": cost, "source": "claude_code", "model": model}
