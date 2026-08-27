@@ -221,6 +221,34 @@ def run():
         checks.append(("cykl 3: te same zadania nie są naprawiane drugi raz",
                        len(wynik_cyklu_3["naprawiono"]) == 0))
 
+        # --- 7b. run_repo_improvement_cycle: "brak_akcji" (awaria NARZĘDZIA) jest
+        # ponawiane, NIE blokowane trwale jak "brak_zmian" — żywy bug 25-26.08.2026
+        # (znaleziony w audycie 27.08.2026): 142 zadania padłe przez brak usunięcia
+        # ANTHROPIC_API_KEY nigdy nie zostałyby ponowione mimo naprawy tego buga,
+        # bo "brak_akcji" trafiało do `reviewed` na równi z "brak_zmian".
+        retry_state_path = tmp / "retry_state.json"
+        cursor_retry = state_store.max_event_id()
+        retry_state_path.write_text(
+            json.dumps({"last_event_id": cursor_retry, "reviewed": {}, "kolejka": []}), encoding="utf-8")
+        _zapisz_zdarzenia_needs_approval("T-BRAK-AKCJI", now)
+
+        rai._uruchom_subagenta = lambda worktree, prompt: {
+            "executed": False, "powod": "symulowana awaria narzędzia (np. subagent chwilowo niedostępny)"}
+        fake_client_retry = _FakeProjectlyClient()
+        for i in range(rai.MAX_PROB_BRAK_AKCJI):
+            wynik_retry = rai.run_repo_improvement_cycle(state_path=retry_state_path, limit=1, client=fake_client_retry)
+            checks.append((f"retry brak_akcji: próba {i + 1}/{rai.MAX_PROB_BRAK_AKCJI} faktycznie podjęta",
+                           len(wynik_retry["naprawiono"]) == 1
+                           and wynik_retry["naprawiono"][0]["akcja"] == "brak_akcji"))
+        stan_po_probach = json.loads(retry_state_path.read_text(encoding="utf-8"))
+        checks.append((f"retry brak_akcji: po {rai.MAX_PROB_BRAK_AKCJI} próbach -> trwale w reviewed, nie w kolejce",
+                       "T-BRAK-AKCJI" in stan_po_probach["reviewed"]
+                       and "T-BRAK-AKCJI" not in stan_po_probach.get("kolejka", [])))
+
+        wynik_po_limicie = rai.run_repo_improvement_cycle(state_path=retry_state_path, limit=1, client=fake_client_retry)
+        checks.append(("retry brak_akcji: po wyczerpaniu prób KOLEJNY cykl już NIC nie robi (nie ponawia w nieskończoność)",
+                       len(wynik_po_limicie["naprawiono"]) == 0))
+
         # --- 8. _uruchom_subagenta: woła Claude Code z --model (Fable 5) i Skill ---
         captured_cmd = {}
         captured_env = {}
@@ -258,14 +286,23 @@ def run():
             (folder_zadania / "wynik_T-ONEDRIVE.pdf").write_bytes(b"%PDF-fake")
             os.environ["ONEDRIVE_TASKS_ROOT"] = str(onedrive_tmp)
 
-            tresc = rai._plik_wyniku_tekst("T-ONEDRIVE")
+            tresc = rai._plik_wyniku_tekst({"task_id": "T-ONEDRIVE"})
             checks.append(("_plik_wyniku_tekst: treść .md dołączona wprost", "Treść realnego wyniku" in tresc))
             checks.append(("_plik_wyniku_tekst: plik binarny tylko odnotowany z nazwy",
                            "wynik_T-ONEDRIVE.pdf" in tresc and "%PDF-fake" not in tresc))
 
+            # Podzadanie (parent_task_id ustawione) -> szuka folderu RODZICA, nie
+            # swojego id (żywy bug 26.08.2026, znaleziony w audycie 27.08.2026:
+            # runner_loop._save_result_to_onedrive zapisuje wynik podzadania do
+            # folderu rodzica, wcześniejsza wersja szukała po własnym task_id i
+            # zawsze cicho dostawała "").
+            tresc_podzadania = rai._plik_wyniku_tekst({"task_id": "T-SUBTASK", "parent_task_id": "T-ONEDRIVE"})
+            checks.append(("_plik_wyniku_tekst: podzadanie znajduje wynik w folderze RODZICA",
+                           "Treść realnego wyniku" in tresc_podzadania))
+
             del os.environ["ONEDRIVE_TASKS_ROOT"]
             checks.append(("_plik_wyniku_tekst: brak ONEDRIVE_TASKS_ROOT -> fail-soft ''",
-                           rai._plik_wyniku_tekst("T-ONEDRIVE") == ""))
+                           rai._plik_wyniku_tekst({"task_id": "T-ONEDRIVE"}) == ""))
         finally:
             if original_onedrive_root is None:
                 os.environ.pop("ONEDRIVE_TASKS_ROOT", None)

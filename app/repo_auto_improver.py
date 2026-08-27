@@ -59,6 +59,11 @@ RESULT_FILENAME = "AUTO_FIX_SUMMARY.md"
 # (tekst). Dla innych (.pdf/.docx/.xlsx) odnotowujemy tylko nazwę — bez nowej
 # zależności do parsowania, której dziś nie ma w requirements.txt.
 _ROZSZERZENIA_TEKSTOWE = (".md", ".txt")
+# Ile razy ponowić naprawę zadania, które padło z powodu awarii NARZĘDZIA
+# (akcja="brak_akcji"), zanim uznamy to za permanentne i przestaniemy próbować
+# (np. subagent trwale niedostępny) — nie chcemy zapętlić się w nieskończoność
+# na jednym uporczywie zawodzącym task_id.
+MAX_PROB_BRAK_AKCJI = 3
 
 
 def _load_state(path=STATE_PATH):
@@ -150,17 +155,27 @@ def _posprzataj_worktree(worktree, branch):
     _run(["git", "-C", str(REPO_DIR), "branch", "-D", branch], timeout=60)
 
 
-def _plik_wyniku_tekst(task_id):
+def _plik_wyniku_tekst(task):
     """Treść realnego pliku wyniku zadania z OneDrive (dowód, nie tylko log
-    zdarzeń) — ten sam folder, który zapisuje runner_loop._save_result_to_onedrive
-    (prefiks task_id w nazwie folderu). Pliki .md/.txt wchodzą wprost, dla
-    .pdf/.docx/.xlsx odnotowujemy tylko nazwę (bez nowej zależności do
-    parsowania). Fail-soft: brak ONEDRIVE_TASKS_ROOT/folderu/błąd -> ""."""
+    zdarzeń) — ten sam folder, który zapisuje runner_loop._save_result_to_onedrive.
+
+    Przyjmuje CAŁE zadanie (nie sam task_id): podzadanie (task["parent_task_id"]
+    ustawione) NIE dostaje własnego folderu — runner_loop._save_result_to_onedrive
+    zapisuje jego wynik do folderu RODZICA (effective_id = parent_task_id or
+    task_id, patrz runner_loop.py). Żywy bug 26.08.2026, znaleziony w audycie
+    27.08.2026: szukanie po WŁASNYM task_id podzadania zawsze cicho zwracało ''
+    (fail-soft bez wyjątku) — subagent naprawiający kod nigdy nie widział
+    realnej treści wyniku dla flagowanych podzadań, tylko log zdarzeń.
+
+    Pliki .md/.txt wchodzą wprost, dla .pdf/.docx/.xlsx odnotowujemy tylko nazwę
+    (bez nowej zależności do parsowania). Fail-soft: brak ONEDRIVE_TASKS_ROOT/
+    folderu/błąd -> ""."""
     root = os.environ.get("ONEDRIVE_TASKS_ROOT")
     if not root:
         return ""
+    effective_id = task.get("parent_task_id") or task.get("task_id")
     try:
-        foldery = sorted(Path(root).glob(f"{task_id}_*"))
+        foldery = sorted(Path(root).glob(f"{effective_id}_*"))
         if not foldery:
             return ""
         czesci = []
@@ -230,8 +245,14 @@ def _uruchom_subagenta(worktree, prompt):
     except (subprocess.TimeoutExpired, OSError) as exc:
         return {"executed": False, "powod": f"Subagent nie powiódł się: {exc}"}
     if result.returncode != 0:
+        # stderr I stdout — niektóre błędy Claude Code CLI (np. komunikaty
+        # połączenia/uprawnień) trafiają na stdout, nie stderr. Żywy bug
+        # 27.08.2026, znaleziony przy diagnozowaniu KOLEJNEGO błędu po naprawie
+        # ANTHROPIC_API_KEY: komunikat błędu był pusty (tylko stderr sprawdzany),
+        # więc niemożliwe było zdiagnozować, co faktycznie poszło nie tak.
+        tresc_bledu = (result.stderr or "").strip() or (result.stdout or "").strip()
         return {"executed": False,
-                "powod": f"Subagent zwrócił kod {result.returncode}: {(result.stderr or '').strip()[:300]}"}
+                "powod": f"Subagent zwrócił kod {result.returncode}: {tresc_bledu[:300]}"}
     return {"executed": True}
 
 
@@ -303,7 +324,7 @@ def napraw_zadanie(task_id, powod, historia):
         return {"task_id": task_id, "akcja": "brak_akcji", "powod": f"Przygotowanie worktree nie powiodło się: {exc}"}
 
     try:
-        plik_wyniku = _plik_wyniku_tekst(task_id)
+        plik_wyniku = _plik_wyniku_tekst(task)
         wynik_subagenta = _uruchom_subagenta(worktree, _zbuduj_prompt(task, powod, historia, plik_wyniku))
         if not wynik_subagenta["executed"]:
             return {"task_id": task_id, "akcja": "brak_akcji", "powod": wynik_subagenta["powod"]}
@@ -362,17 +383,38 @@ def run_repo_improvement_cycle(state_path=STATE_PATH, limit=1, client=None):
             reviewed[task_id] = "brak_sygnalu"
     state["last_event_id"] = new_last_id
 
+    retry_counts = state.setdefault("retry_counts", {})
     naprawiono = []
     while kolejka and len(naprawiono) < limit:
         task_id = kolejka.pop(0)
         powod, historia = sygnal_problemu(task_id)
         if not powod:
             reviewed[task_id] = "brak_sygnalu"
+            retry_counts.pop(task_id, None)
             continue
         wynik = napraw_zadanie(task_id, powod, historia)
         _zaloguj_wynik(client, task_id, wynik)
-        reviewed[task_id] = wynik.get("akcja", "?")
         naprawiono.append(wynik)
+
+        if wynik.get("akcja") == "brak_akcji":
+            # Awaria NARZĘDZIA (np. subagent chwilowo niedostępny), nie decyzja
+            # "nic do naprawy" — kwalifikuje się do ponownej próby, nie
+            # permanentnego zablokowania. Żywy bug 25-26.08.2026 (znaleziony w
+            # audycie 27.08.2026): 142 zadania padły przez brak usunięcia
+            # ANTHROPIC_API_KEY ze środowiska subprocesu i ŻADNE z nich nigdy
+            # nie zostałoby ponowione, mimo że bug został naprawiony — bo
+            # "brak_akcji" trafiał do `reviewed` na równi z "brak_zmian"
+            # (subagent faktycznie uznał, że nie ma czego poprawiać).
+            proby = retry_counts.get(task_id, 0) + 1
+            retry_counts[task_id] = proby
+            if proby < MAX_PROB_BRAK_AKCJI:
+                kolejka.append(task_id)
+            else:
+                reviewed[task_id] = wynik.get("akcja", "?")
+                del retry_counts[task_id]
+        else:
+            reviewed[task_id] = wynik.get("akcja", "?")
+            retry_counts.pop(task_id, None)
 
     _save_state(state, state_path)
     return {"events_scanned": len(events), "naprawiono": naprawiono, "w_kolejce": len(kolejka)}
