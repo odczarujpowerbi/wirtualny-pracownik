@@ -38,6 +38,7 @@ import live_status_publisher
 import output_decider
 import risk_classifier
 import risk_hint
+import sharepoint_link
 import skill_usage_logger
 import state_store
 import task_decomposer
@@ -388,10 +389,19 @@ def _process_task_core(task, policy, routing, client):
     if reasoning:
         comment += "\n\n🧠 Analiza (Claude):\n" + reasoning
 
+    # Zapis do OneDrive PRZED komentarzem (kolejność zmieniona 29.08.2026,
+    # decyzja właściciela: chce od razu, wchodząc w zadanie, mieć klikalny link
+    # do folderu z materiałami — bez tego trzeba było szukać folderu ręcznie po
+    # task_id). Plik w folderze budowany jest z `comment` SPRZED doklejenia tego
+    # linku (nie ma sensu, żeby plik linkował do samego siebie).
+    folder = _save_result_to_onedrive(task, status, comment, execution_result)
+    link = sharepoint_link.folder_url(folder)
+    if link:
+        comment += f"\n\n📁 Materiały: {link}"
+
     client.post_comment(task_id, comment)
     client.update_status(task_id, status)
     _zapisz_feedback(client, task_id, status, execution_result, risk)
-    _save_result_to_onedrive(task, status, comment, execution_result)
 
     return {"task_id": task_id, "risk": risk, "owner": owner, "status": status}
 

@@ -133,6 +133,15 @@ def run():
         checks.append(("Happy path: folder roboczy subagenta powstał pod runs/agentic_tasks",
                        len(agentic_folders) == 1))
 
+        # Komentarz na zadaniu ma klikalny link do folderu SharePoint z tym samym
+        # zadaniem (decyzja właściciela 29.08.2026: chce od razu, wchodząc w
+        # status zadania, mieć link do materiałów, bez ręcznego szukania folderu).
+        komentarze_done = client._load(client._comments_path, default={})
+        tresc_komentarzy = " ".join(komentarze_done.get("T-REALNY-WYNIK", []))
+        checks.append(("Happy path: komentarz zawiera klikalny link do SharePoint",
+                       "📁 Materiały:" in tresc_komentarzy and "https://" in tresc_komentarzy
+                       and "T-REALNY-WYNIK" in tresc_komentarzy))
+
         # --- Scenariusz 2: content-check ODRZUCA wynik -> NIE może cicho skończyć się 'done' ---
         task_thinker.ask_model = _fake_ask_model_factory(wynik_aligned=False)
         client2 = MockProjectlyClient()
