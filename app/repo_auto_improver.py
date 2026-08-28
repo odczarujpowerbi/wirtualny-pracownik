@@ -44,6 +44,8 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+import cost_estimator
+import cost_tracker
 import model_registry
 import projectly_client
 import state_store
@@ -220,7 +222,16 @@ def _zbuduj_prompt(task, powod, historia, plik_wyniku=""):
     )
 
 
-def _uruchom_subagenta(worktree, prompt):
+def _uruchom_subagenta(worktree, prompt, task_id=None):
+    """task_id: TYLKO do zapisania kosztu (cost_tracker.record_cost) — żywy bug
+    25-27.08.2026: ten moduł NIGDY nie zgłaszał kosztu, więc $200 realnie
+    wydane na drogi model (Fable 5, cofnięte na Opus 5 29.08.2026) było
+    całkowicie niewidoczne w cost_tracker/Projectly. Koszt liczony tym samym
+    proxy co wszędzie indziej (cost_estimator.estimate_call("claude_code") —
+    stały bezpiecznik WOLUMENU wywołań, NIE rzeczywisty rachunek w dolarach;
+    realne saldo trzeba sprawdzać na claude.ai/admin-settings/usage) —
+    zapisywany TYLKO gdy subprocess faktycznie wystartował (nie przy braku
+    Claude Code w ogóle, gdzie żaden koszt nie mógł powstać)."""
     claude_exe = task_thinker._find_claude()
     if not claude_exe:
         return {"executed": False, "powod": "Brak Claude Code (claude login) na tej maszynie."}
@@ -243,7 +254,11 @@ def _uruchom_subagenta(worktree, prompt):
             cwd=worktree, timeout=SUBAGENT_TIMEOUT_SECONDS, env=env,
         )
     except (subprocess.TimeoutExpired, OSError) as exc:
+        # Subprocess FAKTYCZNIE wystartował (mógł zdążyć zużyć tokeny przed
+        # timeoutem/błędem OS) — koszt zapisywany mimo awarii.
+        cost_tracker.record_cost(task_id or "repo_auto_improver", cost_estimator.estimate_call("claude_code"), model)
         return {"executed": False, "powod": f"Subagent nie powiódł się: {exc}"}
+    cost_tracker.record_cost(task_id or "repo_auto_improver", cost_estimator.estimate_call("claude_code"), model)
     if result.returncode != 0:
         # stderr I stdout — niektóre błędy Claude Code CLI (np. komunikaty
         # połączenia/uprawnień) trafiają na stdout, nie stderr. Żywy bug
@@ -325,7 +340,7 @@ def napraw_zadanie(task_id, powod, historia):
 
     try:
         plik_wyniku = _plik_wyniku_tekst(task)
-        wynik_subagenta = _uruchom_subagenta(worktree, _zbuduj_prompt(task, powod, historia, plik_wyniku))
+        wynik_subagenta = _uruchom_subagenta(worktree, _zbuduj_prompt(task, powod, historia, plik_wyniku), task_id)
         if not wynik_subagenta["executed"]:
             return {"task_id": task_id, "akcja": "brak_akcji", "powod": wynik_subagenta["powod"]}
 
@@ -382,6 +397,19 @@ def run_repo_improvement_cycle(state_path=STATE_PATH, limit=1, client=None):
         else:
             reviewed[task_id] = "brak_sygnalu"
     state["last_event_id"] = new_last_id
+
+    # Bezpiecznik budżetu DOBOWEGO — żywy incydent 25-27.08.2026: ten job leci
+    # co 120s i NIGDY nie sprawdzał budżetu, więc dzienny limit kosztowy
+    # (cost_tracker) nie miał żadnego wpływu na jego działanie (miękkie
+    # zatrzymanie w control.py chroni tylko pobieranie NOWYCH zadań w
+    # runner_loop.py, nie pozostałe joby cykliczne — patrz audyt 27.08.2026).
+    # "exceeded" tu wstrzymuje TYLKO fazę NAPRAWY (drogi subagent) — detekcja
+    # powyżej i tak leci dalej, nic nie ginie, tylko czeka do jutra/wyższego limitu.
+    stan_budzetu = cost_tracker.budget_state()
+    if stan_budzetu["level"] == "exceeded":
+        _save_state(state, state_path)
+        return {"events_scanned": len(events), "naprawiono": [], "w_kolejce": len(kolejka),
+                "wstrzymano_budzetem": stan_budzetu}
 
     retry_counts = state.setdefault("retry_counts", {})
     naprawiono = []

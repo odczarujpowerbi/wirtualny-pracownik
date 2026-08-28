@@ -17,23 +17,25 @@
 poziomy:
   high: opus_5
   low: sonnet_4_6
-  # "Agent sterujacy" (decyduje CO ma sie stac z zadaniem, nie wykonuje go
-  # mechanicznie) - decyzja wlasciciela 25.08.2026: przeniesc na Fable 5,
-  # dwa razy drozszy niz Opus 5 ($10/$50 vs $5/$25 za milion tokenow), ale
-  # to jedyne trzy miejsca, ktore decyduja "co to zadanie naprawde znaczy /
-  # jak je rozbic / w jakim formacie oddac wynik" - nie walidatory
+  # "Agent sterujacy" (task_thinker/task_decomposer/output_decider) i
+  # repo_auto_improver byly na Fable 5 (decyzja wlasciciela 25.08.2026) -
+  # COFNIETE 29.08.2026 (decyzja wlasciciela): Fable 5 ($10/$50 za milion
+  # tokenow, dwa razy drozszy niz Opus 5) w polaczeniu z repo_auto_improver.py
+  # dzialajacym co 120s spalilo $200 w kilka godzin BEZ zadnej widocznosci w
+  # Projectly (repo_auto_improver nie zglaszal kosztu do cost_tracker - patrz
+  # osobna poprawka w repo_auto_improver.py). Te cztery miejsca wracaja na
+  # "high"/opus_5, tak jak przed 25.08.2026 - nie walidatory
   # (bot_content_check/bot_oskar_wizja) i nie wykonawca (agentic_worker.run),
-  # te zostaja na "high"/opus_5.
-  steering: fable_5
+  # te i tak juz byly na "high".
 
 tiers:
   # --- mechanizm agenta (task_thinker.py) ---
-  task_thinker.think: steering           # analiza zadania (co rozumiem/plan/ryzyka) - runner_loop
-  output_decider.decide: steering        # wybor formatu pliku wyniku (pdf/docx/md/xlsx) - decyzja per zadanie
-  task_decomposer.decide: steering       # czy rozbic zadanie na podzadania - osad, nie mechaniczne wykonanie
+  task_thinker.think: high               # analiza zadania (co rozumiem/plan/ryzyka) - runner_loop
+  output_decider.decide: high            # wybor formatu pliku wyniku (pdf/docx/md/xlsx) - decyzja per zadanie
+  task_decomposer.decide: high           # czy rozbic zadanie na podzadania - osad, nie mechaniczne wykonanie
   bot_content_check.review: high         # czy plan/wynik faktycznie odpowiada zadaniu - osad
   agentic_worker.run: high                # realne wykonanie z Read/Write/Edit - realne skutki, nie mechaniczne
-  repo_auto_improver.napraw_zadanie: steering  # analiza kodu repo + decyzja co zmienic - osad, jak agent sterujacy
+  repo_auto_improver.napraw_zadanie: high  # analiza kodu repo + decyzja co zmienic - osad, jak agent sterujacy
   web_answer.answer: low                 # pisanie tresci z pobranych danych wg scisle opisanych regul
   poprawka_materialu.popraw: low         # naniesienie konkretnej listy zastrzezen na material
 

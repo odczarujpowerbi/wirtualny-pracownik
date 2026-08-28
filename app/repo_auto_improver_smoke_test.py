@@ -16,6 +16,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+import cost_tracker
 import repo_auto_improver as rai
 import state_store
 import task_thinker
@@ -109,7 +110,7 @@ def run():
     original_uruchom = rai._uruchom_subagenta
     now = "2026-08-25T10:00:00+00:00"
 
-    def _z_podsumowaniem(worktree, prompt):
+    def _z_podsumowaniem(worktree, prompt, task_id=None):
         (worktree / rai.RESULT_FILENAME).write_text("Naprawiono routing MailerLite.", encoding="utf-8")
         return {"executed": True}
 
@@ -156,7 +157,7 @@ def run():
 
         # --- 3. napraw_zadanie: subagent nie znalazł nic do poprawy ---
         rai._run = _fake_run_factory(git_status_stdout="", gh_dostepne=True)
-        rai._uruchom_subagenta = lambda worktree, prompt: {"executed": True}
+        rai._uruchom_subagenta = lambda worktree, prompt, task_id=None: {"executed": True}
         wynik_brak = rai.napraw_zadanie("T-GATE", "bramka_odrzucila", "historia")
         checks.append(("napraw_zadanie: brak zmian -> akcja='brak_zmian'", wynik_brak["akcja"] == "brak_zmian"))
 
@@ -232,7 +233,7 @@ def run():
             json.dumps({"last_event_id": cursor_retry, "reviewed": {}, "kolejka": []}), encoding="utf-8")
         _zapisz_zdarzenia_needs_approval("T-BRAK-AKCJI", now)
 
-        rai._uruchom_subagenta = lambda worktree, prompt: {
+        rai._uruchom_subagenta = lambda worktree, prompt, task_id=None: {
             "executed": False, "powod": "symulowana awaria narzędzia (np. subagent chwilowo niedostępny)"}
         fake_client_retry = _FakeProjectlyClient()
         for i in range(rai.MAX_PROB_BRAK_AKCJI):
@@ -264,8 +265,9 @@ def run():
             rai._uruchom_subagenta(tmp, "prompt testowy")
         finally:
             del rai.os.environ["ANTHROPIC_API_KEY"]
-        checks.append(("_uruchom_subagenta: komenda ma --model claude-fable-5 (tier 'steering')",
-                       "--model" in captured_cmd["cmd"] and "claude-fable-5" in captured_cmd["cmd"]))
+        checks.append(("_uruchom_subagenta: komenda ma --model claude-opus-5 (tier 'high', cofnięte "
+                       "z Fable 5 29.08.2026 - $200 spalone bez widoczności kosztu w Projectly)",
+                       "--model" in captured_cmd["cmd"] and "claude-opus-5" in captured_cmd["cmd"]))
         checks.append(("_uruchom_subagenta: prompt zaraz po --model, PRZED --allowedTools",
                        captured_cmd["cmd"].index("prompt testowy") < captured_cmd["cmd"].index("--allowedTools")))
         checks.append(("_uruchom_subagenta: --allowedTools zawiera Skill",
@@ -313,6 +315,43 @@ def run():
         prompt_testowy = rai._zbuduj_prompt(TASK, "bramka_odrzucila", "historia")
         checks.append(("_zbuduj_prompt: zabrania usuwania plików",
                        "NIGDY nie usuwaj żadnego pliku" in prompt_testowy))
+
+        # --- 11. Koszt FAKTYCZNIE zgłaszany do cost_tracker (żywy bug 25-27.08.2026:
+        # ten moduł nigdy nie zgłaszał kosztu - $200 spalone na Fable 5 bez śladu). ---
+        rai._run = _run_przechwytujacy  # zwraca sukces (kod 0), nie tworzy zmian
+        koszt_przed = cost_tracker.today_total()
+        rai._uruchom_subagenta("T-KOSZT-WORKTREE", "prompt", "T-KOSZT")
+        koszt_po = cost_tracker.today_total()
+        checks.append(("_uruchom_subagenta: realne wywołanie subprocesu zgłasza koszt do cost_tracker",
+                       koszt_po > koszt_przed))
+
+        # Brak Claude Code w ogóle -> subprocess NIGDY nie wystartował -> BRAK kosztu.
+        task_thinker._find_claude = lambda: None
+        koszt_przed2 = cost_tracker.today_total()
+        rai._uruchom_subagenta("T-WORKTREE", "prompt", "T-BRAK-CLAUDE")
+        koszt_po2 = cost_tracker.today_total()
+        checks.append(("_uruchom_subagenta: brak Claude Code -> BRAK zgłoszonego kosztu (zero realnej próby)",
+                       koszt_po2 == koszt_przed2))
+        task_thinker._find_claude = lambda: "claude"
+
+        # --- 12. Bezpiecznik budżetu dobowego: "exceeded" wstrzymuje FAZĘ NAPRAWY
+        # (drogi subagent), detekcja i tak leci dalej, nic nie ginie. ---
+        original_budget_state = rai.cost_tracker.budget_state
+        rai.cost_tracker.budget_state = lambda: {"level": "exceeded", "total": 999.0, "limit": 20.0, "percent": 4995.0}
+        state_path_budzet = tmp / "budzet_state.json"
+        cursor_budzet = state_store.max_event_id()
+        state_path_budzet.write_text(
+            json.dumps({"last_event_id": cursor_budzet, "reviewed": {}, "kolejka": []}), encoding="utf-8")
+        _zapisz_zdarzenia_gate_failed("T-BUDZET", now)
+        try:
+            wynik_budzet = rai.run_repo_improvement_cycle(state_path=state_path_budzet, limit=1,
+                                                           client=_FakeProjectlyClient())
+        finally:
+            rai.cost_tracker.budget_state = original_budget_state
+        checks.append(("Budżet 'exceeded' -> ZERO napraw w tym przebiegu (drogi subagent wstrzymany)",
+                       len(wynik_budzet["naprawiono"]) == 0 and "wstrzymano_budzetem" in wynik_budzet))
+        checks.append(("Budżet 'exceeded' -> zadanie NADAL trafia do kolejki (detekcja leci dalej, nic nie ginie)",
+                       wynik_budzet["w_kolejce"] == 1))
     finally:
         rai._run = original_run
         rai.shutil.which = original_which

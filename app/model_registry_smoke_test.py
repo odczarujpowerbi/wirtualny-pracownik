@@ -25,13 +25,15 @@ def run():
 
     checks.append(("Znany caller z tabeli -> tier zgodny z config/model_tiers.yaml",
                    model_registry.tier_for_caller("web_answer.answer") == "low"
-                   and model_registry.tier_for_caller("task_thinker.think") == "steering"))
+                   and model_registry.tier_for_caller("task_thinker.think") == "high"))
     checks.append(("Agent sterujący (task_thinker.think/task_decomposer.decide/output_decider.decide) "
-                   "-> tier 'steering' -> rola fable_5",
-                   model_registry.tier_for_caller("task_decomposer.decide") == "steering"
-                   and model_registry.tier_for_caller("output_decider.decide") == "steering"
-                   and model_registry.role_for_tier("steering") == "fable_5"
-                   and model_registry.model_id("fable_5") == "claude-fable-5"))
+                   "-> tier 'high' -> rola opus_5 (cofnięte z Fable 5 29.08.2026: $200 spalone przez "
+                   "repo_auto_improver na Fable 5 bez widoczności kosztu w Projectly)",
+                   model_registry.tier_for_caller("task_decomposer.decide") == "high"
+                   and model_registry.tier_for_caller("output_decider.decide") == "high"
+                   and model_registry.tier_for_caller("repo_auto_improver.napraw_zadanie") == "high"
+                   and model_registry.role_for_tier("high") == "opus_5"
+                   and model_registry.model_id("opus_5") == "claude-opus-5"))
     checks.append(("Nieznany caller -> tier 'high' (fail-closed)",
                    model_registry.tier_for_caller("cos.czego.nie.ma") == "high"))
 
