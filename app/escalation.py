@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 
 import email_client
 import state_store
+from projectly_client import PRIORITY_PARKING, effective_priority
 from projectly_client import _load_config as _load_projectly_config
 
 
@@ -101,6 +102,10 @@ def escalate_to_human(task, reason, client, options=None, assignee=None):
         parent_task_id=task["task_id"],
         project_id=task.get("project_id"),
         relation_type="eskalacja",
+        # parking (29.08.2026, decyzja właściciela): zadanie czeka na decyzję
+        # człowieka, więc bot nie ma go samo z siebie odbierać jako "do zrobienia
+        # teraz" — patrz runner_loop._efektywny_priorytet/kolejka po priorytecie.
+        priority=PRIORITY_PARKING,
     )
     now = datetime.now(timezone.utc).isoformat()
     state_store.record_event(task["task_id"], "escalated_to_human", f"{new_id}: {reason}", now)
@@ -152,6 +157,12 @@ def continuation_task_creator(original_task, human_decision_text, client):
         parent_task_id=original_task["task_id"],
         project_id=original_task.get("project_id"),
         relation_type="kontynuacja",
+        # Dziedziczy priorytet oryginalnego zadania (decyzja człowieka je
+        # odblokowała, praca ma wrócić na taki sam poziom pilności jak przed
+        # eskalacją) — fallback "bieżące", gdy oryginał go nie niósł.
+        # effective_priority(), NIE `task.get("priority") or ...` — priority=0
+        # (PARKING) jest falsy i zostałby błędnie podbity do BIEŻĄCE.
+        priority=effective_priority(original_task),
     )
     now = datetime.now(timezone.utc).isoformat()
     state_store.record_event(original_task["task_id"], "continuation_created", new_id, now)

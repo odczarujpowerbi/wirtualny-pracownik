@@ -36,7 +36,7 @@ import json
 from pathlib import Path
 
 from email_draft_generator import generate_draft
-from projectly_client import get_client
+from projectly_client import PRIORITY_BACKLOG, get_client
 
 ASKED_PATH = Path(__file__).parent / "runs" / "feedback_requested.json"
 
@@ -101,6 +101,9 @@ def request_feedback_for_task(task, client=None, send_email=False):
         parent_task_id=task["task_id"],
         project_id=task.get("project_id"),
         relation_type="kontynuacja",
+        # backlog (29.08.2026, decyzja właściciela): prośba o feedback po
+        # fakcie nie jest pilna, nie ma blokować realnej pracy w kolejce bota.
+        priority=PRIORITY_BACKLOG,
     )
 
     email_result = None

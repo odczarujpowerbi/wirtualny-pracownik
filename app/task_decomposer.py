@@ -22,6 +22,7 @@ import json
 import agentic_worker
 import cost_estimator
 import task_thinker
+from projectly_client import effective_priority
 
 MIN_SUBTASKS = 2
 MAX_SUBTASKS = 5
@@ -144,11 +145,19 @@ def decompose(client, task, decyzja):
     w tym samym projekcie co rodzic. Zwraca {"created_ids", "comment"} — komentarz
     do wklejenia na zadaniu głównym, gotowy tekst z listą utworzonych podzadań."""
     project_id = task.get("project_id")
+    # Podzadania dziedziczą priorytet rodzica (29.08.2026, decyzja właściciela)
+    # — rodzic trafił do przetworzenia W TYM cyklu, więc jego priorytet był
+    # (per runner_loop._wybierz_partie_wg_priorytetu) najwyższym obecnym w
+    # kolejce; dzieci mają zostać na tym samym poziomie pilności, nie spaść na
+    # domyślny. effective_priority(), NIE `task.get("priority") or ...` —
+    # priority=0 (PARKING) jest falsy i zostałby błędnie podbity do BIEŻĄCE.
+    priorytet = effective_priority(task)
     created = []
     for i, sub in enumerate(decyzja["subtasks"]):
         child_id = client.create_task(
             sub["title"], sub.get("description") or "", assigned_to="bot",
             subtask_of=task["task_id"], order=i, project_id=project_id,
+            priority=priorytet,
         )
         created.append({"task_id": child_id, "title": sub["title"]})
 

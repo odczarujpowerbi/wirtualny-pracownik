@@ -27,12 +27,13 @@ class _FakeClient:
         self.created = []
         self._next_id = 1
 
-    def create_task(self, title, description, assigned_to, subtask_of=None, order=None, project_id=None):
+    def create_task(self, title, description, assigned_to, subtask_of=None, order=None,
+                    project_id=None, priority=None):
         new_id = f"CHILD-{self._next_id}"
         self._next_id += 1
         self.created.append({"task_id": new_id, "title": title, "description": description,
                              "assigned_to": assigned_to, "subtask_of": subtask_of,
-                             "order": order, "project_id": project_id})
+                             "order": order, "project_id": project_id, "priority": priority})
         return new_id
 
 
@@ -104,6 +105,26 @@ def run():
         checks.append(("decompose: comment wymienia utworzone ID",
                        all(c["task_id"] in wynik["comment"] for c in client.created)))
         checks.append(("decompose: created_ids zwrócone", wynik["created_ids"] == [c["task_id"] for c in client.created]))
+
+        # --- 8. Priorytet podzadań: dziedziczy priorytet rodzica (29.08.2026,
+        # decyzja właściciela) — TASK bez priorytetu -> fallback BIEŻĄCE (4).
+        checks.append(("decompose: rodzic bez priorytetu -> podzadania dostają fallback BIEŻĄCE (4)",
+                       all(c["priority"] == 4 for c in client.created)))
+
+        client_priorytet = _FakeClient()
+        task_z_priorytetem = {**TASK, "priority": 5}
+        task_decomposer.decompose(client_priorytet, task_z_priorytetem, decyzja_ok)
+        checks.append(("decompose: rodzic z priorytetem 5 -> podzadania dziedziczą 5 (nie fallback)",
+                       all(c["priority"] == 5 for c in client_priorytet.created)))
+
+        # --- 8b. Żywy bug znaleziony 29.08.2026: `priority or BIEŻĄCE` traktuje
+        # priority=0 (PARKING) jako falsy i błędnie podbija zaparkowane zadanie
+        # do BIEŻĄCE. Rodzic zaparkowany musi dać podzadania NA PARKING.
+        client_parking = _FakeClient()
+        task_zaparkowany = {**TASK, "priority": 0}
+        task_decomposer.decompose(client_parking, task_zaparkowany, decyzja_ok)
+        checks.append(("decompose: rodzic z priority=0 (PARKING) -> podzadania NIE są podbite do BIEŻĄCE",
+                       all(c["priority"] == 0 for c in client_parking.created)))
     finally:
         task_thinker.ask_model = original_ask_model
 

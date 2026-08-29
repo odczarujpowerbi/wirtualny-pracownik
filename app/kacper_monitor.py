@@ -47,7 +47,7 @@ import yaml
 
 import job_scheduler
 import state_store
-from projectly_client import get_client
+from projectly_client import PRIORITY_PRIORYTET, get_client
 
 STATE_PATH = Path(__file__).parent / "runs" / "kacper_state.json"
 THRESHOLDS_PATH = Path(__file__).parent / "config" / "kacper_thresholds.yaml"
@@ -132,7 +132,10 @@ def _create_repair_task(client, admin_project_id, title, description, assignee):
     if not admin_project_id:
         print(f"[Kacper] Brak default_admin_project — NIE tworzę zadania w Projectly: {title}")
         return None
-    return client.create_task(title, description, assigned_to=assignee, project_id=admin_project_id)
+    # priorytet (29.08.2026, decyzja właściciela): powtarzalna awaria
+    # joba/skilla ma być obsłużona najpierw, przed zwykłą pracą w kolejce.
+    return client.create_task(title, description, assigned_to=assignee, project_id=admin_project_id,
+                              priority=PRIORITY_PRIORYTET)
 
 
 def run_monitor_cycle(client=None, thresholds=None, state_path=STATE_PATH):

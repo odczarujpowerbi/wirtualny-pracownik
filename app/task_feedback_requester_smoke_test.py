@@ -38,8 +38,8 @@ class _FakeClient:
         return True
 
     def create_task(self, title, description, assigned_to, parent_task_id=None,
-                    project_id=None, relation_type="kontynuacja"):
-        self.utworzone.append({"title": title, "parent_task_id": parent_task_id})
+                    project_id=None, relation_type="kontynuacja", priority=None):
+        self.utworzone.append({"title": title, "parent_task_id": parent_task_id, "priority": priority})
         return f"FB-{len(self.utworzone)}"
 
 
@@ -93,6 +93,8 @@ def run():
                        len(wolania_maila) == 0 and wynik["email"] is None))
         checks.append(("request_feedback_for_task: komentarz i zadanie feedbackowe i tak powstają",
                        len(client.komentarze) == 1 and len(client.utworzone) == 1))
+        checks.append(("request_feedback_for_task: zadanie feedbackowe ma priorytet BACKLOG (3)",
+                       client.utworzone[0]["priority"] == tfr.PRIORITY_BACKLOG))
 
         # --- 3. send_email=True jawnie -> mail wołany ---
         wolania_maila.clear()

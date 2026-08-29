@@ -36,6 +36,28 @@ MOCK_TASKS_PATH = Path(__file__).parent / "mock_data" / "sample_tasks.json"
 MOCK_RUNS_DIR = Path(__file__).parent / "runs"
 MAX_COMMENTS_PER_TASK = 200  # rotacja mock_comments.json — patrz post_comment
 
+# Pole "priority" (number) na zadaniu Projectly — 4 poziomy, znaczenie
+# potwierdzone wprost w opisie schematu MCP create_task/update_task
+# (tools/list, 29.08.2026), zgodne z decyzją właściciela o czterech kolumnach
+# roboczych: parking (czeka na decyzję człowieka) / backlog (opcjonalne, może
+# poczekać) / bieżące (normalna praca) / priorytet (najważniejsze, obsłużyć
+# najpierw). runner_loop.py sortuje/dzieli kolejkę bota WYŁĄCZNIE po tym polu
+# (patrz _efektywny_priorytet, PRIORITY_DEFAULT).
+PRIORITY_PARKING = 0
+PRIORITY_BACKLOG = 3
+PRIORITY_BIEZACE = 4
+PRIORITY_PRIORYTET = 5
+
+
+def effective_priority(task, default=PRIORITY_BIEZACE):
+    """Priorytet zadania z bezpiecznym fallbackiem na brak/nienumeryczną wartość.
+    CELOWO NIE `task.get("priority") or default` — priority=0 (PARKING) jest
+    falsy w Pythonie i taki zapis błędnie podbijałby zaparkowane zadanie do
+    domyślnego priorytetu (żywy bug znaleziony 29.08.2026 w task_decomposer.py
+    i escalation.py przy pisaniu tej funkcji)."""
+    priorytet = task.get("priority")
+    return priorytet if isinstance(priorytet, (int, float)) else default
+
 # Projectly zna cztery statusy (todo|in_progress|done|przeniesione — ostatni to
 # natywny status kontenera rozbitego na podzadania, potwierdzony przez właściciela
 # Projectly 24.08.2026, patrz task_decomposer.py). Pipeline używa szerszego zestawu
@@ -423,7 +445,7 @@ class ProjectlyClient:
 
     def create_task(self, title, description, assigned_to, parent_task_id=None, project_id=None,
                     relation_type="eskalacja", expected_result=None, acceptance_criteria=None,
-                    subtask_of=None, order=None, due_date=None):
+                    subtask_of=None, order=None, due_date=None, priority=None):
         """MCP: create_task (+ zbot_link_tasks). Tworzy zadanie w projekcie project_id,
         przypisane do assigned_to (alias lub nazwa osoby), i — jeśli podano
         parent_task_id — łączy je z rodzicem relacją relation_type (buduje ciąg
@@ -459,12 +481,20 @@ class ProjectlyClient:
         if acceptance_criteria is not None:
             args["effect"] = acceptance_criteria
         if due_date is not None:
-            # Pole widziane przy ODCZYCIE (_map_task czyta raw.get("dueDate")) —
-            # nie potwierdzone, że create_task je PRZYJMUJE przy zapisie (MCP nie
-            # dokumentuje tego wprost). Jeśli serwer je zignoruje, to zadanie
-            # zostanie utworzone bez terminu — do zgłoszenia jako rozszerzenie
-            # MCP, nie do obchodzenia po stronie klienta.
+            # Potwierdzone schematem MCP create_task (tools/list, 29.08.2026):
+            # dueDate to udokumentowany, przyjmowany parametr zapisu.
             args["dueDate"] = due_date
+        if priority is not None:
+            # Priorytet: 0=parking, 3=backlog, 4=bieżące, 5=priorytet (dokładny
+            # opis pola w schemacie MCP create_task/update_task, potwierdzone
+            # 29.08.2026 — patrz stałe PRIORITY_* w tym module). Decyzja
+            # właściciela: kolejka runnera ma sama sortować/priorytetyzować
+            # zadania po tym polu, więc KAŻDE zadanie tworzone przez ten kod
+            # (eskalacja, dekompozycja, alert, feedback...) ma je ustawiać
+            # jawnie, zamiast zostawiać nieskonfigurowane (co Projectly
+            # traktuje jako None -> _efektywny_priorytet() w runner_loop.py
+            # spada na PRIORITY_DEFAULT).
+            args["priority"] = priority
         if subtask_of is not None:
             args["parentTaskId"] = subtask_of
             if order is not None:
@@ -674,7 +704,7 @@ class MockProjectlyClient:
 
     def create_task(self, title, description, assigned_to, parent_task_id=None, project_id=None,
                     relation_type="eskalacja", expected_result=None, acceptance_criteria=None,
-                    subtask_of=None, order=None, due_date=None):
+                    subtask_of=None, order=None, due_date=None, priority=None):
         tasks = self._load(self._created_tasks_path, default=[])
         new_id = f"PRJ-ESC-{len(tasks) + 1:04d}"
         record = {
@@ -690,6 +720,7 @@ class MockProjectlyClient:
             "subtask_of": subtask_of,
             "order": order,
             "due_date": due_date,
+            "priority": priority,
         }
         tasks.append(record)
         self._save(self._created_tasks_path, tasks)

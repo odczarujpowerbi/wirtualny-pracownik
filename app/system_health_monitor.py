@@ -36,7 +36,7 @@ from pathlib import Path
 import psutil
 import yaml
 
-from projectly_client import get_client
+from projectly_client import PRIORITY_PRIORYTET, get_client
 
 THRESHOLDS_PATH = Path(__file__).parent / "config" / "health_thresholds.yaml"
 STATE_PATH = Path(__file__).parent / "runs" / "system_health_state.json"
@@ -144,6 +144,9 @@ def run_health_check(client=None, thresholds=None, state_path=STATE_PATH):
                 description="Wykryte problemy:\n- " + "\n- ".join(health["issues"]),
                 assigned_to=thresholds.get("alert_assignee", "pawel"),
                 project_id=admin_project_id,
+                # priorytet (29.08.2026, decyzja właściciela): realna awaria
+                # maszyny ma być obsłużona najpierw, przed zwykłą pracą w kolejce.
+                priority=PRIORITY_PRIORYTET,
             )
             state["alert_tasks"][dedup_key] = created_task_id
             _save_state(state, state_path)

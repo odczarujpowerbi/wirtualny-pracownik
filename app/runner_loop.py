@@ -46,7 +46,7 @@ import task_router
 import task_thinker
 import validator_prompt
 from escalation import ESCALATION_TITLE_PREFIX, escalate_to_human
-from projectly_client import get_client
+from projectly_client import effective_priority, get_client
 
 HINT_TO_ACTION = {
     "green": "read_report",
@@ -62,6 +62,22 @@ HINT_TO_ACTION = {
 # zostaje w Projectly ze statusem "todo" i czeka na kolejny poll (30s, patrz
 # schedule.yaml), więc to naturalna kolejka, nie utrata zadań.
 MAX_TASKS_PER_RUN = 5
+
+
+def _wybierz_partie_wg_priorytetu(tasks):
+    """Z całej pobranej kolejki wybiera TYLKO zadania z najwyższego OBECNEGO
+    priorytetu (żądanie właściciela 29.08.2026: przy dużym backlogu jeden
+    przebieg ma najpierw posortować, potem wziąć czubek — nie "pierwsze z
+    brzegu"). Nadmiar tego samego, najwyższego poziomu (ponad MAX_TASKS_PER_RUN)
+    I wszystkie niższe poziomy wracają do `deferred` — to samo naturalne
+    "zaczeka na kolejny poll", co wcześniej robił sam cap liczbowy, tylko
+    priorytet decyduje PIERWSZY, limit liczbowy dopiero potem."""
+    if not tasks:
+        return [], []
+    najwyzszy = max(effective_priority(t) for t in tasks)
+    czolo = [t for t in tasks if effective_priority(t) == najwyzszy]
+    reszta = [t for t in tasks if effective_priority(t) != najwyzszy]
+    return czolo[:MAX_TASKS_PER_RUN], czolo[MAX_TASKS_PER_RUN:] + reszta
 
 
 def now_iso():
@@ -181,6 +197,18 @@ def _process_task_core(task, policy, routing, client):
 
     state_store.upsert_task(task_id, payload=task, status="planning", now=now)
     state_store.record_event(task_id, "task_received", task["title"], now)
+
+    # Widoczność "co jest w trakcie" (żądanie właściciela 29.08.2026): zadanie,
+    # które weszło do partii tego przebiegu (patrz _wybierz_partie_wg_priorytetu),
+    # dostaje status "w trakcie" w REALNYM Projectly zanim zacznie się realna
+    # praca — użytkownik ma widzieć na pierwszy rzut oka, co bot faktycznie
+    # ciągnie teraz, a co dopiero czeka w kolejce (queued_tasks, live_status_publisher).
+    # Fail-soft: to widoczność, nie krok pipeline'u — błąd MCP/sieci nie może
+    # zablokować przetwarzania samego zadania.
+    try:
+        client.update_status(task_id, "in_progress")
+    except Exception as exc:  # noqa: BLE001 — status wczesny to dodatek, nie krytyczny krok
+        state_store.record_event(task_id, "early_status_update_failed", str(exc), now_iso())
 
     # Sprawdzenie bezpieczeństwa treści PRZED klasyfikacją ryzyka — wykryta
     # próba wstrzyknięcia eskaluje zawsze, niezależnie od koloru zadania
@@ -602,11 +630,11 @@ def run_once(client=None):
 
     tasks = client.get_new_tasks()
     _zaloguj_kolejke_przy_starcie(tasks)
-    deferred = []
-    if len(tasks) > MAX_TASKS_PER_RUN:
-        print(f"{len(tasks)} nowych zadań — przetwarzam {MAX_TASKS_PER_RUN} w tym przebiegu, "
-              "reszta zaczeka na kolejny poll.")
-        deferred, tasks = tasks[MAX_TASKS_PER_RUN:], tasks[:MAX_TASKS_PER_RUN]
+    razem = len(tasks)
+    tasks, deferred = _wybierz_partie_wg_priorytetu(tasks)
+    if deferred:
+        print(f"{razem} nowych zadań — przetwarzam {len(tasks)} w tym przebiegu "
+              "(najwyższy obecny priorytet, limit MAX_TASKS_PER_RUN), reszta zaczeka na kolejny poll.")
     results = []
     for task in tasks:
         heartbeat.write_heartbeat(current_task_id=task["task_id"])

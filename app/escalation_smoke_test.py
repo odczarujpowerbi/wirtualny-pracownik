@@ -27,10 +27,10 @@ class _FakeProjectlyClient:
         self.utworzone = []
 
     def create_task(self, title, description, assigned_to, parent_task_id=None,
-                    project_id=None, relation_type="eskalacja"):
+                    project_id=None, relation_type="eskalacja", priority=None):
         self.utworzone.append({"title": title, "description": description, "assigned_to": assigned_to,
                               "parent_task_id": parent_task_id, "project_id": project_id,
-                              "relation_type": relation_type})
+                              "relation_type": relation_type, "priority": priority})
         return f"ESK-{len(self.utworzone)}"
 
 
@@ -97,6 +97,33 @@ def run():
         escalation.escalate_to_human(already_escalated_task, "Kolejny powód.", projectly_stack, assignee="pawel")
         checks.append(("escalate_to_human: BRAK podwójnego prefiksu, gdy zadanie już nim jest",
                        projectly_stack.utworzone[0]["title"] == "Wymaga decyzji: Zadanie testowe"))
+
+        # --- 1c. Priorytet zadania eskalacji: PARKING (0) - czeka na decyzję
+        # człowieka, bot nie ma go samo z siebie odbierać jako "do zrobienia teraz".
+        checks.append(("escalate_to_human: zadanie eskalacji ma priorytet PARKING (0)",
+                       projectly.utworzone[0]["priority"] == projectly_client.PRIORITY_PARKING))
+
+        # --- 1d. continuation_task_creator: dziedziczy priorytet oryginału,
+        # fallback "bieżące" gdy oryginał go nie niósł.
+        projectly_kont = _FakeProjectlyClient()
+        oryginal_z_priorytetem = {**TASK, "priority": projectly_client.PRIORITY_PRIORYTET}
+        escalation.continuation_task_creator(oryginal_z_priorytetem, "Zatwierdzam.", projectly_kont)
+        checks.append(("continuation_task_creator: dziedziczy priorytet oryginalnego zadania",
+                       projectly_kont.utworzone[0]["priority"] == projectly_client.PRIORITY_PRIORYTET))
+
+        projectly_kont_bez = _FakeProjectlyClient()
+        escalation.continuation_task_creator(TASK, "Zatwierdzam.", projectly_kont_bez)
+        checks.append(("continuation_task_creator: brak priorytetu w oryginale -> fallback BIEŻĄCE (4)",
+                       projectly_kont_bez.utworzone[0]["priority"] == projectly_client.PRIORITY_BIEZACE))
+
+        # --- 1e. Żywy bug znaleziony 29.08.2026: `priority or BIEŻĄCE` traktuje
+        # priority=0 (PARKING) jako falsy i błędnie podbija zaparkowane zadanie
+        # do BIEŻĄCE. Oryginał z priorytetem PARKING musi zostać na PARKING.
+        projectly_kont_parking = _FakeProjectlyClient()
+        oryginal_zaparkowany = {**TASK, "priority": projectly_client.PRIORITY_PARKING}
+        escalation.continuation_task_creator(oryginal_zaparkowany, "Zatwierdzam.", projectly_kont_parking)
+        checks.append(("continuation_task_creator: priority=0 (PARKING) w oryginale NIE jest podbijane do BIEŻĄCE",
+                       projectly_kont_parking.utworzone[0]["priority"] == projectly_client.PRIORITY_PARKING))
 
         # --- 2. event escalated_to_human zapisany w dzienniku ---
         conn = state_store.get_connection()

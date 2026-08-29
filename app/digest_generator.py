@@ -18,7 +18,7 @@ import json
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-from projectly_client import get_client
+from projectly_client import PRIORITY_BACKLOG, get_client
 
 DONE_STATUSES = {"done"}
 OPEN_STATUSES = {"todo", "in_progress"}
@@ -203,6 +203,9 @@ def _digest_task_id(client, project_id, path=None):
         "Cykliczny digest aktywności (digest_generator.py) — aktualizowany komentarzami, "
         "nie zadanie do wykonania.",
         assigned_to="unassigned_pool", project_id=docelowy_projekt,
+        # backlog (29.08.2026): to kanał-kontener na komentarze, nie realna
+        # praca — nie ma trafiać do kolejki bota jako "do zrobienia".
+        priority=PRIORITY_BACKLOG,
     )
     mapowanie[klucz] = nowy_id
     _zapisz_id_zadan_digestu(mapowanie, path)
