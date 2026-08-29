@@ -215,6 +215,8 @@ def _process_task_core(task, policy, routing, client):
         _save_result_to_onedrive(task, "needs_approval", komentarz)
         return {"task_id": task_id, "risk": risk, "owner": owner, "status": "needs_approval"}
 
+    feedback_opis = None  # nadpisywane tam, gdzie sam status nie opisuje wyniku wiernie
+
     if risk == "red":
         reason = "Czerwona akcja — poza zakresem tego szkieletu, brak jeszcze zdefiniowanej bounded_red do sprawdzenia."
         escalate_to_human(task, reason, client, assignee=_escalation_assignee())
@@ -244,10 +246,24 @@ def _process_task_core(task, policy, routing, client):
         if not gate["passed"]:
             gate, execution_result = _popraw_i_sprawdz_ponownie(task, execution_result, gate)
 
-        if gate["passed"]:
+        decyzja = _decyzja_bramki(gate, execution_result)
+        if decyzja == GATE_PRZESZLO:
             status, comment = "done", _comment_gate_passed(owner, gate, execution_result)
             skill_usage_logger.log_usage(task_id, "quality_gate", "success", gate["summary"])
-        elif _zadanie_zle_postawione(execution_result, gate):
+        elif decyzja == GATE_BEZ_WERYFIKACJI:
+            # Bramka nie miała CZEGO sprawdzić (wynik czysto tekstowy: bez zrzutu,
+            # bez testów funkcjonalnych, bez powtórki). Nie ma tu żadnej decyzji dla
+            # człowieka: eskalacja kończyła się zadaniem "Wymaga decyzji" z
+            # uzasadnieniem "Zastrzeżenia: brak szczegółów", a po trzech takich
+            # zadaniach kacper_monitor zakładał jeszcze zadanie naprawcze
+            # "quality_gate zawodzi powtarzalnie". Oddajemy wynik z jawnym
+            # zastrzeżeniem, że nie został automatycznie zweryfikowany.
+            state_store.log_decision(task_id, agent="gustaw", decision="brak_weryfikacji",
+                                     reason=gate["summary"], now=now_iso(), event_type="quality_gate")
+            status, comment = "done", _comment_bez_weryfikacji(owner, gate, execution_result)
+            feedback_opis = "Wykonane, ale BEZ automatycznej kontroli jakości: nie było czego sprawdzić."
+            skill_usage_logger.log_usage(task_id, "quality_gate", "success", gate["summary"])
+        elif decyzja == GATE_ZLE_ZADANIE:
             # Zadanie bez potrzebnych danych albo źle postawione. Zakładanie zadania
             # "wymaga decyzji" nic tu nie wnosi — zamykamy z konkretnym feedbackiem,
             # czego zabrakło, żeby właściciel mógł poprawić polecenie i wrzucić je
@@ -256,7 +272,11 @@ def _process_task_core(task, policy, routing, client):
             state_store.log_decision(task_id, agent="pawel", decision="zamkniete_z_feedbackiem",
                                      reason=reason, now=now_iso(), event_type="escalation")
             status, comment = "done", _comment_zamkniete_z_feedbackiem(owner, execution_result, gate)
-            skill_usage_logger.log_usage(task_id, "quality_gate", "failure", reason)
+            # 'success', bo bramka ZADZIAŁAŁA: rozpoznała źle postawione zadanie.
+            # Zapis 'failure' kacper_monitor liczy jako awarię narzędzia i po trzech
+            # takich zadaniach zakładał zadanie naprawcze, czyli dokładnie to
+            # zadanie dla człowieka, którego ta gałąź świadomie NIE tworzy.
+            skill_usage_logger.log_usage(task_id, "quality_gate", "success", reason)
         else:
             reason = _gate_failure_reason(gate)
             escalate_to_human(task, reason, client, assignee=_escalation_assignee())
@@ -279,16 +299,20 @@ def _process_task_core(task, policy, routing, client):
 
     client.post_comment(task_id, comment)
     client.update_status(task_id, status)
-    _zapisz_feedback(client, task_id, status, execution_result, risk)
+    _zapisz_feedback(client, task_id, status, execution_result, risk, opis=feedback_opis)
     _save_result_to_onedrive(task, status, comment)
 
     return {"task_id": task_id, "risk": risk, "owner": owner, "status": status}
 
 
-def _zapisz_feedback(client, task_id, status, execution_result, risk):
+def _zapisz_feedback(client, task_id, status, execution_result, risk, opis=None):
     """Samoocena agenta w polu `feedback` zadania (MCP update_task) — po to, żeby
     człowiek widział W ZADANIU, czym się skończyła praca, bez czytania całego
     wątku komentarzy. Zapisujemy zwięźle: co użyto, ile kosztowało, jaki wynik.
+
+    `opis` nadpisuje domyślny opis wyprowadzony ze statusu, bo "done" znaczy dziś
+    dwie różne rzeczy (przyjęte przez bramkę ALBO wydane bez weryfikacji), a pole
+    feedbacku nie może twierdzić, że bramka coś przyjęła, gdy nic nie sprawdziła.
 
     Feedback to pole informacyjne, więc jego brak nie może wywrócić przebiegu —
     klient bez tej metody (starszy mock) albo błąd MCP są łapane."""
@@ -298,7 +322,7 @@ def _zapisz_feedback(client, task_id, status, execution_result, risk):
 
     narzedzie = execution_result.get("tool") or "brak workera"
     koszt = execution_result.get("cost_usd", 0.0)
-    opis = {
+    opis = opis or {
         "done": "Wykonane i przyjęte przez bramkę jakości.",
         "needs_approval": "Wykonane, ale bramka jakości nie przepuściła — czeka na decyzję człowieka.",
     }.get(status, f"Status: {status}.")
@@ -336,8 +360,47 @@ def _comment_gate_passed(owner, gate, execution_result=None):
     )
 
 
+def _comment_bez_weryfikacji(owner, gate, execution_result):
+    """Komentarz do wyniku, którego bramka nie miała jak sprawdzić. Mówi wprost,
+    że automatycznej weryfikacji NIE było, zamiast udawać, że wynik przeszedł
+    kontrolę jakości, i zamiast zakładać człowiekowi zadanie decyzyjne bez treści."""
+    notes = (execution_result or {}).get("acceptance_notes")
+    wynik = f"\n📄 Wynik:\n{notes}\n" if notes else ""
+    return (
+        "✅ done (bez automatycznej kontroli jakości)\n"
+        f"{gate['summary']}\n{wynik}"
+        "ℹ️ Żaden bot bramki nie miał czego sprawdzić: efekt nie ma zrzutu ekranu, "
+        "testów funkcjonalnych ani powtarzalnego przebiegu. Wynik NIE został "
+        "automatycznie zweryfikowany, przejrzyj go, zanim go użyjesz.\n"
+        f"Przypisano do: {owner}\n"
+    )
+
+
 def _comment_escalated(owner, reason):
     return f"⚠️ needs_approval\nWymaga decyzji: tak — {reason}\nUtworzono osobne zadanie dla: {owner}\n"
+
+
+# Cztery RÓŻNE sytuacje, na jakie rozpada się wynik bramki. Wcześniej trzy z nich
+# ("nie przeszło") były jednym workiem, przez co wynik, którego po prostu nie dało
+# się zweryfikować, szedł do człowieka jako zadanie decyzyjne bez żadnej treści.
+GATE_PRZESZLO = "passed"
+GATE_BEZ_WERYFIKACJI = "bez_weryfikacji"
+GATE_ZLE_ZADANIE = "zle_postawione"
+GATE_BLOKADA = "blokada"
+
+
+def _decyzja_bramki(gate, execution_result):
+    """Co zrobić z wynikiem po bramce jakości: jedna z czterech stałych GATE_*.
+    Kolejność jest istotna, bo 'nie było czego sprawdzić' rozstrzygamy PRZED oceną
+    zastrzeżeń: w tym przypadku lista zastrzeżeń jest pusta i każda dalsza
+    heurystyka czytałaby z niej to samo (nic)."""
+    if gate["passed"]:
+        return GATE_PRZESZLO
+    if gate.get("nothing_to_check"):
+        return GATE_BEZ_WERYFIKACJI
+    if _zadanie_zle_postawione(execution_result, gate):
+        return GATE_ZLE_ZADANIE
+    return GATE_BLOKADA
 
 
 MAX_POPRAWEK = 2

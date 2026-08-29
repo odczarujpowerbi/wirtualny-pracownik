@@ -15,7 +15,6 @@ import bot_bartek_dubler
 import bot_franek_funkcjonalny
 import bot_gustaw_bramka
 import bot_oskar_wizja
-import task_thinker
 
 
 def run():
@@ -91,6 +90,30 @@ def run():
     gate_cost = bot_gustaw_bramka.run_gate(task_over, {"cost_usd": 5.0}, config=cfg)
     checks.append(("Gustaw: przekroczony budżet -> nie passed",
                    gate_cost["passed"] is False and any("budżet" in c.lower() for c in gate_cost["concerns"])))
+
+    # Wynik czysto tekstowy: każdy bot pomija (brak zrzutu, testów, powtórki).
+    # To NIE jest wada jakości, bramka musi to odróżnić od odrzucenia, inaczej
+    # zadanie idzie do człowieka z zastrzeżeniami "brak szczegółów".
+    cfg_all = {
+        "gate": {"enabled": True, "order": ["bartek", "franek", "oskar"], "required_approvals": 1, "mandatory": []},
+        "bots": {"bartek": {"enabled": True}, "franek": {"enabled": True}, "oskar": {"enabled": True}},
+    }
+    gate_nic = bot_gustaw_bramka.run_gate(task, {"cost_usd": 0.0, "acceptance_notes": "Odpowiedź tekstowa."},
+                                          config=cfg_all)
+    checks.append(("Gustaw: wszystkie boty pominięte -> nothing_to_check, zero zastrzeżeń",
+                   gate_nic["nothing_to_check"] is True and gate_nic["concerns"] == []
+                   and gate_nic["passed"] is False))
+
+    # Odrzucenie to co innego niż brak czego sprawdzać, nothing_to_check musi być False,
+    # bo inaczej wynik z realną wadą zostałby wydany bez decyzji człowieka.
+    checks.append(("Gustaw: odrzucenie (budżet) -> nothing_to_check False",
+                   gate_cost["nothing_to_check"] is False))
+
+    # Pominięcie Z ZASTRZEŻENIEM (zadanie wizualne bez zrzutu) to NIE jest
+    # "brak czego sprawdzić": jest co powiedzieć człowiekowi.
+    gate_uwaga = bot_gustaw_bramka.run_gate(task, {"cost_usd": 0.0, "tool": "capture_screenshot"}, config=cfg_all)
+    checks.append(("Gustaw: same pominięcia, ale ze zastrzeżeniem -> nothing_to_check False",
+                   gate_uwaga["concerns"] != [] and gate_uwaga["nothing_to_check"] is False))
 
     print("\n--- Wynik testu dymnego bramki jakości ---")
     all_passed = True

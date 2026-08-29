@@ -20,9 +20,19 @@ Dodatkowo Gustaw robi deterministyczną kontrolę zakresu kosztu PRZED botami
 (max_ai_cost_usd z zadania) — przekroczenie budżetu blokuje od razu, bez
 angażowania modeli.
 
+Osobno raportowany jest przypadek "nie było CZEGO sprawdzić" (`nothing_to_check`):
+wszystkie boty zwróciły `skipped`, bo efekt nie ma zrzutu ekranu, testów
+funkcjonalnych ani powtarzalnego przebiegu (typowy wynik czysto tekstowy). To NIE
+jest wada jakości materiału: zgód jest zero, więc `passed` wychodzi fałszywe, ale
+zastrzeżeń nie ma żadnych. Bez tego rozróżnienia takie zadanie szło do człowieka
+z uzasadnieniem "Zastrzeżenia: brak szczegółów", a po trzech takich zadaniach
+kacper_monitor zakładał jeszcze zadanie naprawcze "quality_gate zawodzi
+powtarzalnie", czyli kolejną eskalację bez żadnej treści do decyzji.
+
 Kontrakt bramki:
     run_gate(task, execution_result, config=None) -> dict z polami:
-        passed, verdicts, approvals, required, mandatory_ok, concerns, summary
+        passed, verdicts, approvals, required, mandatory_ok, concerns, summary,
+        nothing_to_check
 """
 
 from pathlib import Path
@@ -68,7 +78,8 @@ def run_gate(task, execution_result, config=None):
 
     if not gate.get("enabled", True):
         return {"passed": True, "verdicts": [], "approvals": 0, "required": 0,
-                "mandatory_ok": True, "concerns": [], "summary": "Bramka wyłączona w konfiguracji."}
+                "mandatory_ok": True, "concerns": [], "nothing_to_check": False,
+                "summary": "Bramka wyłączona w konfiguracji."}
 
     verdicts = []
 
@@ -99,6 +110,11 @@ def run_gate(task, execution_result, config=None):
 
     passed = (not rejections) and mandatory_ok and (len(approvals) >= required)
     concerns = [c for v in verdicts for c in v.get("concerns", [])]
+    nothing_to_check = _nothing_to_check(verdicts, concerns)
+
+    summary = _summary(verdicts, passed, len(approvals), required, mandatory_ok)
+    if nothing_to_check:
+        summary += " Żaden bot nie miał czego sprawdzić (brak automatycznej weryfikacji)."
 
     return {
         "passed": passed,
@@ -107,8 +123,22 @@ def run_gate(task, execution_result, config=None):
         "required": required,
         "mandatory_ok": mandatory_ok,
         "concerns": concerns,
-        "summary": _summary(verdicts, passed, len(approvals), required, mandatory_ok),
+        "nothing_to_check": nothing_to_check,
+        "summary": summary,
     }
+
+
+def _nothing_to_check(verdicts, concerns):
+    """Czy bramka nie miała CZEGO sprawdzić: każdy uruchomiony bot zwrócił
+    'skipped' (albo żaden bot nie był włączony) i nikt nie zgłosił zastrzeżenia.
+    Odróżnia "efekt jest zły" od "efektu nie da się zweryfikować tymi
+    narzędziami". Bez tego oba wyglądały identycznie: passed=False z pustą listą
+    zastrzeżeń.
+
+    Zastrzeżenie przy werdykcie 'skipped' (np. Oskar: brakujący plik zrzutu przy
+    zadaniu wizualnym) wyklucza ten przypadek, bo jest wtedy CO powiedzieć
+    człowiekowi: zadanie idzie zwykłą ścieżką."""
+    return not concerns and all(v["verdict"] == "skipped" for v in verdicts)
 
 
 def _summary(verdicts, passed, approvals, required, mandatory_ok):
