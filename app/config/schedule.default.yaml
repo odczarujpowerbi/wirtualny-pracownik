@@ -177,3 +177,31 @@ jobs:
   interval_seconds: 30
   enabled: true
   role: marketing
+# Domyka petle eskalacja->kontynuacja (escalation.py) - human_response_validator/
+# continuation_task_creator istnialy, ale nic ich nie wywolywalo (zywa luka
+# znaleziona 29.08.2026). Jeden wpis per rola (jak runner_loop_checker/
+# _marketing), zeby kazdy proces pilnowal TYLKO wlasnych eskalacji (WS1).
+- name: escalation_watcher
+  description: Sprawdza WLASNE eskalacje ("Wymaga decyzji - ...") - rozstrzygniete
+    przez czlowieka wracaja do bota jako kontynuacja, otwarte po terminie dostaja
+    jedno przypomnienie.
+  module: escalation_watcher
+  function: run_once
+  interval_seconds: 90
+  enabled: true
+- name: escalation_watcher_checker
+  description: Ta sama funkcja co "escalation_watcher" - osobny wpis dla procesu
+    checkera (BOT_ROLE=checker), pilnuje WYLACZNIE eskalacji konta "AI-Checker".
+  module: escalation_watcher
+  function: run_once
+  interval_seconds: 90
+  enabled: true
+  role: checker
+- name: escalation_watcher_marketing
+  description: Ta sama funkcja co "escalation_watcher" - osobny wpis dla procesu
+    marketingu (BOT_ROLE=marketing), pilnuje WYLACZNIE eskalacji konta "AI - Marketing".
+  module: escalation_watcher
+  function: run_once
+  interval_seconds: 90
+  enabled: true
+  role: marketing
