@@ -40,6 +40,16 @@ from projectly_client import get_client
 
 ASKED_PATH = Path(__file__).parent / "runs" / "feedback_requested.json"
 
+# Ten sam wzorzec buga co escalation.py::ESCALATION_TITLE_PREFIX (naprawiony
+# 25-26.08.2026), znaleziony tu 29.08.2026: zadanie feedbackowe utworzone
+# PRZEZ ten skrypt (tytuł "Feedback: <oryginał>") to NOWY task_id w Projectly —
+# gdy TO zadanie samo dostanie status "done" (człowiek je zamknie), kolejny
+# przebieg run_feedback_requests() widział je jako zwykłe "done" zadanie i
+# doklejał KOLEJNE "Feedback: " ("Feedback: Feedback: ..." narastające w
+# kółko z każdym zamknięciem) — bo find_tasks_needing_feedback nie
+# rozróżniało prawdziwej pracy od własnych zadań meta.
+FEEDBACK_TITLE_PREFIX = "Feedback: "
+
 FEEDBACK_COMMENT = (
     "👋 Krótki feedback do tego zadania: ile realnie zajęło (jeśli różni się "
     "od estymacji), co było trudne, i czy zostały jakieś zaległości/podzadania "
@@ -65,15 +75,27 @@ def _save_asked(asked, path=None):
 
 
 def find_tasks_needing_feedback(tasks, already_asked):
-    return [t for t in tasks if t.get("status") == "done" and t["task_id"] not in already_asked]
+    """Pomija zadania utworzone PRZEZ ten skrypt (tytuł już zaczyna się od
+    FEEDBACK_TITLE_PREFIX) — to zadania META o pytaniu o feedback, nie
+    prawdziwa praca do oceny. Bez tego zamknięcie takiego zadania przez
+    człowieka wywoływało kolejną rundę "Feedback: Feedback: ..." (patrz
+    komentarz przy FEEDBACK_TITLE_PREFIX)."""
+    return [t for t in tasks if t.get("status") == "done" and t["task_id"] not in already_asked
+           and not (t.get("title") or "").startswith(FEEDBACK_TITLE_PREFIX)]
 
 
 def request_feedback_for_task(task, client=None, send_email=False):
     client = client or get_client()
 
     client.post_comment(task["task_id"], FEEDBACK_COMMENT)
+    original_title = task["title"]
+    # Zabezpieczenie defense-in-depth (główny filtr jest w
+    # find_tasks_needing_feedback) — na wypadek wywołania tej funkcji wprost,
+    # z pominięciem tamtego filtra, nie dokładaj prefiksu drugi raz.
+    tytul = original_title if original_title.startswith(FEEDBACK_TITLE_PREFIX) \
+        else f"{FEEDBACK_TITLE_PREFIX}{original_title}"
     feedback_task_id = client.create_task(
-        title=f"Feedback: {task['title']}",
+        title=tytul,
         description=FEEDBACK_COMMENT,
         assigned_to=task.get("assignee", "unassigned_pool"),
         parent_task_id=task["task_id"],

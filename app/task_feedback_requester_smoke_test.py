@@ -65,6 +65,27 @@ def run():
         checks.append(("find_tasks_needing_feedback: pomija już zapytane",
                        {t["task_id"] for t in tfr.find_tasks_needing_feedback(TASKS, {"T-1"})} == {"T-2"}))
 
+        # --- 1b. Żywy bug 29.08.2026 (ten sam wzorzec co escalation.py
+        # ESCALATION_TITLE_PREFIX): zadanie FEEDBACKOWE, utworzone przez ten
+        # skrypt, samo dostaje status "done" (zamknięte przez człowieka) —
+        # NIE może być traktowane jak zwykłe "done" zadanie, inaczej dokleja
+        # się kolejny prefiks w kółko ("Feedback: Feedback: ...").
+        zadania_z_meta = TASKS + [
+            {"task_id": "T-FB-META", "title": "Feedback: Zadanie 1", "status": "done", "assignee": "asia"},
+        ]
+        do_zapytania_z_meta = tfr.find_tasks_needing_feedback(zadania_z_meta, already_asked=set())
+        checks.append(("find_tasks_needing_feedback: pomija WŁASNE zadania feedbackowe (tytuł 'Feedback: ...')",
+                       "T-FB-META" not in {t["task_id"] for t in do_zapytania_z_meta}
+                       and {t["task_id"] for t in do_zapytania_z_meta} == {"T-1", "T-2"}))
+
+        # Defense-in-depth: nawet wywołane wprost, request_feedback_for_task
+        # NIE dokleja drugiego prefiksu do już-prefiksowanego tytułu.
+        client_meta = _FakeClient()
+        tfr.request_feedback_for_task(
+            {"task_id": "T-FB-META", "title": "Feedback: Zadanie 1", "assignee": "asia"}, client=client_meta)
+        checks.append(("request_feedback_for_task: BRAK podwójnego prefiksu 'Feedback: Feedback: ...'",
+                       client_meta.utworzone[0]["title"] == "Feedback: Zadanie 1"))
+
         # --- 2. domyślnie send_email=False — mail NIE jest wołany ---
         client = _FakeClient()
         wynik = tfr.request_feedback_for_task(TASKS[0], client=client)
