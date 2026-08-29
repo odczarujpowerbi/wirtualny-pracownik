@@ -43,6 +43,7 @@ import yaml
 import control
 import env_bootstrap  # noqa: F401 — wymusza UTF-8 na stdout/stderr dla procesu schedulera (autostart Windows)
 import kill_switch
+import remote_control
 import scheduler_lock
 
 # Ile znakow wyjscia (stdout+stderr) zapisujemy na przebieg. Powyzej tego
@@ -379,6 +380,13 @@ def run_scheduler(tick_seconds=5, schedule_path=SCHEDULE_PATH):
                 print(f"Kill switch aktywny ({kill_switch.reason()}) — nie odpalam nowych zadań.")
                 time.sleep(tick_seconds)
                 continue
+            # PRIORYTETOWO, PRZED jakimkolwiek innym jobem (decyzja właściciela
+            # 29.08.2026): sterowanie z Projectly ma działać nawet gdy bot jest
+            # AKTUALNIE wstrzymany — inaczej, gdyby to wołanie było POD gałęzią
+            # "if control.is_paused(): continue", sync() nigdy by nie zobaczył
+            # zmiany statusu z powrotem na "wznów" (throttling wewnątrz sync()
+            # samo w sobie chroni Projectly przed zapytaniem co tick).
+            remote_control.sync(role=CURRENT_ROLE)
             if control.is_paused():
                 print(f"PAUSE ({control.pause_reason()}) — nie odpalam nowych zadań.")
                 time.sleep(tick_seconds)
