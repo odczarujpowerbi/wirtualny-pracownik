@@ -163,3 +163,17 @@ jobs:
   interval_seconds: 30
   enabled: true
   role: checker
+- name: runner_loop_marketing
+  description: Ta sama funkcja co job "runner_loop" (runner_loop.run_once) -
+    osobny wpis dla WLASNEGO procesu marketingu (BOT_ROLE=marketing,
+    start-agent-marketing.bat) - decyzja wlasciciela 29.08.2026. Wczesniej
+    zadania konta "AI - Marketing" byly odbierane przy okazji przez proces
+    "dev" (poll.extra_accounts w config/projectly.yaml) - od tej daty "AI -
+    Marketing" usuniete stamtad, marketing ma wlasny, niezalezny proces.
+    Konto/zakres zadan wynika WYLACZNIE z roli procesu (BOT_ROLE), nie z
+    tego wpisu - patrz config/projectly.yaml role_to_account.
+  module: runner_loop
+  function: run_once
+  interval_seconds: 30
+  enabled: true
+  role: marketing

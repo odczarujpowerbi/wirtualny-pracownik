@@ -232,10 +232,14 @@ class ProjectlyClient:
 
     def _polled_account_names(self):
         """Konta AI, których zadania bierze TA maszyna: własne konto roli plus
-        konta z poll.extra_accounts. Jedna maszyna obsługuje dziś kilka ról
-        naraz (rola 'dev' fizycznie wykonuje też zadania marketingowe), a bez
-        tego zadanie wrzucone na 'AI - Marketing' nie zostałoby podjęte przez
-        nikogo i po cichu wisiałoby w kolejce."""
+        konta z poll.extra_accounts. Do 29.08.2026 rola 'dev' fizycznie
+        wykonywała też zadania marketingowe (extra_accounts zawierał
+        'AI - Marketing') — od tej daty marketing ma WŁASNY, osobny proces
+        (BOT_ROLE=marketing), więc jego konto zostało stąd usunięte (dwa
+        procesy pytające o to samo konto ryzykowałyby podwójne wykonanie).
+        extra_accounts zostaje jako mechanizm na wypadek przyszłych ról bez
+        własnego procesu — zadanie wrzucone na konto spoza własnej roli I
+        spoza tej listy po cichu wisiałoby w kolejce, nigdy niepodjęte."""
         wlasne = self._cfg.get("role_to_account", {}).get(self._role)
         nazwy = [wlasne] if wlasne else []
         for dodatkowe in self._cfg.get("poll", {}).get("extra_accounts", []) or []:
