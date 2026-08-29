@@ -31,6 +31,7 @@ import control
 import cost_tracker
 import document_builder
 import executor
+import feedback_task
 import heartbeat
 import kill_switch
 import poprawka_materialu
@@ -150,6 +151,30 @@ def _process_task_core(task, policy, routing, client):
         client.update_status(task_id, status)
         _save_result_to_onedrive(task, status, komentarz)
         return {"task_id": task_id, "risk": "red", "owner": owner, "status": status}
+
+    # Prośba o feedback NIE jest pracą do wykonania — to pytanie o przebieg
+    # zadania, na które odpowiada wykonawca. Trafiała do kolejki bota, bo
+    # zakładano ją na koncie assignee zadania źródłowego (poprawione w
+    # task_feedback_requester), a runner bierze z Projectly wszystko, co ma
+    # status todo na koncie AI. Tutaj domykamy to, co w tej kolejce już leży:
+    # bez modelu, bez kosztu i bez eskalacji, bo odpowiedź agenta na to pytanie
+    # jest już zapisana w polu `feedback` zadania źródłowego (_zapisz_feedback).
+    # Po sprawdzeniu bezpieczeństwa treści, żeby podejrzany tytuł nadal eskalował.
+    if feedback_task.czy_prosba_o_feedback(task):
+        owner, _ = task_router.route_task(task["title"], routing)
+        komentarz = _comment_prosba_o_feedback()
+        state_store.log_decision(
+            task_id, agent="pawel", decision="prosba_o_feedback_domknieta",
+            reason="Prośba o feedback nie jest zadaniem do wykonania — samoocena agenta "
+                   "jest już w polu feedback zadania źródłowego.",
+            now=now_iso())
+        state_store.upsert_task(task_id, payload=task, status="done", assigned_to=owner,
+                                risk_level="green", now=now_iso())
+        state_store.record_event(task_id, "status_set", "done", now_iso())
+        client.post_comment(task_id, komentarz)
+        client.update_status(task_id, "done")
+        _save_result_to_onedrive(task, "done", komentarz)
+        return {"task_id": task_id, "risk": "green", "owner": owner, "status": "done"}
 
     # Hint ryzyka: gdy źródło nie niesie własnego (albo niesie sztywny domyślny
     # 'yellow' z mapowania Projectly), wywnioskuj kolor Z TREŚCI zadania —
@@ -338,6 +363,16 @@ def _comment_gate_passed(owner, gate, execution_result=None):
 
 def _comment_escalated(owner, reason):
     return f"⚠️ needs_approval\nWymaga decyzji: tak — {reason}\nUtworzono osobne zadanie dla: {owner}\n"
+
+
+def _comment_prosba_o_feedback():
+    """Komentarz domykający prośbę o feedback, która trafiła do kolejki bota."""
+    return (
+        "✅ done — to prośba o feedback, nie praca do wykonania.\n"
+        "Nie uruchamiam workera ani modelu (zero kosztu) i nie zakładam eskalacji.\n"
+        "Moja samoocena z tamtego zadania (użyte narzędzie, ryzyko, koszt) jest "
+        "zapisana w polu `feedback` zadania źródłowego.\n"
+    )
 
 
 MAX_POPRAWEK = 2
