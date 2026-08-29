@@ -12,6 +12,13 @@ UCZCIWA GRANICA: Projectly nie ma dziś pola z realną datą wykonania
 przeszłości", nie "zrobione w tym konkretnym okresie". Dokładniejszy
 digest (naprawdę "co zrobiono w ostatnim tygodniu") wymaga pola
 completedAt z tamtego dokumentu.
+
+Świadomie czyta zadania WSZYSTKICH kont (client.list_tasks() bez filtra po
+assignee) — to zarządczy DIGEST, z natury przekrojowy (ma pokazać całą
+aktywność projektu/firmy), nie działanie bota na cudzych zadaniach (WS1,
+29.08.2026: "bot ma do dyspozycji tylko swoje zadania" dotyczy wykonywania/
+walidowania, nie raportów tego typu). Nie zgłaszać jako tego samego bugа
+co task_feedback_requester.py.
 """
 
 import json

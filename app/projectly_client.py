@@ -96,6 +96,19 @@ def _load_role():
     return "dev"
 
 
+def own_account_name(role=None):
+    """Nazwa konta AI Projectly (np. "AI - Dev", "AI-Checker") tej roli, wg
+    config/projectly.yaml role_to_account — ta sama nazwa, jaką _map_task
+    kładzie w polu 'assignee'. Do porównania "czy to zadanie jest MOJE"
+    (task_feedback_requester.py, escalation_watcher.py) — bot ma czytać/
+    działać wyłącznie na zadaniach przypisanych do WŁASNEGO konta, nigdy
+    cudzych (ludzi albo innych botów). Funkcja modułowa, nie metoda klienta —
+    nie wymaga instancji ProjectlyClient/MockProjectlyClient (mock nie ma
+    self._role), więc działa identycznie w obu trybach."""
+    role = role or _load_role()
+    return _load_config().get("role_to_account", {}).get(role)
+
+
 _STATUS_ENUM = {"working", "idle", "alert", "paused", "stopped"}
 # snake_case (jak build_status() i inni wywolujacy publish_status) -> kontrakt
 # post_agent_status (camelCase, PLAN-MONITOROWANIE-AGENTOW-*.md sekcja 1).

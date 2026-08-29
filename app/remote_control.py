@@ -87,7 +87,12 @@ def _save_state(state, path):
 def _find_or_create_control_task(client, role, state, admin_project_id):
     """Cache po task_id w stanie lokalnym (jedno zapytanie mniej na sync po
     pierwszym udanym uruchomieniu) — ale sam STATUS i tak zawsze czytamy na
-    żywo (_task_status), cache dotyczy tylko ID, nie stanu."""
+    żywo (_task_status), cache dotyczy tylko ID, nie stanu.
+
+    list_tasks(project_id=...) świadomie bez filtra po assignee (WS1,
+    29.08.2026) — szuka WYŁĄCZNIE PO TYTULE dokładnego zadania kontrolnego tej
+    roli (_control_task_title), nie działa na żadnym innym znalezionym
+    zadaniu. Nie zgłaszać jako tego samego bugа co task_feedback_requester.py."""
     task_id = state.get("task_id")
     if task_id:
         return task_id

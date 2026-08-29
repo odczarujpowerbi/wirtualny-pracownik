@@ -80,7 +80,13 @@ def _needs_approval_count(client):
     state_store (żywy incydent 25.08.2026: 341 wpisów lokalnie, w tym 336 z
     MOCK pipeline'u notebook_intake.py, ktore w ogole nie istnieja w Projectly
     — user zobaczyl 341 "zadan do decyzji" bez ZADNEGO realnego pokrycia).
-    Fail-soft: błąd/mock bez pełnej listy -> 0, nie wywala publikacji statusu."""
+    Fail-soft: błąd/mock bez pełnej listy -> 0, nie wywala publikacji statusu.
+
+    Świadomie czyta zadania WSZYSTKICH kont (client.list_tasks() bez filtra po
+    assignee) — to tylko LICZY nierozstrzygnięte eskalacje po tytule, nic nie
+    zmienia ani nie waliduje (WS1, 29.08.2026: "bot ma do dyspozycji tylko
+    swoje zadania" dotyczy działania, nie tej metryki). Nie zgłaszać jako tego
+    samego bugа co task_feedback_requester.py."""
     try:
         tasks = client.list_tasks()
     except Exception:  # noqa: BLE001 — dodatkowa metadana, nie może ubić publikacji

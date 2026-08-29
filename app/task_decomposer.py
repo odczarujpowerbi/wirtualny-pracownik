@@ -171,7 +171,14 @@ def sibling_tasks(client, task):
     kontekst dla agenta wykonującego (decyzja właściciela 25.08.2026: subagenty
     mają wiedzieć, co robią pozostałe podzadania). Żadne API nie filtruje tego
     po stronie serwera — filtr po parent_task_id robimy tu, po liście zadań
-    całego projektu. Fail-soft: brak project_id/parent_task_id albo błąd -> []."""
+    całego projektu. Fail-soft: brak project_id/parent_task_id albo błąd -> [].
+
+    Świadomie czyta poza własnym kontem AI (WS1, 29.08.2026: "bot ma do
+    dyspozycji tylko swoje zadania") — to tylko ODCZYT kontekstu RODZEŃSTWA tego
+    samego zadania (przefiltrowany po parent_task_id, nie cała kolejka), bez
+    żadnej akcji na cudzych zadaniach. Podzadania i tak są zawsze
+    assigned_to="bot" tej samej roli (task_decomposer.decompose), więc w
+    praktyce to i tak własne zadania — nie zgłaszać jako tego samego bugа."""
     parent_id = task.get("parent_task_id")
     if not parent_id or not task.get("project_id"):
         return []

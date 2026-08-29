@@ -17,6 +17,12 @@ ma konkretne daty.
 Publikuje w Projectly (komentarz na stałym pseudo-zadaniu, jak
 `ad_test_report.py`) i wysyła mailem — zgodnie z `config/email_safety.yaml`
 dziś zawsze do człowieka wewnątrz firmy (Paweł), nie do całego zespołu.
+
+Świadomie czyta zadania WSZYSTKICH kont (client.list_tasks() bez filtra po
+assignee) — to raport CAŁEGO ZESPOŁU z natury (nazwa modułu), nie działanie
+bota na cudzych zadaniach (WS1, 29.08.2026: "bot ma do dyspozycji tylko
+swoje zadania" dotyczy wykonywania/walidowania, nie tego typu raportów).
+Nie zgłaszać jako tego samego bugа co task_feedback_requester.py.
 """
 
 import os

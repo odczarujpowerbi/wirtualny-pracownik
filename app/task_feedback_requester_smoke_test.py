@@ -15,21 +15,37 @@ from pathlib import Path
 
 import task_feedback_requester as tfr
 
+# "assignee" == "asia"/"kacper" (zamiast konta AI) - te dwa zadania testowe
+# reprezentują WŁASNE zadania bota w testach 1/1b/2/3 (assignee dowolny,
+# own_account=None w tych wywołaniach = filtr wyłączony). Izolacja po koncie
+# AI (żywy bug 29.08.2026) ma OSOBNY fixture niżej (TASKS_IZOLACJA).
 TASKS = [
     {"task_id": "T-1", "title": "Zadanie 1", "status": "done", "assignee": "asia"},
     {"task_id": "T-2", "title": "Zadanie 2", "status": "done", "assignee": "kacper"},
     {"task_id": "T-3", "title": "Zadanie 3", "status": "todo", "assignee": "asia"},
 ]
 
+# Fixture dedykowany testowi izolacji: dwa zadania WŁASNEGO konta bota +
+# jedno człowieka + jedno innego bota, wszystkie "done" - bez filtru po
+# assignee wszystkie cztery kwalifikowałyby się do feedbacku (żywy bug).
+OWN_ACCOUNT = "AI - Test"
+TASKS_IZOLACJA = [
+    {"task_id": "T-WLASNE-1", "title": "Własne zadanie 1", "status": "done", "assignee": OWN_ACCOUNT},
+    {"task_id": "T-WLASNE-2", "title": "Własne zadanie 2", "status": "done", "assignee": OWN_ACCOUNT},
+    {"task_id": "T-CZLOWIEK", "title": "Zadanie człowieka", "status": "done", "assignee": "Kasia"},
+    {"task_id": "T-INNY-BOT", "title": "Zadanie innego bota", "status": "done", "assignee": "AI - Marketing"},
+]
+
 
 class _FakeClient:
-    def __init__(self, pada_na_task_id=None):
+    def __init__(self, pada_na_task_id=None, tasks=None):
         self.komentarze = []
         self.utworzone = []
         self.pada_na_task_id = pada_na_task_id
+        self.tasks = tasks if tasks is not None else TASKS
 
     def list_tasks(self):
-        return TASKS
+        return self.tasks
 
     def post_comment(self, task_id, text):
         if task_id == self.pada_na_task_id:
@@ -51,9 +67,16 @@ def run():
     tmp = Path(tempfile.mkdtemp())
     original_asked_path = tfr.ASKED_PATH
     original_generate_draft = tfr.generate_draft
+    original_own_account_name = tfr.own_account_name
 
     wolania_maila = []
     tfr.generate_draft = lambda *a, **k: wolania_maila.append((a, k)) or {"ok": True}
+    # Testy 1-5 używają zadań "asia"/"kacper" jako WŁASNYCH (own_account=None
+    # w wywołaniach bezpośrednich, filtr wyłączony) - dla run_feedback_requests(),
+    # które woła own_account_name() naprawdę, podkładamy atrapę zwracającą None
+    # (żeby nie zależeć od realnego config/projectly.yaml + BOT_ROLE maszyny
+    # testowej). Izolacja po realnym koncie ma OSOBNY blok niżej z inną atrapą.
+    tfr.own_account_name = lambda: None
 
     try:
         tfr.ASKED_PATH = tmp / "feedback_requested.json"
@@ -130,9 +153,29 @@ def run():
                        all(tid != "T-1" for tid, _ in client4.komentarze)))
         checks.append(("Kolejny przebieg: T-2 (przerwane wcześniej) dochodzi do końca",
                        any(tid == "T-2" for tid, _ in client4.komentarze) and "T-2" in tfr._load_asked()))
+
+        # --- 6. Izolacja: bot dotyka WYŁĄCZNIE zadań własnego konta AI (żywy
+        # bug 29.08.2026, żądanie właściciela: "żadnych innych"). Bez filtru
+        # T-CZLOWIEK i T-INNY-BOT też dostałyby komentarz/zadanie feedbackowe. ---
+        checks.append(("find_tasks_needing_feedback: BEZ own_account -> widzi też cudze zadania",
+                       {t["task_id"] for t in tfr.find_tasks_needing_feedback(TASKS_IZOLACJA, set())}
+                       == {"T-WLASNE-1", "T-WLASNE-2", "T-CZLOWIEK", "T-INNY-BOT"}))
+        checks.append(("find_tasks_needing_feedback: Z own_account -> WYŁĄCZNIE własne konto",
+                       {t["task_id"] for t in tfr.find_tasks_needing_feedback(TASKS_IZOLACJA, set(), own_account=OWN_ACCOUNT)}
+                       == {"T-WLASNE-1", "T-WLASNE-2"}))
+
+        tfr.own_account_name = lambda: OWN_ACCOUNT
+        tfr.ASKED_PATH = tmp / "feedback_requested_izolacja.json"
+        client_izolacja = _FakeClient(tasks=TASKS_IZOLACJA)
+        tfr.run_feedback_requests(client=client_izolacja)
+        checks.append(("run_feedback_requests: komentarz/zadanie feedbackowe TYLKO na własnych zadaniach",
+                       {tid for tid, _ in client_izolacja.komentarze} == {"T-WLASNE-1", "T-WLASNE-2"}))
+        checks.append(("run_feedback_requests: cudze zadania (człowiek/inny bot) NIGDY nie dostają komentarza",
+                       all(tid not in {"T-CZLOWIEK", "T-INNY-BOT"} for tid, _ in client_izolacja.komentarze)))
     finally:
         tfr.ASKED_PATH = original_asked_path
         tfr.generate_draft = original_generate_draft
+        tfr.own_account_name = original_own_account_name
 
     print("\n--- Wynik testu dymnego task_feedback_requester ---")
     all_passed = True

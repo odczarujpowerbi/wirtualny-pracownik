@@ -36,7 +36,7 @@ import json
 from pathlib import Path
 
 from email_draft_generator import generate_draft
-from projectly_client import PRIORITY_BACKLOG, get_client
+from projectly_client import PRIORITY_BACKLOG, get_client, own_account_name
 
 ASKED_PATH = Path(__file__).parent / "runs" / "feedback_requested.json"
 
@@ -74,14 +74,24 @@ def _save_asked(asked, path=None):
     path.write_text(json.dumps(sorted(asked), ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def find_tasks_needing_feedback(tasks, already_asked):
+def find_tasks_needing_feedback(tasks, already_asked, own_account=None):
     """Pomija zadania utworzone PRZEZ ten skrypt (tytuł już zaczyna się od
     FEEDBACK_TITLE_PREFIX) — to zadania META o pytaniu o feedback, nie
     prawdziwa praca do oceny. Bez tego zamknięcie takiego zadania przez
     człowieka wywoływało kolejną rundę "Feedback: Feedback: ..." (patrz
-    komentarz przy FEEDBACK_TITLE_PREFIX)."""
+    komentarz przy FEEDBACK_TITLE_PREFIX).
+
+    Żywy bug znaleziony 29.08.2026 (żądanie właściciela: "bot ma do dyspozycji
+    tylko swoje zadania, żadnych innych"): client.list_tasks() w
+    run_feedback_requests() nie filtruje po assignee — bez tego filtru TUTAJ
+    ten skrypt pytał o feedback i zakładał podzadanie na KAŻDYM zamkniętym
+    zadaniu w pollowanych projektach, łącznie z zadaniami ludzi i innych
+    botów, nie tylko własnymi. own_account=None (np. Mock bez roli/configu)
+    -> filtr po assignee pomijany, zachowanie sprzed poprawki (nie blokuje
+    testów/trybu mock bez pełnej konfiguracji ról)."""
     return [t for t in tasks if t.get("status") == "done" and t["task_id"] not in already_asked
-           and not (t.get("title") or "").startswith(FEEDBACK_TITLE_PREFIX)]
+           and not (t.get("title") or "").startswith(FEEDBACK_TITLE_PREFIX)
+           and (own_account is None or t.get("assignee") == own_account)]
 
 
 def request_feedback_for_task(task, client=None, send_email=False):
@@ -125,7 +135,7 @@ def run_feedback_requests(client=None, send_email=False):
     tasks = client.list_tasks()
     already_asked = _load_asked()
 
-    to_ask = find_tasks_needing_feedback(tasks, already_asked)
+    to_ask = find_tasks_needing_feedback(tasks, already_asked, own_account=own_account_name())
     results = []
     for task in to_ask:
         results.append(request_feedback_for_task(task, client=client, send_email=send_email))
