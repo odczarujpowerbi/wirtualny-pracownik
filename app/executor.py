@@ -23,6 +23,7 @@ import integracje_worker
 import pbi_desktop_bridge
 import pbip_validate
 import screenshot_capture
+import sharepoint_reader
 import tool_registry
 import validator_prompt
 import web_answer
@@ -44,6 +45,8 @@ def execute(task):
         return _run_pbip_capture(task)
     if action == "browser_task" or _browser_url_from_task(task):
         return _run_browser_task(task)
+    if action == "sharepoint_read" or _sharepoint_url_from_task(task):
+        return _run_sharepoint_read(task)
     # Konektory firmowe PRZED fetch_url: zadanie o MailerLite potrafi nieść w
     # opisie zwykły link (np. do panelu), a wtedy trafiłoby do pobierania strony
     # zamiast do właściwego źródła danych.
@@ -87,6 +90,8 @@ def rozpoznaj_narzedzie(task):
         return "open_pbip_capture"
     if action == "browser_task" or _browser_url_from_task(task):
         return "browser_task" if (task.get("browser_steps") or task.get("kroki")) else "browser_task_readonly"
+    if action == "sharepoint_read" or _sharepoint_url_from_task(task):
+        return "sharepoint_read"
     if action == "mailerlite_report" or integracje_worker.czy_mailerlite(task):
         return "mailerlite_report"
     if action == "zanfia_query" or integracje_worker.czy_zanfia(task):
@@ -114,6 +119,67 @@ def _browser_url_from_task(task):
         if web_fetch_worker.host_allowed(kandydat, domeny):
             return kandydat
     return None
+
+
+def _sharepoint_url_from_task(task):
+    """Adres SharePoint (firmowa organizacja, patrz sharepoint_read w
+    tool_contracts.yaml) wyłuskany z treści zadania — ten sam wzorzec co
+    _url_from_task/_browser_url_from_task, sprawdzany PRZED nimi, żeby link do
+    SharePoint nie trafił do zwykłego fetch_url (nieautoryzowany GET zwróciłby
+    tylko stronę logowania, nie realną treść)."""
+    contract = tool_registry.get_contract("sharepoint_read") or {}
+    domeny = tool_registry.allowed_domains(contract)
+    wskazany = task.get("url")
+    if wskazany and web_fetch_worker.host_allowed(wskazany, domeny):
+        return wskazany
+    tekst = " ".join(str(task.get(p) or "") for p in ("title", "description", "expected_result",
+                                                      "acceptance_criteria", "source_file_link"))
+    for kandydat in re.findall(r"https://\S+", tekst):
+        kandydat = kandydat.rstrip(".,;:!?)\"']")
+        if web_fetch_worker.host_allowed(kandydat, domeny):
+            return kandydat
+    return None
+
+
+def _run_sharepoint_read(task):
+    """Odczyt READ-ONLY dowolnej witryny SharePoint firmowej organizacji
+    (decyzja właściciela 29.08.2026), z wyjątkiem witryn na liście wykluczeń
+    (config/sharepoint.yaml -> read_access.denied_site_paths, np. "Zarządcze").
+    Polityka dostępu i parsowanie URL siedzą w sharepoint_reader.py — ten
+    worker tylko przekłada wynik na kontrakt execution_result."""
+    url = _sharepoint_url_from_task(task)
+    if not url:
+        return _refused("Zadanie nie wskazuje adresu SharePoint z allowlisty sharepoint_read "
+                        "(config/tool_contracts.yaml -> allowed_domains).", tool="sharepoint_read")
+
+    check = tool_registry.check_call("sharepoint_read", {"url": url})
+    if not check["allowed"]:
+        return _refused(check["reason"], tool="sharepoint_read")
+
+    wynik = sharepoint_reader.read_sharepoint_url(url)
+    if not wynik["available"]:
+        return _refused(wynik["detail"], tool="sharepoint_read")
+
+    if wynik["kind"] == "file":
+        safety = validator_prompt.check_prompt_safety(wynik["text"][:4000])
+        if not safety["safe"]:
+            return _refused(
+                f"Treść pliku '{url}' wygląda na próbę wstrzyknięcia instrukcji "
+                f"({safety['detail']}) — treść NIE jest podawana dalej do modelu.",
+                tool="sharepoint_read")
+        acceptance_notes = f"Odczytano plik SharePoint '{url}':\n\n{wynik['text']}"
+    else:
+        lista = "\n".join(f"- {'📁' if it['is_folder'] else '📄'} {it['name']}" for it in wynik["items"])
+        acceptance_notes = f"Zawartość folderu SharePoint '{url}':\n{lista or '(pusto)'}"
+
+    return {
+        "cost_usd": 0.0,  # czysty odczyt Graph, bez modelu
+        "tool": "sharepoint_read",
+        "executed": True,
+        "acceptance_notes": acceptance_notes,
+        "source_note": f"SharePoint: {url}",
+        "output": wynik,
+    }
 
 
 def _profile_for_url(url, contract):

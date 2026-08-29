@@ -11,3 +11,26 @@ library: "Dokumenty"
 # jeden podfolder per zadanie (data + skrócony tytuł), żeby łatwo
 # odróżnić deliverable od reszty zawartości biblioteki.
 root_folder: "Zadania-Agenta"
+
+# --- Odczyt INNYCH witryn SharePoint tej samej organizacji (site_host powyżej) ---
+# Decyzja właściciela 29.08.2026: każdy agent/subagent ma mieć ODCZYT (NIGDY
+# zapis) do wszystkich witryn firmowego SharePoint, z WYJĄTKIEM listy poniżej.
+# Zapis (upload_file/ensure_folder) zostaje ograniczony WYŁĄCZNIE do site_path
+# powyżej (Wirtualny-pracownik) — ta sekcja dotyczy TYLKO odczytu
+# (sharepoint_client.read_text/list_children, patrz sharepoint_reader.py).
+#
+# UWAGA (zależność zewnętrzna, nie do naprawienia w kodzie): odczyt witryny
+# INNEJ niż site_path powyżej wymaga, żeby aplikacja Graph (MS_GRAPH_CLIENT_ID)
+# miała nadane uprawnienie Sites.Read.All (całej organizacji) albo Sites.Selected
+# z jawnym dostępem do KAŻDEJ dodatkowej witryny — to nadaje się WYŁĄCZNIE przez
+# administratora Azure AD (admin consent), nie przez ten plik. Dopóki uprawnienie
+# nie jest nadane, wywołania zwrócą 403 (SharePointWriteError) — fail-closed,
+# nie cichy błąd.
+read_access:
+  # Ścieżki witryn (site_path, dokładne dopasowanie LUB prefiks) wykluczone z
+  # odczytu — dane zarządu NIE są dla botów. PLACEHOLDER: potwierdź dokładną
+  # ścieżkę witryny "Zarządcze" w SharePoint (Ustawienia witryny -> adres URL)
+  # i podmień poniżej, jeśli różni się od zgadywanej wartości.
+  denied_site_paths:
+    - "/sites/Zarzadcze"
+    - "/sites/Zarządcze"

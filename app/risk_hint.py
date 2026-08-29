@@ -34,7 +34,7 @@ _GREEN_KEYWORDS = (
 # nie powinno podnosić koloru do red — to ten sam odczyt co fetch_url, inne
 # źródło. Zadanie Z krokami (klikanie) zostaje pod zwykłą klasyfikację słów.
 _GREEN_ACTIONS = {"validate_pbip", "read_report", "capture_screenshot", "fetch_url",
-                  "browser_task_readonly", "mailerlite_report", "zanfia_query"}
+                  "browser_task_readonly", "mailerlite_report", "zanfia_query", "sharepoint_read"}
 
 # Czasowniki, które opisują CZYNNOŚĆ do wykonania na zewnątrz. Ich obecność
 # trzyma zadanie na czerwonym nawet wtedy, gdy rozpoznaliśmy read-only workera —

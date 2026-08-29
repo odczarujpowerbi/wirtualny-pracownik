@@ -163,11 +163,45 @@ class SharePointClient:
         """Link do folderu/pliku do wklejenia w komentarz Projectly."""
         return self.get_item(remote_path).get("webUrl", "")
 
+    def list_children(self, remote_path=""):
+        """ODCZYT: nazwy + typ (folder/plik) + webUrl elementów w folderze —
+        'sprawdź co jest w tym folderze SharePoint' (żądanie właściciela
+        29.08.2026: agenci/subagenci mają mieć odczyt do innych witryn firmy)."""
+        resp = self._request("GET", self._children_url(remote_path))
+        if resp.status_code != 200:
+            raise SharePointWriteError(f"Nie udało się wypisać '{remote_path or '/'}': "
+                                       f"{resp.status_code} {resp.text[:300]}")
+        return [
+            {"name": item.get("name"), "is_folder": "folder" in item, "web_url": item.get("webUrl", "")}
+            for item in resp.json().get("value", [])
+        ]
+
+    def read_text(self, remote_path):
+        """ODCZYT treści pliku jako tekst (UTF-8) — dla dokumentów tekstowych
+        (.md/.txt/.csv/.json). Pliki binarne (.docx/.pdf/.xlsx) zgłaszają się
+        czytelnym błędem zamiast zwracać nieczytelne bajty — czytanie ich
+        treści wymaga innej biblioteki (poza zakresem tej funkcji, patrz
+        document_builder.py/ocr_extract.py dla wzorców parsowania formatów)."""
+        drive_id = self.resolve_drive()
+        remote_path = remote_path.strip("/")
+        resp = self._request("GET", f"{GRAPH_BASE}/drives/{drive_id}/root:/{remote_path}:/content")
+        if resp.status_code != 200:
+            raise SharePointWriteError(f"Nie udało się odczytać '{remote_path}': "
+                                       f"{resp.status_code} {resp.text[:300]}")
+        try:
+            return resp.content.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise SharePointWriteError(
+                f"'{remote_path}' nie jest plikiem tekstowym (UTF-8) — read_text nie obsługuje "
+                f"formatów binarnych (docx/pdf/xlsx)."
+            ) from exc
+
 
 def get_sharepoint_client():
     """Realny klient, gdy sekrety MS_GRAPH_* i msal są dostępne — inaczej None
     (fail-closed: wołający decyduje, co robić bez realnego dostępu, tak jak
-    email_client.get_email_client() robi to dla poczty)."""
+    email_client.get_email_client() robi to dla poczty). Zapis (upload_file) —
+    ZAWSZE ta jedna witryna z config/sharepoint.yaml (site_host/site_path)."""
     import os
 
     required = ["MS_GRAPH_CLIENT_ID", "MS_GRAPH_CLIENT_SECRET", "MS_GRAPH_TENANT_ID"]
@@ -182,4 +216,25 @@ def get_sharepoint_client():
     return SharePointClient(
         os.environ["MS_GRAPH_CLIENT_ID"], os.environ["MS_GRAPH_CLIENT_SECRET"], os.environ["MS_GRAPH_TENANT_ID"],
         config["site_host"], config["site_path"], library=config.get("library"),
+    )
+
+
+def get_sharepoint_client_for_site(site_host, site_path, library=None):
+    """Jak get_sharepoint_client(), ale dla DOWOLNEJ witryny tej samej
+    organizacji (site_host/site_path parametryzowane) — te same poświadczenia
+    aplikacji (Graph app registration jest per-tenant, nie per-witryna), ale
+    działa TYLKO jeśli aplikacja ma nadane uprawnienie odczytu tej konkretnej
+    witryny (Sites.Read.All albo Sites.Selected + jawny dostęp) w Azure AD —
+    to nadaje administrator, nie ten kod (patrz sharepoint_reader.py i
+    config/sharepoint.yaml -> read_access). Do ODCZYTU (sharepoint_reader.py) —
+    NIE do zapisu; wołający nie powinien wołać upload_file/ensure_folder na
+    kliencie z tej fabryki."""
+    import os
+
+    required = ["MS_GRAPH_CLIENT_ID", "MS_GRAPH_CLIENT_SECRET", "MS_GRAPH_TENANT_ID"]
+    if any(not os.environ.get(k) for k in required) or not msal_available():
+        return None
+    return SharePointClient(
+        os.environ["MS_GRAPH_CLIENT_ID"], os.environ["MS_GRAPH_CLIENT_SECRET"], os.environ["MS_GRAPH_TENANT_ID"],
+        site_host, site_path, library=library,
     )
