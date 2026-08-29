@@ -22,6 +22,11 @@ maszyna (SKALOWANIE.md sekcja 2), nie substytut pola w Projectly.
 
 Mail leci zgodnie z `config/email_safety.yaml` — dziś zawsze do człowieka
 wewnątrz firmy (Paweł/Aldona), NIE bezpośrednio do assignee zadania.
+
+O feedback pytamy WYŁĄCZNIE o zadania merytoryczne. Zadania założone przez sam
+mechanizm (eskalacja/kontynuacja/feedback, patrz task_titles.py) są pomijane —
+inaczej każde zamknięte zadanie feedbackowe rodzi kolejne i mechanizm napędza
+sam siebie (opis żywego przebiegu: task_titles.py).
 """
 
 import json
@@ -29,6 +34,7 @@ from pathlib import Path
 
 from email_draft_generator import generate_draft
 from projectly_client import get_client
+from task_titles import PREFIX_FEEDBACK, derived_title, is_auto_generated_title
 
 ASKED_PATH = Path(__file__).parent / "runs" / "feedback_requested.json"
 
@@ -51,17 +57,31 @@ def _save_asked(asked, path=ASKED_PATH):
 
 
 def find_tasks_needing_feedback(tasks, already_asked):
-    return [t for t in tasks if t.get("status") == "done" and t["task_id"] not in already_asked]
+    """Zamknięte zadania merytoryczne, o które jeszcze nie pytaliśmy.
+
+    Zadania pochodne mechanizmu (eskalacja/kontynuacja/feedback) odpadają:
+    feedback do artefaktu procesu jest nie do napisania rzetelnie, a pytanie o
+    feedback do zadania feedbackowego zapętla mechanizm na własnym wyjściu."""
+    return [
+        t for t in tasks
+        if t.get("status") == "done"
+        and t["task_id"] not in already_asked
+        and not is_auto_generated_title(t.get("title"))
+    ]
 
 
 def request_feedback_for_task(task, client=None, send_email=True):
     client = client or get_client()
 
+    # .get(klucz, domyslna) NIE zadziała: kontrakt zadania niesie 'assignee'
+    # zawsze, bywa że z wartością None (zadanie bez przypisania).
+    assignee = task.get("assignee") or "unassigned_pool"
+
     client.post_comment(task["task_id"], FEEDBACK_COMMENT)
     feedback_task_id = client.create_task(
-        title=f"Feedback: {task['title']}",
+        title=derived_title(PREFIX_FEEDBACK, task["title"]),
         description=FEEDBACK_COMMENT,
-        assigned_to=task.get("assignee", "unassigned_pool"),
+        assigned_to=assignee,
         parent_task_id=task["task_id"],
         project_id=task.get("project_id"),
         relation_type="kontynuacja",
@@ -71,20 +91,20 @@ def request_feedback_for_task(task, client=None, send_email=True):
     if send_email:
         email_result = generate_draft(
             "feedback_request",
-            to=f"{task.get('assignee', 'zespol')}@wewnetrzny",
+            to=f"{assignee}@wewnetrzny",
             action="send",
             tytul_zadania=task["title"],
-            osoba=task.get("assignee", "?"),
+            osoba=assignee,
             nadawca="Bot",
         )
 
     return {"task_id": task["task_id"], "feedback_task_id": feedback_task_id, "email": email_result}
 
 
-def run_feedback_requests(client=None, send_email=True):
+def run_feedback_requests(client=None, send_email=True, asked_path=ASKED_PATH):
     client = client or get_client()
     tasks = client.list_tasks()
-    already_asked = _load_asked()
+    already_asked = _load_asked(asked_path)
 
     to_ask = find_tasks_needing_feedback(tasks, already_asked)
     results = []
@@ -92,7 +112,7 @@ def run_feedback_requests(client=None, send_email=True):
         results.append(request_feedback_for_task(task, client=client, send_email=send_email))
         already_asked.add(task["task_id"])
 
-    _save_asked(already_asked)
+    _save_asked(already_asked, asked_path)
     return results
 
 

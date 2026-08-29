@@ -15,6 +15,7 @@ zadania źródłowego (get_new_tasks niesie je w polu 'project_id').
 """
 
 import state_store
+from task_titles import PREFIX_ESKALACJA, PREFIX_KONTYNUACJA, derived_title
 
 
 def escalate_to_human(task, reason, client, options=None, assignee="pawel"):
@@ -22,7 +23,7 @@ def escalate_to_human(task, reason, client, options=None, assignee="pawel"):
     komentarz (PLAN-WDROZENIA.md sekcja 4). Zwraca ID nowo utworzonego zadania."""
     from datetime import datetime, timezone
 
-    title = f"Wymaga decyzji: {task['title']}"
+    title = derived_title(PREFIX_ESKALACJA, task["title"])
     description_lines = [
         f"Zadanie źródłowe: {task['task_id']}",
         f"Co jest potrzebne: {reason}",
@@ -75,7 +76,7 @@ def continuation_task_creator(original_task, human_decision_text, client):
     dla agenta z decyzją wbudowaną w kontekst (PLAN-WDROZENIA.md sekcja 4)."""
     from datetime import datetime, timezone
 
-    title = f"Kontynuacja: {original_task['title']}"
+    title = derived_title(PREFIX_KONTYNUACJA, original_task["title"])
     description = (
         f"Zadanie źródłowe: {original_task['task_id']}\n"
         f"Decyzja człowieka: {human_decision_text}\n"
