@@ -69,10 +69,12 @@
 
   <h2><span class="n">3</span> Uruchom agenta</h2>
   <div class="card">
-    <p>Agent startuje <b>sam</b> po zalogowaniu (autostart ustawia instalator). Ręcznie:</p>
+    <p>Bot dev startuje <b>sam</b> po zalogowaniu (autostart ustawia instalator) — podobnie marketing/zarząd, każdy jako osobny proces. Checker (dostęp do repozytorium) <b>świadomie bez autostartu</b> (29.08.2026, decyzja właściciela — ciągła pętla zużywała tokeny bez potrzeby) — startuje wyłącznie ręcznie: <code>start-agent-checker.bat</code>. Ręcznie (dowolna rola):</p>
     <pre>cd app
-python job_scheduler.py        # pętla 24/7 (pobiera zadania, klasyfikuje, waliduje)
-python dashboard.py            # podgląd: http://127.0.0.1:8787/</pre>
+set BOT_ROLE=dev    REM albo checker / marketing / zarzad
+python job_scheduler.py        # pętla (pobiera zadania, klasyfikuje, waliduje)
+python dashboard.py            # podgląd wszystkich botów: http://127.0.0.1:8787/</pre>
+    <p>Albo z korzenia repo: pliki <code>start-agent-*.bat</code> (jeden per rola), <code>start-agent-all.bat</code> (wszystkie naraz, osobne okna), <code>start-dashboard.bat</code>.</p>
   </div>
 
   <h2><span class="n">4</span> Zaloguj się na konta</h2>

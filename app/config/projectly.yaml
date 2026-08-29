@@ -14,7 +14,8 @@ ai_account:
   type_value: "AI"         # używane dopiero gdy by = type
 
 # Mapa: rola maszyny (config/role.json, bootstrap_register.py) -> nazwa konta
-# AI w Projectly. Dev, Marketing i Checker istnieją dziś; reszta to plan (ZESPOL-BOTOW.md).
+# AI w Projectly. Dev, Marketing, Checker i Zarząd istnieją dziś; reszta to
+# plan (ZESPOL-BOTOW.md).
 role_to_account:
   dev: "AI - Dev"
   marketing: "AI - Marketing"
@@ -26,6 +27,11 @@ role_to_account:
   # niespójne z resztą ("AI - Dev" itd.), ale to tylko string dopasowywany
   # 1:1 do katalogu osób (_resolve_person_id), nie wzorzec.
   checker: "AI-Checker"
+  # "Zarząd" (decyzja właściciela 29.08.2026): własny, niezależny proces —
+  # wcześniej konto "AI - Zarząd" było odbierane przy okazji przez proces dev
+  # (patrz poniżej poll.extra_accounts, gdzie ten wpis został USUNIĘTY tego
+  # samego dnia z tego samego powodu co przy wydzieleniu marketingu).
+  zarzad: "AI - Zarząd"
   admin: "AI - Admin"          # planowane
   asystent: "AI - Asystent"    # planowane
   strateg: "AI - Strateg"      # planowane
@@ -53,10 +59,12 @@ poll:
   # (BOT_ROLE=marketing, start-agent-marketing.bat, job "runner_loop_marketing"
   # w schedule.yaml) — zostawienie go też tutaj groziłoby PODWÓJNYM
   # przetworzeniem tego samego zadania przez dwa niezależne procesy naraz.
+  # "AI - Zarząd" USUNIĘTE stąd tego samego dnia, tym samym powodem — zarząd
+  # dostał WŁASNY proces (BOT_ROLE=zarzad, start-agent-zarzad.bat, job
+  # "runner_loop_zarzad"), patrz role_to_account.zarzad wyżej.
   # Konto wymienione tutaj, a nieistniejące w Projectly, jest zgłaszane w logu
   # (literówka nie może wyglądać jak "brak zadań").
-  extra_accounts:
-    - "AI - Zarząd"
+  extra_accounts: []
 
 # Status na żywo per rola (live_status_publisher.py, machine_status_reporter.py,
 # kacper_monitor.py, system_health_monitor.py — wszystkie przez

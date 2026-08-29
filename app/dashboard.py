@@ -15,14 +15,14 @@ job_scheduler.py; ten plik to tylko cienka warstwa HTTP nad nim:
     GET  /api/state           -> zadania + status + historia przebiegów (JSON)
     POST /api/schedule        -> zmiana interwału / włączenia / opisu jednego zadania
     POST /api/run             -> uruchom jedno zadanie natychmiast (poza harmonogramem)
-    GET  /api/agents          -> status (działa/nie) każdego bota (dev/checker/marketing)
+    GET  /api/agents          -> status (działa/nie) każdego bota (dev/checker/marketing/zarząd)
     POST /api/agents/start    -> odpala PROCES joba wskazanej roli (jeśli nie działa)
     POST /api/agents/start-all -> to samo dla wszystkich ról naraz
 
 Serwer słucha TYLKO na 127.0.0.1 (localhost) — nie jest wystawiony na sieć.
 'Uruchom teraz' odpala wyłącznie zadania zadeklarowane w schedule.yaml,
 nigdy dowolny kod. 'Uruchom agenta' (dodane 29.08.2026, do testowania)
-odpala WYŁĄCZNIE jeden z trzech znanych .bat-ów (AGENT_BAT_FILES), nigdy
+odpala WYŁĄCZNIE jeden ze znanych .bat-ów (AGENT_BAT_FILES), nigdy
 dowolną ścieżkę z requestu.
 """
 
@@ -51,13 +51,17 @@ HTML_PATH = Path(__file__).parent / "dashboard.html"
 # Przyciski "uruchom agenta X" (dodane 29.08.2026, na wyraźną prośbę
 # właściciela — do testowania: chce móc odpalić każdego bota osobno, bez
 # grzebania w Harmonogramie zadań Windows/terminalu). Repo root = katalog
-# NADRZĘDNY wobec app/ (ten plik jest w app/, .bat-y w korzeniu repo, ten
-# sam układ co start-agent.bat/start-agent-checker.bat/start-agent-marketing.bat).
+# NADRZĘDNY wobec app/ (ten plik jest w app/, .bat-y w korzeniu repo). "dev"
+# przemianowany z "start-agent.bat" na "start-agent-dev.bat" 29.08.2026 (spójność
+# nazw z checker/marketing/zarząd). "zarzad" (29.08.2026) — czwarta, niezależna
+# rola (konto "AI - Zarząd" w Projectly, wcześniej odbierane przy okazji przez
+# proces dev — patrz config/projectly.yaml poll.extra_accounts).
 REPO_ROOT = Path(__file__).parent.parent
 AGENT_BAT_FILES = {
-    "dev": REPO_ROOT / "start-agent.bat",
+    "dev": REPO_ROOT / "start-agent-dev.bat",
     "checker": REPO_ROOT / "start-agent-checker.bat",
     "marketing": REPO_ROOT / "start-agent-marketing.bat",
+    "zarzad": REPO_ROOT / "start-agent-zarzad.bat",
 }
 
 
@@ -75,7 +79,7 @@ def _launch_process(cmd, cwd):
 
 
 def build_agents():
-    """Status (działa/nie działa) każdego z trzech botów na tej maszynie —
+    """Status (działa/nie działa) każdego bota na tej maszynie —
     do panelu 'Agenci' w dashboardzie. is_running() to prawdziwy test
     żywotności procesu (scheduler_lock.py), nie tylko obecność pliku."""
     return {"agents": [{"role": rola, "running": scheduler_lock.is_running(rola)}
@@ -105,7 +109,7 @@ def start_all_agents():
 
 
 def build_state():
-    """Zagregowany widok WSZYSTKICH ról (dev/checker/marketing, patrz
+    """Zagregowany widok WSZYSTKICH ról (dev/checker/marketing/zarząd, patrz
     job_scheduler.discover_roles()) — dodane 29.08.2026, kiedy stan/historia
     stały się plikami PER ROLA (job_scheduler._status_path_for_role itd.).
     Bez tej agregacji dashboard pokazywałby tylko rolę procesu, pod którym

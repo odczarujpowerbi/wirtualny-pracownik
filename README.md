@@ -23,7 +23,7 @@ Pełna dokumentacja (wiele małych, samodzielnych stron, wspólny wygląd, każd
    Repo już jest? Kliknij `instalacja\Przygotuj-srodowisko.bat` (jako administrator). Instalacja jest **bezobsługowa**.
 2. Uzupełnij dostępy w `app\secrets\.env` (i `app\secrets\mcp\*.json`). Szczegóły w instrukcji.
 3. Zaloguj się na konta: `instalacja\Zaloguj.bat` (osobny, szybki krok po instalacji).
-4. Agent startuje sam (autostart). Podgląd: `python app\dashboard.py` → http://127.0.0.1:8787/
+4. Bot dev/marketing/zarząd startuje sam (autostart). Checker (dostęp do repo) startuje WYŁĄCZNIE ręcznie (`start-agent-checker.bat`) — świadomie bez autostartu, żeby nie zużywał tokenów w tle bez potrzeby. Podgląd: `start-dashboard.bat` (albo `python app\dashboard.py`) → http://127.0.0.1:8787/
 
 ## Główny folder — co jest czym
 
@@ -31,7 +31,8 @@ Pełna dokumentacja (wiele małych, samodzielnych stron, wspólny wygląd, każd
 - **`docs/`** — dokumentacja (instrukcja, dokumentacja projektu, przepływ).
 - **`app/`** — kod (rdzeń agenta, boty, dashboard, skrypty instalacyjne). Stan i sekrety w `app/runs/` i `app/secrets/` (poza repo).
 - **`aktualizuj-repo.bat`** — pobranie nowego kodu z GitHub (dwuklik).
-- **`start-agent.bat`** — ręczny start pętli agenta.
+- **`start-agent-dev.bat`** / **`start-agent-checker.bat`** / **`start-agent-marketing.bat`** / **`start-agent-zarzad.bat`** — ręczny start pętli jednego z czterech botów (każdy osobny proces/okno). **`start-agent-all.bat`** — odpala wszystkie cztery naraz, w osobnych oknach.
+- **`start-dashboard.bat`** — ręczny start panelu operatora (`python app\dashboard.py` → http://127.0.0.1:8787/).
 
 ## Stack
 

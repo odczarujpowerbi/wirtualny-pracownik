@@ -65,7 +65,7 @@
   .ctrl-btns { display:flex; gap:8px; flex-wrap:wrap; }
   button.danger { background:var(--err); border-color:var(--err); color:#fff; }
 
-  /* Panel agentów (dev/checker/marketing) - przyciski "uruchom" per bot. */
+  /* Panel agentów (dev/checker/marketing/zarząd) - przyciski "uruchom" per bot. */
   .agents { display:flex; align-items:center; gap:10px; padding:12px 16px; flex-wrap:wrap; }
   .agent-chip { display:flex; align-items:center; gap:8px; padding:6px 12px; border:1px solid var(--line);
                 border-radius:999px; }
@@ -157,7 +157,7 @@
     </div>
   </div>
 
-  <h2>Agenci (dev / checker / marketing)</h2>
+  <h2>Agenci (dev / checker / marketing / zarząd)</h2>
   <div class="card agents" id="agents"></div>
 
   <h2>Dodaj zadanie</h2>
@@ -341,7 +341,7 @@ async function loadHealth() {
   } catch (e) { /* cicho */ }
 }
 
-// ---- Panel agentów: dev/checker/marketing, przyciski "uruchom" per bot ----
+// ---- Panel agentów: dev/checker/marketing/zarząd, przyciski "uruchom" per bot ----
 async function startAgent(role, button) {
   button.disabled = true;
   try {

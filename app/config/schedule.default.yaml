@@ -205,3 +205,23 @@ jobs:
   interval_seconds: 90
   enabled: true
   role: marketing
+- name: runner_loop_zarzad
+  description: Ta sama funkcja co job "runner_loop" (runner_loop.run_once) -
+    osobny wpis dla WLASNEGO procesu zarzadu (BOT_ROLE=zarzad,
+    start-agent-zarzad.bat) - decyzja wlasciciela 29.08.2026. Wczesniej
+    zadania konta "AI - Zarzad" byly odbierane przy okazji przez proces "dev"
+    (poll.extra_accounts w config/projectly.yaml) - od tej daty usuniete
+    stamtad, zarzad ma wlasny, niezalezny proces.
+  module: runner_loop
+  function: run_once
+  interval_seconds: 30
+  enabled: true
+  role: zarzad
+- name: escalation_watcher_zarzad
+  description: Ta sama funkcja co "escalation_watcher" - osobny wpis dla procesu
+    zarzadu (BOT_ROLE=zarzad), pilnuje WYLACZNIE eskalacji konta "AI - Zarzad".
+  module: escalation_watcher
+  function: run_once
+  interval_seconds: 90
+  enabled: true
+  role: zarzad
