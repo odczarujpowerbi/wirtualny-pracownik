@@ -87,6 +87,13 @@ _STATUS_KEY_RENAME = {
     "cost_limit_usd": "costLimitUsd",
     "machine": "machine",
     "message": "message",
+    # Dodane 29.08.2026 (docs/MCP-STATUS-I-KOSZTY.md sekcja 1) — dłuższy opis
+    # zdarzenia (co dokładnie się wydarzyło, ID, parametry), pokazywany po
+    # rozwinięciu zdarzenia w monitoringu Projectly. Odrębne od `details`
+    # (liczba mnoga, cały surowy payload, niżej) — `detail` to CELOWY, krótki
+    # tekst pisany PRZEZ wywołującego (patrz live_status_publisher.build_status
+    # nowy parametr `detail`), nie automatyczny zrzut.
+    "detail": "detail",
     # Dodane 25.08.2026 — jak "details" niżej: produkcyjny schemat post_agent_status
     # może dziś TO pole ignorować (nierozpoznany klucz), wysyłamy mimo to, żeby
     # zadziałało bez zmiany tego kodu, gdy Projectly rozpozna je po swojej stronie.
@@ -466,10 +473,17 @@ class ProjectlyClient:
             )
         return new_id
 
-    def set_task_feedback(self, task_id, feedback=None, actual_hours=None, completed_at=None, status=None):
+    def set_task_feedback(self, task_id, feedback=None, actual_hours=None, completed_at=None,
+                          status=None, cost_usd=None):
         """MCP: update_task. Feedback po zadaniu / samoocena i domknięcie:
         wypełnia feedback, realny czas (actualHours) i datę wykonania
-        (completedAt), opcjonalnie ustawia status. Pola puste pomijamy."""
+        (completedAt), opcjonalnie ustawia status. Pola puste pomijamy.
+
+        cost_usd (NOWE, 29.08.2026 — docs/MCP-STATUS-I-KOSZTY.md sekcja 2):
+        koszt AI TEGO zadania (`costUsd` w Projectly) — pole opcjonalne w MCP,
+        jeszcze bez gwarancji zapisu po stronie serwera na czas wdrożenia
+        (dokumentacja: "wchodzi do bazy przy najbliższym deployu... do tego
+        czasu wysyłanie nie zaszkodzi"), więc wysyłamy mimo to — fail-soft."""
         args = {"taskId": task_id}
         if feedback is not None:
             args["feedback"] = feedback
@@ -479,6 +493,8 @@ class ProjectlyClient:
             args["completedAt"] = completed_at
         if status is not None:
             args["status"] = status
+        if cost_usd is not None:
+            args["costUsd"] = round(cost_usd, 4)
         self._mcp.call_tool("update_task", args)
         return True
 
@@ -677,8 +693,10 @@ class MockProjectlyClient:
         comments = self._load(self._comments_path, default={})
         return comments.get(task_id, [])
 
-    def set_task_feedback(self, task_id, feedback=None, actual_hours=None, completed_at=None, status=None):
-        record = {"feedback": feedback, "actual_hours": actual_hours, "completed_at": completed_at, "status": status}
+    def set_task_feedback(self, task_id, feedback=None, actual_hours=None, completed_at=None,
+                          status=None, cost_usd=None):
+        record = {"feedback": feedback, "actual_hours": actual_hours, "completed_at": completed_at,
+                 "status": status, "cost_usd": cost_usd}
         store = self._load(self._feedback_path, default={})
         store[task_id] = record
         self._save(self._feedback_path, store)

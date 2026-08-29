@@ -425,7 +425,10 @@ def _zapisz_feedback(client, task_id, status, execution_result, risk):
     }.get(status, f"Status: {status}.")
     tresc = f"[agent] {opis} Narzędzie: {narzedzie}. Ryzyko: {risk}. Koszt modelu: {koszt:.2f} USD."
     try:
-        zapis(task_id, feedback=tresc)
+        # cost_usd (29.08.2026, docs/MCP-STATUS-I-KOSZTY.md): rozbicie kosztów
+        # PER ZADANIE w Projectly (nie tylko dzienna suma z cost_tracker), żeby
+        # master widział koszt każdego agenta jako sumę jego zadań.
+        zapis(task_id, feedback=tresc, cost_usd=koszt)
         return True
     except Exception as exc:  # noqa: BLE001 — feedback jest dodatkiem, nie może ubić przebiegu
         state_store.log_decision(task_id, agent="pawel", decision="feedback_failed",

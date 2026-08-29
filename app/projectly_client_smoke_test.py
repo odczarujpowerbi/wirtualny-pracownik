@@ -146,6 +146,31 @@ def test_update_status_maps_przeniesione_literally():
     print("OK  update_status('przeniesione') mapuje na Projectly status 'przeniesione', nie in_progress")
 
 
+def test_set_task_feedback_sends_cost_usd_to_update_task():
+    # costUsd (29.08.2026, docs/MCP-STATUS-I-KOSZTY.md sekcja 2) - koszt PER
+    # ZADANIE, rozbicie kosztow per agent jako suma jego zadan w Projectly.
+    client = ProjectlyClient(api_key="fake-token", base_url="http://fake.local/mcp")
+    client._mcp = _FakeMCPClient()
+
+    client.set_task_feedback("T-1", feedback="Zrobione.", cost_usd=0.8765)
+
+    name, args = client._mcp.calls[0]
+    assert name == "update_task"
+    assert args["costUsd"] == 0.8765, "cost_usd musi trafic jako costUsd (camelCase) do update_task"
+    print("OK  set_task_feedback wysyla cost_usd jako costUsd do update_task")
+
+
+def test_set_task_feedback_omits_cost_usd_when_not_given():
+    client = ProjectlyClient(api_key="fake-token", base_url="http://fake.local/mcp")
+    client._mcp = _FakeMCPClient()
+
+    client.set_task_feedback("T-1", feedback="Zrobione.")
+
+    _, args = client._mcp.calls[0]
+    assert "costUsd" not in args, "brak cost_usd -> pole pominiete, nie None"
+    print("OK  set_task_feedback bez cost_usd -> costUsd pominiete w wywolaniu MCP")
+
+
 def test_load_role_bot_role_env_var_overrides_role_json(tmp_path=None):
     # BOT_ROLE dodane 29.08.2026 (ten sam mechanizm co env_bootstrap._current_role,
     # celowo zduplikowany zamiast importu - patrz komentarz przy _load_role) -
@@ -177,5 +202,7 @@ if __name__ == "__main__":
     test_create_task_parent_task_id_still_uses_zbot_link_tasks()
     test_map_task_exposes_parent_task_id_and_subtask_count()
     test_update_status_maps_przeniesione_literally()
+    test_set_task_feedback_sends_cost_usd_to_update_task()
+    test_set_task_feedback_omits_cost_usd_when_not_given()
     test_load_role_bot_role_env_var_overrides_role_json()
     print("\nWszystkie testy MockProjectlyClient przeszły.")

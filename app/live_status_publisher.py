@@ -88,7 +88,7 @@ def _needs_approval_count(client):
     return sum(1 for t in tasks if (t.get("title") or "").startswith("Wymaga decyzji:") and t.get("status") != "done")
 
 
-def build_status(role="dev", processed_tasks=None, queued_tasks=None, client=None):
+def build_status(role="dev", processed_tasks=None, queued_tasks=None, client=None, detail=None):
     watchdog_result = watchdog.check()
     cost = cost_tracker.check_daily_limit()
     processed_tasks = processed_tasks or []
@@ -132,11 +132,21 @@ def build_status(role="dev", processed_tasks=None, queued_tasks=None, client=Non
         # "bezczynny" mimo realnej pracy — build_status() nigdy nie ustawiało
         # 'status', więc _map_status_payload zawsze wpisywało domyślne "idle").
         "status": "working" if (processed_tasks or queued_tasks) else "idle",
+        # detail (29.08.2026, docs/MCP-STATUS-I-KOSZTY.md sekcja 1): dłuższy opis
+        # zdarzenia, pokazywany po rozwinięciu w monitoringu. `detail` jawnie
+        # podane przez wywołującego wygrywa; inaczej domyślny, zbudowany z
+        # processed_tasks (id + tytuł każdego przetworzonego zadania w tym
+        # cyklu) — bez tego jedynym śladem PO CO był ten przebieg jest skrócony
+        # `message` (obcięty do 500 znaków, patrz _map_status_payload).
+        "detail": detail if detail is not None else (
+            "; ".join(f"{t.get('task_id', '?')}: {str(t.get('title') or '?')[:60]}" for t in processed_tasks)
+            or None
+        ),
     }
 
 
-def publish(client, role="dev", processed_tasks=None, queued_tasks=None):
-    status = build_status(role, processed_tasks, queued_tasks, client=client)
+def publish(client, role="dev", processed_tasks=None, queued_tasks=None, detail=None):
+    status = build_status(role, processed_tasks, queued_tasks, client=client, detail=detail)
     client.publish_status(role, status)
     return status
 

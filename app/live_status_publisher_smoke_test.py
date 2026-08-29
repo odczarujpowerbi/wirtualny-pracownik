@@ -32,6 +32,23 @@ def test_map_status_payload_keeps_known_fields_and_full_details():
     print("OK  live_status_publisher-kształt payloadu -> pola rozpoznane + details bez strat")
 
 
+def test_map_status_payload_maps_detail_field():
+    # detail (29.08.2026, docs/MCP-STATUS-I-KOSZTY.md sekcja 1) - dluzszy opis
+    # zdarzenia, odrebne od "details" (liczba mnoga, caly surowy payload).
+    payload = {"message": "Przeskanowano 14 zdarzen", "detail": "Zrodlo: inbox. Nowe: 3."}
+    mapped = _map_status_payload(payload)
+    assert mapped["detail"] == "Zrodlo: inbox. Nowe: 3."
+    assert mapped["message"] == "Przeskanowano 14 zdarzen"
+    assert mapped["details"] == payload, "details (liczba mnoga) nadal niesie caly oryginalny payload"
+    print("OK  _map_status_payload mapuje pole 'detail' (dluzszy opis zdarzenia), odrebnie od 'details'")
+
+
+def test_map_status_payload_detail_absent_when_not_provided():
+    mapped = _map_status_payload({"message": "cos"})
+    assert "detail" not in mapped, "brak 'detail' w payloadzie -> pole pominiete, nie None/pusty string"
+    print("OK  brak 'detail' w payloadzie wejsciowym -> pole pominiete w wyniku")
+
+
 def test_map_status_payload_infers_alert_from_critical_health_status():
     # Kształt jak system_health_monitor.py: 'status' znaczy ok/warning/critical, NIE working/idle/...
     payload = {
@@ -91,6 +108,32 @@ def test_map_status_payload_machine_status_synthesizes_readable_message():
     assert "RAM wolne: 55.0%" in mapped["message"]
     assert mapped["health"] == "ok", "machine_status_reporter nie niesie sygnału zdrowia -> domyślnie ok"
     print("OK  machine_status_reporter-kształt -> message z wersjami narzędzi + RAM, mimo braku 'details' w schemacie")
+
+
+def test_build_status_detail_default_synthesized_from_processed_tasks():
+    import live_status_publisher
+
+    processed = [{"task_id": "T-1", "title": "Zestawienie kampanii"}, {"task_id": "T-2", "title": "Raport tygodniowy"}]
+    status = live_status_publisher.build_status(role="dev", processed_tasks=processed)
+    assert status["detail"] == "T-1: Zestawienie kampanii; T-2: Raport tygodniowy"
+    print("OK  build_status(): brak jawnego 'detail' -> domyślnie zbudowany z processed_tasks")
+
+
+def test_build_status_detail_explicit_overrides_default():
+    import live_status_publisher
+
+    processed = [{"task_id": "T-1", "title": "Zestawienie kampanii"}]
+    status = live_status_publisher.build_status(role="dev", processed_tasks=processed, detail="Coś innego.")
+    assert status["detail"] == "Coś innego."
+    print("OK  build_status(): jawnie podane 'detail' wygrywa nad domyślną syntezą")
+
+
+def test_build_status_detail_none_when_nothing_processed():
+    import live_status_publisher
+
+    status = live_status_publisher.build_status(role="dev")
+    assert status["detail"] is None, "brak processed_tasks i brak jawnego detail -> None, nie pusty string"
+    print("OK  build_status(): brak processed_tasks -> detail=None (pole pominięte w _map_status_payload)")
 
 
 def test_real_live_status_publisher_payload_maps_cleanly():
@@ -170,10 +213,15 @@ def test_publish_status_falls_back_to_documentation_by_default():
 
 if __name__ == "__main__":
     test_map_status_payload_keeps_known_fields_and_full_details()
+    test_map_status_payload_maps_detail_field()
+    test_map_status_payload_detail_absent_when_not_provided()
     test_map_status_payload_infers_alert_from_critical_health_status()
     test_map_status_payload_unknown_shape_still_preserved_in_details()
     test_map_status_payload_kacper_repairs_created_forces_alert_and_message()
     test_map_status_payload_machine_status_synthesizes_readable_message()
+    test_build_status_detail_default_synthesized_from_processed_tasks()
+    test_build_status_detail_explicit_overrides_default()
+    test_build_status_detail_none_when_nothing_processed()
     test_real_live_status_publisher_payload_maps_cleanly()
     test_real_machine_status_payload_maps_cleanly()
     test_real_system_health_payload_maps_cleanly()
