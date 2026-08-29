@@ -61,9 +61,40 @@ def test_missing_file():
     print("OK  brak pliku -> available:false (lagodna degradacja)")
 
 
+def test_over_threshold_wymaga_swiadomej_konfiguracji():
+    """Zywy przypadek 29.08.2026: DEFAULT_BLOCK_BUDGET_USD (40 USD) na realnej
+    maszynie dawal 198% (sesja realnie kosztowniejsza niz ten placeholder) -
+    over_threshold() MUSI zostac False, dopoki wlasciciel nie ustawi realnego
+    budzetu w BLOCK_BUDGET_PATH - inaczej wlaczenie tej funkcji zatrzymaloby
+    boty na zgadanym progu, bez swiadomej decyzji."""
+    original_path = usage_monitor.BLOCK_BUDGET_PATH
+    tmp_dir = Path(tempfile.mkdtemp())
+    try:
+        usage_monitor.BLOCK_BUDGET_PATH = tmp_dir / "usage_block_budget_usd.txt"
+
+        podsumowanie_wysokie = {"available": True, "block_budget_used_pct": 198.2}
+        assert usage_monitor.over_threshold(podsumowanie_wysokie) is False, \
+            "bez skonfigurowanego budzetu - NIGDY nie blokuje, nawet przy 198%"
+
+        usage_monitor.BLOCK_BUDGET_PATH.write_text("15.0", encoding="utf-8")
+        assert usage_monitor.over_threshold(podsumowanie_wysokie) is True, \
+            "po skonfigurowaniu budzetu - 198% >= prog (85%) -> True"
+
+        podsumowanie_niskie = {"available": True, "block_budget_used_pct": 10.0}
+        assert usage_monitor.over_threshold(podsumowanie_niskie) is False, \
+            "skonfigurowany budzet, ale ponizej progu -> False"
+
+        assert usage_monitor.over_threshold({"available": False}) is False, \
+            "available=False -> zawsze False, niezaleznie od konfiguracji"
+    finally:
+        usage_monitor.BLOCK_BUDGET_PATH = original_path
+    print("OK  over_threshold blokuje WYLACZNIE po swiadomej konfiguracji budzetu okna 5h")
+
+
 if __name__ == "__main__":
     test_window_excludes_old()
     test_today_sums_all()
     test_summary_estimates()
     test_missing_file()
+    test_over_threshold_wymaga_swiadomej_konfiguracji()
     print("\nWszystkie testy monitora zuzycia przeszly.")

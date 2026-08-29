@@ -44,6 +44,7 @@ import state_store
 import task_decomposer
 import task_router
 import task_thinker
+import usage_monitor
 import validator_prompt
 from escalation import ESCALATION_TITLE_PREFIX, escalate_to_human
 from projectly_client import effective_priority, get_client
@@ -621,6 +622,13 @@ def _zaloguj_kolejke_przy_starcie(tasks):
 
 
 def run_once(client=None):
+    # client wstrzykiwany w testach (bootstrap_smoke_test wymusza mock, żeby test
+    # mechanizmu był deterministyczny niezależnie od tego, czy live Projectly ma
+    # akurat zadania). W produkcji None -> get_client() (mock albo realny wg .env).
+    # Rozwiązywany PRZED pozostałymi bramkami (kill switch/pauza/budżet/zużycie) —
+    # potrzebny do publikacji statusu na żywo, gdy któraś z nich wstrzyma cykl.
+    client = client or get_client()
+
     if kill_switch.is_active():
         print(f"Kill switch aktywny ({kill_switch.reason()}) — runner nie podejmuje akcji.")
         return []
@@ -637,12 +645,29 @@ def run_once(client=None):
         heartbeat.write_heartbeat(current_task_id=None, extra={"budget": budget})
         return []
 
+    # Zużycie limitu subskrypcji (żądanie właściciela 29.08.2026, próg finalnie
+    # 85%): bieżące zadanie kończy się normalnie (ten check jest PRZED pobraniem
+    # nowej partii), tylko nowe nie startują — analogicznie do budżetu dobowego
+    # wyżej, ale to osobna metryka (usage_monitor, 5h/subskrypcja, nie dzienny
+    # koszt AI). Status na żywo TEJ roli dostaje jawną notatkę — użytkownik ma
+    # zobaczyć wprost "dlaczego" w statusie konta, nie tylko w logu procesu.
+    usage = usage_monitor.summary()
+    if usage_monitor.over_threshold(usage):
+        procent = usage.get("block_budget_used_pct")
+        print(
+            f"Zużycie limitu ≥{usage_monitor.THRESHOLD_PAUSE_PERCENT}% ({procent}%) — "
+            "runner kończy zadania w kolejce, nowych nie przyjmuje do odnowienia limitu."
+        )
+        heartbeat.write_heartbeat(current_task_id=None, extra={"usage": usage})
+        live_status_publisher.publish(
+            client, role=env_bootstrap._current_role(),
+            detail=f"⏸️ Zużycie limitu ≥{usage_monitor.THRESHOLD_PAUSE_PERCENT}% ({procent}%) — "
+                   "kończę zadania w kolejce, nowych nie przyjmuję do odnowienia limitu.",
+        )
+        return []
+
     policy = risk_classifier.load_policy()
     routing = task_router.load_routing()
-    # client wstrzykiwany w testach (bootstrap_smoke_test wymusza mock, żeby test
-    # mechanizmu był deterministyczny niezależnie od tego, czy live Projectly ma
-    # akurat zadania). W produkcji None -> get_client() (mock albo realny wg .env).
-    client = client or get_client()
 
     heartbeat.write_heartbeat(current_task_id=None)
 

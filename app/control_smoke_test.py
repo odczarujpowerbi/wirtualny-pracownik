@@ -16,7 +16,7 @@ import kill_switch
 
 def _isolate_flags():
     tmp = Path(tempfile.mkdtemp())
-    control.PAUSE_FLAG_PATH = tmp / "PAUSE.flag"
+    control.RUNS_DIR = tmp
     kill_switch.STOP_FLAG_PATH = tmp / "STOP.flag"
     # should_run_new_work() dolicza budżet (cost_tracker.budget_state, żywa
     # runs/state.db) — testy pause/stop mają sprawdzać TYLKO logikę pause/stop,
@@ -77,6 +77,26 @@ def test_budget_blocks_new_work():
     print("OK  budżet warning/exceeded wstrzymuje nową pracę, 'ok' odblokowuje samoczynnie")
 
 
+def test_pauza_rolo_swiadoma():
+    """Żywy bug znaleziony 29.08.2026 (żądanie właściciela: "wyłączenie agenta
+    oznacza, że nie przyjmuje zadań" — o JEDNYM agencie): jeden globalny plik
+    PAUSE.flag pauzował WSZYSTKIE role naraz. Pauza roli 'checker' NIE MOŻE
+    wpływać na rolę 'dev', i odwrotnie."""
+    _isolate_flags()
+    assert control.state(role="dev") == "running"
+    assert control.state(role="checker") == "running"
+
+    control.apply("pause", role="checker")
+    assert control.state(role="checker") == "paused", "checker ma być wstrzymany"
+    assert control.state(role="dev") == "running", "dev NIE MOŻE zostać wstrzymany pauzą checkera"
+    assert control.should_run_new_work(role="checker") is False
+    assert control.should_run_new_work(role="dev") is True
+
+    control.apply("resume", role="checker")
+    assert control.state(role="checker") == "running"
+    print("OK  pauza jednej roli (checker) nie wpływa na inną rolę (dev)")
+
+
 def test_unknown_action():
     _isolate_flags()
     try:
@@ -92,5 +112,6 @@ if __name__ == "__main__":
     test_pause_resume()
     test_stop_priorytet_nad_pause()
     test_budget_blocks_new_work()
+    test_pauza_rolo_swiadoma()
     test_unknown_action()
     print("\nWszystkie testy sterowania przeszły.")

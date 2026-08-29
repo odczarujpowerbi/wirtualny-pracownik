@@ -101,6 +101,8 @@
   .badge.clickable { cursor:pointer; }
   .badge.clickable:hover { filter:brightness(0.95); text-decoration:underline; }
   .row-off td { color:var(--off); }
+  .job-category-row td { background:#fafbfc; font-size:11px; text-transform:uppercase; letter-spacing:.03em;
+    color:var(--muted); padding:6px 14px; border-top:1px solid var(--line); }
   button { font:inherit; cursor:pointer; border-radius:6px; border:1px solid var(--line);
            background:#fff; padding:6px 11px; margin:2px 0; }
   button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
@@ -370,14 +372,39 @@ async function startAllAgents(button) {
   finally { button.disabled = false; }
 }
 
+// Wyłącz/włącz JEDNEGO agenta (29.08.2026, decyzja właściciela) — miękka
+// pauza per rola (control.py): agent kończy bieżące zadanie, nowych nie
+// przyjmuje, dopóki nie zostanie włączony z powrotem.
+async function pauseAgent(role, action, button) {
+  button.disabled = true;
+  try {
+    const res = await fetch("/api/agents/pause", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role, action }),
+    });
+    const json = await res.json();
+    if (!res.ok || json.data.ok === false) throw new Error((json.data && json.data.message) || (json.error && json.error.message) || "Błąd");
+    toast(json.data.message || "OK");
+    setTimeout(loadAgents, 500);
+  } catch (e) { toast(e.message, true); }
+  finally { button.disabled = false; }
+}
+
 function buildAgentChip(agent) {
   const btn = el("button", { class: "primary", text: agent.running ? "Działa" : "▶ Uruchom" });
   btn.disabled = agent.running;
   btn.addEventListener("click", () => startAgent(agent.role, btn));
+  const pauseBtn = el("button", {
+    class: agent.paused ? "primary" : "",
+    text: agent.paused ? "⏸ Wyłączony" : "⏸ Wyłącz",
+    title: agent.paused ? "Kliknij, aby włączyć z powrotem" : "Dokończy bieżące zadanie, nowych nie przyjmie",
+  });
+  pauseBtn.addEventListener("click", () => pauseAgent(agent.role, agent.paused ? "resume" : "pause", pauseBtn));
   return el("div", { class: "agent-chip" }, [
     el("span", { class: `agent-dot ${agent.running ? "on" : "off"}` }),
     el("span", { class: "agent-name", text: agent.role }),
     btn,
+    pauseBtn,
   ]);
 }
 
@@ -565,9 +592,36 @@ function fillStatusCell(td, s) {
   }
 }
 
+// Kategorie (schedule.default.yaml pole 'category', wzorowane na MAPA-SKRYPTOW.md)
+// - grupowanie zamiast plaskiej listy, zeby latwiej odnalezc skrypt wsrod
+// dwudziestu kilku jobow na kilku rolach (zadanie wlasciciela 29.08.2026).
+const CATEGORY_ORDER = [
+  "Rdzeń pętli", "Komunikacja/eskalacja", "Status/monitoring",
+  "Raporty i digesty", "Jakość danych", "Bezpieczeństwo/repo",
+];
+const JOBS_TABLE_COLSPAN = 8;
+
+function groupJobsByCategory(jobs) {
+  const grupy = new Map();
+  for (const job of jobs) {
+    const kat = job.category || "Inne";
+    if (!grupy.has(kat)) grupy.set(kat, []);
+    grupy.get(kat).push(job);
+  }
+  const kolejnosc = [...CATEGORY_ORDER, ...[...grupy.keys()].filter((k) => !CATEGORY_ORDER.includes(k))];
+  return kolejnosc.filter((k) => grupy.has(k)).map((k) => [k, grupy.get(k)]);
+}
+
 function renderJobs(jobs) {
   rowRefs = {};
-  document.getElementById("jobs-body").replaceChildren(...jobs.map(buildJobRow));
+  const wiersze = [];
+  for (const [kategoria, grupa] of groupJobsByCategory(jobs)) {
+    wiersze.push(el("tr", { class: "job-category-row" }, [
+      el("td", { colSpan: JOBS_TABLE_COLSPAN, text: `${kategoria} (${grupa.length})` }),
+    ]));
+    wiersze.push(...grupa.map(buildJobRow));
+  }
+  document.getElementById("jobs-body").replaceChildren(...wiersze);
 }
 
 function updateJobStatuses(jobs) {

@@ -43,6 +43,7 @@ import yaml
 import control
 import env_bootstrap  # noqa: F401 — wymusza UTF-8 na stdout/stderr dla procesu schedulera (autostart Windows)
 import kill_switch
+import projectly_client
 import remote_control
 import scheduler_lock
 
@@ -295,6 +296,25 @@ def _summarize_result(returned):
     return text if len(text) <= 2000 else text[:2000] + " …(obcięto)"
 
 
+def _powiadom_status_po_raporcie(job):
+    """Po udanym przebiegu joba oznaczonego `notify_status: true` w configu
+    (dziś: weekly_team_report/mailerlite_report_analyzer/digest_generator, wszystkie
+    `role: checker`) — wpis w statusie na żywo TEJ roli (live_status_publisher/
+    publish_status), NIE nowe zadanie w Projectly (decyzja właściciela 29.08.2026:
+    ma być widoczne w statusie konta AI, nie zaśmiecać projektu Administracyjne
+    kolejnym zadaniem za każdy przebieg raportu). Pole configu generyczne
+    (nie hardkodowana lista trzech nazw) — kolejny "raportowy" job wystarczy
+    oznaczyć tym samym polem. Fail-soft: błąd MCP/sieci nie może ubić schedulera
+    dla jednego dodatkowego powiadomienia."""
+    try:
+        client = projectly_client.get_client()
+        opis = (job.get("description") or job["name"])[:80]
+        teraz = datetime.now(timezone.utc).isoformat()
+        client.publish_status(CURRENT_ROLE, {"detail": f"📨 Raport wysłany: {opis} ({teraz})"})
+    except Exception as exc:  # noqa: BLE001 — powiadomienie jest dodatkiem, nie może ubić przebiegu
+        print(f"[job_scheduler] Powiadomienie statusu dla '{job['name']}' nie powiodło się: {exc}")
+
+
 def _run_job(job, state, trigger="schedule"):
     name = job["name"]
     run_id = uuid.uuid4().hex[:12]
@@ -316,6 +336,9 @@ def _run_job(job, state, trigger="schedule"):
         status, error = "error", str(exc)
         buffer.write("\n" + traceback.format_exc())
     elapsed = round(time.monotonic() - t0, 1)
+
+    if status == "ok" and job.get("notify_status"):
+        _powiadom_status_po_raporcie(job)
 
     output = buffer.getvalue()
     if len(output) > MAX_OUTPUT_CHARS:

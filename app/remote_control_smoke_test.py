@@ -1,7 +1,7 @@
 """
 Test dymny remote_control.py — sterowanie botem z poziomu Projectly przez
 status jednego, stałego zadania kontrolnego. Zero sieci — klient Projectly to
-atrapa. Izoluje control.PAUSE_FLAG_PATH i remote_control._state_path_for_role
+atrapa. Izoluje control.RUNS_DIR i remote_control._state_path_for_role
 (przez podmianę funkcji), zero wpływu na prawdziwy stan pauzy/plik tej maszyny.
 
 Użycie:
@@ -41,7 +41,7 @@ class _FakeClient:
 
 
 def _isolate(tmp):
-    control.PAUSE_FLAG_PATH = tmp / "PAUSE.flag"
+    control.RUNS_DIR = tmp
     rc._last_checked_at = None
 
 
@@ -57,7 +57,7 @@ def run():
 
     checks = []
     original_state_path_for_role = rc._state_path_for_role
-    original_pause_flag_path = control.PAUSE_FLAG_PATH
+    original_runs_dir = control.RUNS_DIR
 
     try:
         # --- 1. Zadanie kontrolne NIE istnieje -> tworzy je RAZ, status
@@ -148,7 +148,7 @@ def run():
                        wynik_brak_projektu is None and len(client6.utworzone) == 0))
     finally:
         rc._state_path_for_role = original_state_path_for_role
-        control.PAUSE_FLAG_PATH = original_pause_flag_path
+        control.RUNS_DIR = original_runs_dir
         rc._last_checked_at = None
 
     print("\n--- Wynik testu dymnego remote_control ---")

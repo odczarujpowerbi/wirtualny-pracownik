@@ -15,9 +15,10 @@ job_scheduler.py; ten plik to tylko cienka warstwa HTTP nad nim:
     GET  /api/state           -> zadania + status + historia przebiegów (JSON)
     POST /api/schedule        -> zmiana interwału / włączenia / opisu jednego zadania
     POST /api/run             -> uruchom jedno zadanie natychmiast (poza harmonogramem)
-    GET  /api/agents          -> status (działa/nie) każdego bota (dev/checker/marketing/zarząd)
+    GET  /api/agents          -> status (działa/nie, wstrzymany/nie) każdego bota (dev/checker/marketing/zarząd)
     POST /api/agents/start    -> odpala PROCES joba wskazanej roli (jeśli nie działa)
     POST /api/agents/start-all -> to samo dla wszystkich ról naraz
+    POST /api/agents/pause    -> wyłącz/włącz JEDNEGO agenta (miękka pauza per rola, control.py)
 
 Serwer słucha TYLKO na 127.0.0.1 (localhost) — nie jest wystawiony na sieć.
 'Uruchom teraz' odpala wyłącznie zadania zadeklarowane w schedule.yaml,
@@ -79,10 +80,15 @@ def _launch_process(cmd, cwd):
 
 
 def build_agents():
-    """Status (działa/nie działa) każdego bota na tej maszynie —
+    """Status (działa/nie działa, wstrzymany/nie) każdego bota na tej maszynie —
     do panelu 'Agenci' w dashboardzie. is_running() to prawdziwy test
-    żywotności procesu (scheduler_lock.py), nie tylko obecność pliku."""
-    return {"agents": [{"role": rola, "running": scheduler_lock.is_running(rola)}
+    żywotności procesu (scheduler_lock.py), nie tylko obecność pliku.
+
+    'paused' czyta control.is_paused(role=...) — PER ROLA (29.08.2026, decyzja
+    właściciela: "wyłączenie agenta oznacza, że nie przyjmuje zadań i kończy
+    to, co ma" — dla JEDNEGO bota, nie wszystkich naraz, patrz control.py)."""
+    return {"agents": [{"role": rola, "running": scheduler_lock.is_running(rola),
+                       "paused": control.is_paused(role=rola)}
                        for rola in AGENT_BAT_FILES]}
 
 
@@ -106,6 +112,22 @@ def start_agent(role):
 
 def start_all_agents():
     return {"results": {rola: start_agent(rola) for rola in AGENT_BAT_FILES}}
+
+
+def pause_or_resume_agent(role, action):
+    """'Wyłącz'/'Włącz' per agent (29.08.2026, decyzja właściciela) — miękka
+    pauza (control.pause/resume, TEJ roli), nie kill switch: agent kończy
+    zadanie, które już ma w toku, i przestaje przyjmować nowe. Zwraca
+    {"ok": bool, "message": str} — nigdy nie rzuca (wzorzec _run_safely)."""
+    if role not in AGENT_BAT_FILES:
+        return {"ok": False, "message": f"Nieznana rola '{role}'."}
+    if action == "pause":
+        control.pause(reason="Wyłączony z dashboardu (panel Agenci).", role=role)
+        return {"ok": True, "message": f"Agent '{role}' wyłączony — dokończy bieżące zadanie, nowych nie przyjmie."}
+    if action == "resume":
+        control.resume(role=role)
+        return {"ok": True, "message": f"Agent '{role}' włączony."}
+    return {"ok": False, "message": f"Nieznana akcja '{action}' (dozwolone: pause/resume)."}
 
 
 def build_state():
@@ -246,6 +268,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._handle_agent_start()
             elif self.path == "/api/agents/start-all":
                 self._send_json({"data": start_all_agents()})
+            elif self.path == "/api/agents/pause":
+                self._handle_agent_pause()
             else:
                 self._send_error("not_found", "Nieznana ścieżka.", status=404)
         except ValueError as exc:
@@ -275,6 +299,16 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if not role:
             raise ValueError("Brak pola 'role'.")
         self._send_json({"data": start_agent(role)})
+
+    def _handle_agent_pause(self):
+        body = self._read_json_body()
+        role = body.get("role")
+        action = body.get("action")
+        if not role:
+            raise ValueError("Brak pola 'role'.")
+        if action not in ("pause", "resume"):
+            raise ValueError("Nieznana akcja (dozwolone: pause/resume).")
+        self._send_json({"data": pause_or_resume_agent(role, action)})
 
     def _handle_add_task(self):
         """Dopisuje zadanie do notatnika (inbox/zadania.txt) i od razu je przetwarza

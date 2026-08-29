@@ -30,6 +30,50 @@ USAGE_PATH = Path.home() / ".claude" / "powerline" / "usage" / "today.json"
 DEFAULT_BLOCK_BUDGET_USD = 40.0
 BLOCK_HOURS = 5
 
+# Prog, przy ktorym runner_loop.run_once() przestaje przyjmowac NOWE zadania
+# (decyzja wlasciciela 29.08.2026: pierwotnie "90%", finalnie obnizone do 85% -
+# biezace zadania w kolejce koncza sie normalnie, tylko nowe nie startuja, jak
+# przy cost_tracker.budget_state "warning"/"exceeded"). Dzis liczone wzgledem
+# PROXY (block_budget_used_pct, wlasny budzet $ w oknie 5h) - docelowo wzgledem
+# realnego % z hookData.rate_limits (patrz WS6 w planie), bez zmiany API tej
+# funkcji: over_threshold() czyta cokolwiek summary() akurat zwroci.
+THRESHOLD_PAUSE_PERCENT = 85.0
+
+# Realny budzet okna 5h (USD), swiadomie ustawiony przez wlasciciela - ODDZIELNY
+# od DEFAULT_BLOCK_BUDGET_USD wyzej. Zywy przypadek znaleziony 29.08.2026 przy
+# wdrazaniu progu blokujacego: na tej maszynie DEFAULT_BLOCK_BUDGET_USD (40 USD)
+# dawal 198% (realna sesja jest znacznie kosztowniejsza niz ten zachowawczy
+# domyslny placeholder) - gdyby over_threshold() blokowal prace na SAMYM
+# DEFAULT_BLOCK_BUDGET_USD, wlaczenie tej funkcji zatrzymaloby WSZYSTKIE boty od
+# razu, bez swiadomej decyzji wlasciciela o realnym progu. Dlatego blokada
+# (over_threshold) dziala WYLACZNIE, gdy ten plik istnieje - brak pliku = funkcja
+# jest tylko WYSWIETLANA (dashboard), nigdy nie blokuje.
+BLOCK_BUDGET_PATH = Path(__file__).parent / "config" / "usage_block_budget_usd.txt"
+
+
+def _skonfigurowany_budzet_usd():
+    if not BLOCK_BUDGET_PATH.exists():
+        return None
+    try:
+        return float(BLOCK_BUDGET_PATH.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return None
+
+
+def over_threshold(podsumowanie, threshold=THRESHOLD_PAUSE_PERCENT):
+    """Czy zuzycie z summary() osiagnelo/przekroczylo prog. ZAWSZE False, dopoki
+    wlasciciel swiadomie nie ustawi realnego budzetu okna 5h
+    (config/usage_block_budget_usd.txt, patrz BLOCK_BUDGET_PATH) - bez tego
+    DEFAULT_BLOCK_BUDGET_USD (40 USD) to tylko wartosc do WYSWIETLENIA, zbyt
+    zachowawcza, zeby cokolwiek blokowac bez jawnej decyzji. Fail-soft: brak
+    danych (available=False) albo brak procentu -> False."""
+    if _skonfigurowany_budzet_usd() is None:
+        return False
+    if not podsumowanie.get("available"):
+        return False
+    procent = podsumowanie.get("block_budget_used_pct")
+    return procent is not None and procent >= threshold
+
 
 def _now():
     return datetime.now(timezone.utc)

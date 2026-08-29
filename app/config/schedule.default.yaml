@@ -25,6 +25,7 @@ jobs:
     routuje do klienta, waliduje lub eskaluje.
   module: runner_loop
   function: run_once
+  category: Rdzeń pętli
   interval_seconds: 30
   max_duration_seconds: 3600
   enabled: true
@@ -33,6 +34,7 @@ jobs:
     działają; eskaluje przy problemie.
   module: system_health_monitor
   function: run_health_check
+  category: Status/monitoring
   interval_seconds: 120
   enabled: true
 - name: machine_status_reporter
@@ -40,6 +42,7 @@ jobs:
     RAM) wysyłany do Projectly.
   module: machine_status_reporter
   function: run_machine_status_report
+  category: Status/monitoring
   interval_seconds: 3600
   enabled: true
 - name: cost_tracker
@@ -47,6 +50,7 @@ jobs:
     przekroczeniu limitu z polityki. Tylko odczyt plus zabezpieczenie, bezpieczny cyklicznie.
   module: cost_tracker
   function: check_daily_limit
+  category: Status/monitoring
   interval_seconds: 3600
   enabled: true
 - name: knowledge_digest_publisher
@@ -57,6 +61,7 @@ jobs:
     per rola.
   module: knowledge_digest_publisher
   function: run_knowledge_digest
+  category: Raporty i digesty
   interval_seconds: 3600
   enabled: true
 - name: notebook_intake
@@ -65,6 +70,7 @@ jobs:
     decyzje widac w dashboardzie (zakladka Przeplywy). Pusty notatnik = nic nie robi.
   module: notebook_intake
   function: run_once
+  category: Rdzeń pętli
   interval_seconds: 60
   enabled: true
 # Ponizsze skrypty sa WIDOCZNE w dashboardzie, ale domyslnie WYLACZONE
@@ -76,13 +82,21 @@ jobs:
     toku). Domyslnie wylaczony, wlacz gdy chcesz codzienny digest.
   module: digest_generator
   function: generate_digest
+  category: Raporty i digesty
   interval_seconds: 86400
   enabled: false
+  # role/notify_status (29.08.2026, decyzja wlasciciela): "skrypt raportowy" ma
+  # zyc pod rola checker (uruchamiany RECZNIE, checker bez autostartu) i po
+  # udanym przebiegu dopisac wpis w WLASNYM statusie na zywo (job_scheduler.
+  # _powiadom_status_po_raporcie) - NIE nowe zadanie w Projectly/Administracyjne.
+  role: checker
+  notify_status: true
 - name: source_schema_watcher
   description: Wykrywa zmiane struktury plikow zrodlowych CSV i tworzy zadanie dla
     wlasciciela. Domyslnie wylaczony, bo tworzy zadania.
   module: source_schema_watcher
   function: check_all_watched_sources
+  category: Jakość danych
   interval_seconds: 3600
   enabled: false
 - name: weekly_team_report
@@ -90,15 +104,21 @@ jobs:
     czasu). Domyslnie wylaczony, bo moze wysylac kopie mailem.
   module: weekly_team_report
   function: run_weekly_team_report
+  category: Raporty i digesty
   interval_seconds: 604800
   enabled: false
+  role: checker
+  notify_status: true
 - name: mailerlite_report_analyzer
   description: Cotygodniowy raport MailerLite (statystyki, czytelnosc, ocena tonu).
     Domyslnie wylaczony, wymaga klucza MailerLite.
   module: mailerlite_report_analyzer
   function: run_weekly_report
+  category: Raporty i digesty
   interval_seconds: 604800
   enabled: false
+  role: checker
+  notify_status: true
 - name: kacper_monitor
   description: Monitor i samo-naprawa (Kacper, docs/przeplyw.html) - czyta wspolny
     dziennik, wykrywa prace cykliczne i skille zawodzace powtarzalnie, zaklada
@@ -106,6 +126,7 @@ jobs:
     pierwszych przebiegow (python kacper_monitor.py recznie).
   module: kacper_monitor
   function: run_monitor_cycle
+  category: Status/monitoring
   interval_seconds: 60
   enabled: false
 - name: task_feedback_requester
@@ -113,6 +134,7 @@ jobs:
     Domyslnie wylaczony, bo tworzy zadania i wysyla maile.
   module: task_feedback_requester
   function: run_feedback_requests
+  category: Komunikacja/eskalacja
   interval_seconds: 86400
   enabled: false
 # Samo-weryfikacja: uruchamia wszystkie testy dymne i zaznacza w dashboardzie
@@ -123,6 +145,7 @@ jobs:
     Czerwony przebieg = cos sie zepsulo; klik w przebieg pokazuje ktory test i dlaczego.
   module: self_check
   function: run_self_check
+  category: Bezpieczeństwo/repo
   interval_seconds: 3600
   enabled: true
 # Auto-aktualizacja kodu z GitHub. Domyslnie WYLACZONY - wlacz w dashboardzie,
@@ -132,6 +155,7 @@ jobs:
     - wlacz, gdy VM ma sie aktualizowac sama bez klikania aktualizuj-repo.bat.
   module: repo_updater
   function: run_update
+  category: Bezpieczeństwo/repo
   interval_seconds: 1800
   enabled: false
 - name: repo_auto_improver
@@ -148,6 +172,7 @@ jobs:
     nie z procesu dev - odpala go tylko scheduler uruchomiony z BOT_ROLE=checker.
   module: repo_auto_improver
   function: run_repo_improvement_cycle
+  category: Bezpieczeństwo/repo
   interval_seconds: 120
   enabled: true
   role: checker
@@ -160,6 +185,7 @@ jobs:
     wpisu - patrz config/projectly.yaml role_to_account.
   module: runner_loop
   function: run_once
+  category: Rdzeń pętli
   interval_seconds: 30
   enabled: true
   role: checker
@@ -174,6 +200,7 @@ jobs:
     tego wpisu - patrz config/projectly.yaml role_to_account.
   module: runner_loop
   function: run_once
+  category: Rdzeń pętli
   interval_seconds: 30
   enabled: true
   role: marketing
@@ -187,6 +214,7 @@ jobs:
     jedno przypomnienie.
   module: escalation_watcher
   function: run_once
+  category: Komunikacja/eskalacja
   interval_seconds: 90
   enabled: true
 - name: escalation_watcher_checker
@@ -194,6 +222,7 @@ jobs:
     checkera (BOT_ROLE=checker), pilnuje WYLACZNIE eskalacji konta "AI-Checker".
   module: escalation_watcher
   function: run_once
+  category: Komunikacja/eskalacja
   interval_seconds: 90
   enabled: true
   role: checker
@@ -202,6 +231,7 @@ jobs:
     marketingu (BOT_ROLE=marketing), pilnuje WYLACZNIE eskalacji konta "AI - Marketing".
   module: escalation_watcher
   function: run_once
+  category: Komunikacja/eskalacja
   interval_seconds: 90
   enabled: true
   role: marketing
@@ -214,6 +244,7 @@ jobs:
     stamtad, zarzad ma wlasny, niezalezny proces.
   module: runner_loop
   function: run_once
+  category: Rdzeń pętli
   interval_seconds: 30
   enabled: true
   role: zarzad
@@ -222,6 +253,7 @@ jobs:
     zarzadu (BOT_ROLE=zarzad), pilnuje WYLACZNIE eskalacji konta "AI - Zarzad".
   module: escalation_watcher
   function: run_once
+  category: Komunikacja/eskalacja
   interval_seconds: 90
   enabled: true
   role: zarzad

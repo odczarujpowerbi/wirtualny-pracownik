@@ -271,6 +271,31 @@ def run():
             checks.append(("start_all_agents: 'dev' już działał (started=False), 'marketing' bez pliku (started=False)",
                            wynik_wszystkie["results"]["dev"]["started"] is False
                            and wynik_wszystkie["results"]["marketing"]["started"] is False))
+
+            # 24-26. Wyłącz/włącz JEDNEGO agenta (29.08.2026) — pauza per rola,
+            # BEZ wpływu na inne role (control.py, control_smoke_test.py testuje
+            # sam mechanizm; tu sprawdzamy WIRING dashboard.py <-> control.py).
+            import control
+            original_runs_dir = control.RUNS_DIR
+            control.RUNS_DIR = tmp4
+            try:
+                wynik_pauza = dashboard.pause_or_resume_agent("checker", "pause")
+                checks.append(("pause_or_resume_agent: pause -> ok=True", wynik_pauza["ok"] is True))
+                checks.append(("pause_or_resume_agent: build_agents widzi checkera jako wstrzymanego",
+                               {a["role"]: a["paused"] for a in dashboard.build_agents()["agents"]}["checker"] is True))
+                checks.append(("pause_or_resume_agent: pauza checkera NIE wpływa na dev",
+                               {a["role"]: a["paused"] for a in dashboard.build_agents()["agents"]}["dev"] is False))
+
+                wynik_wznow = dashboard.pause_or_resume_agent("checker", "resume")
+                checks.append(("pause_or_resume_agent: resume -> ok=True, checker znów aktywny",
+                               wynik_wznow["ok"] is True
+                               and {a["role"]: a["paused"] for a in dashboard.build_agents()["agents"]}["checker"] is False))
+
+                wynik_zla_rola = dashboard.pause_or_resume_agent("nieistniejąca-rola", "pause")
+                checks.append(("pause_or_resume_agent: nieznana rola -> ok=False, komunikat, bez wyjątku",
+                               wynik_zla_rola["ok"] is False and "Nieznana rola" in wynik_zla_rola["message"]))
+            finally:
+                control.RUNS_DIR = original_runs_dir
         finally:
             scheduler_lock.is_running = original_is_running
             dashboard.AGENT_BAT_FILES = original_agent_bat_files
