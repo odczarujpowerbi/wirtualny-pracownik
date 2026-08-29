@@ -42,9 +42,15 @@ import state_store
 import task_router
 import task_thinker
 import validator_prompt
-from escalation import escalate_to_human
+from escalation import ESCALATION_SKIP_REASON, escalate_to_human, is_escalation_task
 from projectly_client import _load_config as _load_projectly_config
 from projectly_client import get_client
+
+# Status wewnętrzny zadania odłożonego dla człowieka. Celowo NIE 'needs_approval':
+# tamten znaczy "agent wykonał, czeka na akceptację wyniku", a tu agent nic nie
+# wykonał i nie ma czego akceptować. Nie mapujemy go na status Projectly, bo
+# zadania eskalacyjnego w ogóle nie dotykamy (patrz _odloz_zadanie_eskalacyjne).
+STATUS_CZEKA_NA_CZLOWIEKA = "waiting_for_human"
 
 HINT_TO_ACTION = {
     "green": "read_report",
@@ -114,10 +120,34 @@ def _save_result_to_onedrive(task, status, comment):
         return None
 
 
+def _odloz_zadanie_eskalacyjne(task):
+    """Odkłada zadanie eskalacyjne bez wykonywania go: żadnego modelu, bramki,
+    komentarza ani zmiany statusu w Projectly. Decyzja należy do człowieka, a
+    każde dotknięcie takiego zadania przez agenta tylko zaśmieca jego wątek.
+
+    Zdarzenie 'escalation_task_skipped' zapisujemy RAZ na zadanie (przy pierwszym
+    zetknięciu), nie co cykl pollowania — inaczej pojedyncze zadanie czekające
+    tydzień na decyzję wygenerowałoby tysiące identycznych wpisów we wspólnym
+    dzienniku, który czyta kacper_monitor."""
+    task_id = task["task_id"]
+    wczesniej = state_store.get_task(task_id)
+    state_store.upsert_task(task_id, payload=task, status=STATUS_CZEKA_NA_CZLOWIEKA, now=now_iso())
+    if not wczesniej or wczesniej["status"] != STATUS_CZEKA_NA_CZLOWIEKA:
+        state_store.record_event(task_id, "escalation_task_skipped", ESCALATION_SKIP_REASON, now_iso())
+    return {"task_id": task_id, "risk": None, "owner": None, "status": STATUS_CZEKA_NA_CZLOWIEKA}
+
+
 def process_task(task, policy, routing, client):
     """Przetwarza zadanie i oznacza DOMKNIĘCIE BLOKU (block_closed) przy statusie
     końcowym — to granica bezpiecznego resetu kontekstu: brief kolejnych zadań nie
-    wciąga zamkniętego (task_brief_builder). Audyt zostaje, kontekst przestaje ciągnąć."""
+    wciąga zamkniętego (task_brief_builder). Audyt zostaje, kontekst przestaje ciągnąć.
+
+    Zadanie eskalacyjne (własna prośba agenta o decyzję człowieka) NIE jest tu
+    pracą do wykonania — wraca do kolejki, gdy przypisanie nie trafiło na osobę,
+    i bez tej bramki runner eskalowałby je w kółko (patrz is_escalation_task)."""
+    if is_escalation_task(task):
+        return _odloz_zadanie_eskalacyjne(task)
+
     result = _process_task_core(task, policy, routing, client)
     if result and result.get("status") in ("done", "needs_approval"):
         state_store.record_event(result["task_id"], "block_closed", result["status"], now_iso())
