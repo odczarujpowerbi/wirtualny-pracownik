@@ -196,10 +196,34 @@ def _resolve_callable(job):
     return getattr(module, job["function"])
 
 
-def _load_state():
-    if STATUS_PATH.exists():
-        return json.loads(STATUS_PATH.read_text(encoding="utf-8"))
+def _load_state(path=None):
+    """path=None -> stan TEJ roli (STATUS_PATH procesu). Parametr istnieje
+    głównie dla dashboard.py, żeby móc pokazać zagregowany widok WSZYSTKICH
+    ról naraz (dev/checker/marketing) — nie tylko tej, pod którą akurat
+    działa sam proces dashboardu (patrz discover_roles())."""
+    path = path or STATUS_PATH
+    if path.exists():
+        return json.loads(path.read_text(encoding="utf-8"))
     return {}
+
+
+def discover_roles(runs_dir=None):
+    """Role, dla których na tej maszynie istnieje jakikolwiek plik stanu
+    (runs/scheduler_status*.json) — czyli role, pod którymi job_scheduler.py
+    KIEDYKOLWIEK tu działał. Dodane 29.08.2026 dla dashboard.py: pozwala
+    pokazać jeden, zagregowany widok wszystkich botów (dev/checker/marketing)
+    na tej maszynie, niezależnie pod jaką rolą działa SAM proces dashboardu.
+    "dev" zawsze dołączony (nawet bez pliku) — to domyślna, zawsze-obecna rola.
+    runs_dir wstrzykiwalny (testowalność, bez dotykania prawdziwego runs/)."""
+    runs_dir = runs_dir or (Path(__file__).parent / "runs")
+    role_bez_prefix = "dev"
+    role_znalezione = {role_bez_prefix}
+    if runs_dir.is_dir():
+        for plik in runs_dir.glob("scheduler_status_*.json"):
+            rola = plik.stem[len("scheduler_status_"):]
+            if rola:
+                role_znalezione.add(rola)
+    return sorted(role_znalezione)
 
 
 def _save_state(state):
@@ -225,13 +249,17 @@ def _trim_history(keep=MAX_HISTORY):
         HISTORY_PATH.write_text("\n".join(lines[-keep:]) + "\n", encoding="utf-8")
 
 
-def load_history(limit=100, include_output=False):
+def load_history(limit=100, include_output=False, path=None):
     """Ostatnie `limit` przebiegów, najnowszy pierwszy — do listy w dashboardzie.
     Domyślnie BEZ pola `output` (pełne wyjście bywa duże) — do szczegółu
-    pojedynczego przebiegu służy `get_run_log(run_id)`."""
-    if not HISTORY_PATH.exists():
+    pojedynczego przebiegu służy `get_run_log(run_id)`.
+
+    path=None -> historia TEJ roli (HISTORY_PATH procesu). Parametr istnieje
+    głównie dla dashboard.py (widok wszystkich ról naraz, patrz discover_roles())."""
+    path = path or HISTORY_PATH
+    if not path.exists():
         return []
-    lines = [ln for ln in HISTORY_PATH.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    lines = [ln for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
     records = list(reversed([json.loads(ln) for ln in lines[-limit:]]))
     if not include_output:
         for record in records:

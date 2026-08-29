@@ -42,10 +42,34 @@ HTML_PATH = Path(__file__).parent / "dashboard.html"
 
 
 def build_state():
+    """Zagregowany widok WSZYSTKICH ról (dev/checker/marketing, patrz
+    job_scheduler.discover_roles()) — dodane 29.08.2026, kiedy stan/historia
+    stały się plikami PER ROLA (job_scheduler._status_path_for_role itd.).
+    Bez tej agregacji dashboard pokazywałby tylko rolę procesu, pod którym
+    sam akurat działa — operator otwierający `python dashboard.py` chce widzieć
+    WSZYSTKICH botów na tej maszynie naraz, nie tylko jednego."""
+    jobs = job_scheduler.load_schedule()
+    status, history = {}, []
+    for rola in job_scheduler.discover_roles():
+        # Dla WŁASNEJ roli procesu (job_scheduler.CURRENT_ROLE) czytamy globalne
+        # STATUS_PATH/HISTORY_PATH (nie świeżo przeliczoną ścieżkę) — to jedyne
+        # miejsce, które testy/ewentualne nadpisanie na żywo mogą podmienić;
+        # dla POZOSTAŁYCH ról nie ma czego podmieniać, liczymy wprost z nazwy roli.
+        if rola == job_scheduler.CURRENT_ROLE:
+            status_path, history_path = job_scheduler.STATUS_PATH, job_scheduler.HISTORY_PATH
+        else:
+            status_path = job_scheduler._status_path_for_role(rola)
+            history_path = job_scheduler._history_path_for_role(rola)
+        stan_roli = job_scheduler._load_state(status_path)
+        for nazwa, info in stan_roli.items():
+            status[nazwa] = {**info, "role": rola}
+        for rekord in job_scheduler.load_history(limit=100, path=history_path):
+            history.append({**rekord, "role": rola})
+    history.sort(key=lambda r: r.get("run_at") or "", reverse=True)
     return {
-        "jobs": job_scheduler.load_schedule(),
-        "status": job_scheduler._load_state(),
-        "history": job_scheduler.load_history(limit=100),
+        "jobs": jobs,
+        "status": status,
+        "history": history[:100],
     }
 
 

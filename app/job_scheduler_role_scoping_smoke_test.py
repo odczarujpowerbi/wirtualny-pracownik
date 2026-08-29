@@ -13,6 +13,8 @@ Użycie:
 """
 
 import sys
+import tempfile
+from pathlib import Path
 
 import job_scheduler
 
@@ -50,6 +52,32 @@ def run():
     checks.append(("Job z role='checker' -> WYŁĄCZNIE proces checker, nie dev",
                    job_scheduler._job_runs_under_role(job_checker, "checker") is True
                    and job_scheduler._job_runs_under_role(job_checker, "dev") is False))
+
+    # --- discover_roles: "dev" zawsze obecny, inne role wykrywane po plikach ---
+    tmp = Path(tempfile.mkdtemp())
+    checks.append(("discover_roles: pusty katalog -> tylko 'dev'",
+                   job_scheduler.discover_roles(tmp) == ["dev"]))
+
+    (tmp / "scheduler_status_checker.json").write_text("{}", encoding="utf-8")
+    (tmp / "scheduler_status_marketing.json").write_text("{}", encoding="utf-8")
+    checks.append(("discover_roles: wykrywa dodatkowe role po plikach stanu",
+                   job_scheduler.discover_roles(tmp) == ["checker", "dev", "marketing"]))
+
+    checks.append(("discover_roles: katalog nieistniejący -> fail-soft, tylko 'dev'",
+                   job_scheduler.discover_roles(tmp / "brak") == ["dev"]))
+
+    # --- _load_state/load_history z jawną ścieżką (inna rola niż proces) ---
+    inny_status = tmp / "scheduler_status_checker.json"
+    inny_status.write_text('{"repo_auto_improver": {"last_status": "ok"}}', encoding="utf-8")
+    checks.append(("_load_state(path=...) czyta WSKAZANY plik, nie STATUS_PATH procesu",
+                   job_scheduler._load_state(inny_status) == {"repo_auto_improver": {"last_status": "ok"}}))
+
+    inna_historia = tmp / "run_history_checker.jsonl"
+    inna_historia.write_text('{"id": "abc", "name": "repo_auto_improver", "run_at": "2026-08-29T00:00:00+00:00"}\n',
+                             encoding="utf-8")
+    wynik_historii = job_scheduler.load_history(path=inna_historia)
+    checks.append(("load_history(path=...) czyta WSKAZANY plik, nie HISTORY_PATH procesu",
+                   len(wynik_historii) == 1 and wynik_historii[0]["name"] == "repo_auto_improver"))
 
     print("\n--- Wynik testu dymnego job_scheduler (role scoping) ---")
     all_passed = True

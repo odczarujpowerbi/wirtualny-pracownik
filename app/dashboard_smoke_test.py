@@ -133,10 +133,53 @@ def run():
         rejected = True
     checks.append(("_validate_updates odrzuca interwał <= 0", rejected))
 
-    # 12. build_state ma komplet kluczy i czyta zadeklarowane zadania (read-only).
-    state = dashboard.build_state()
-    checks.append(("build_state zwraca jobs/status/history",
-                   set(state) == {"jobs", "status", "history"} and isinstance(state["jobs"], list)))
+    # 12. build_state: zagregowany widok WSZYSTKICH ról naraz (dev/checker),
+    # dodane 29.08.2026 razem z podziałem stanu/historii per rola. Izolacja
+    # PEŁNA (w tym discover_roles i CURRENT_ROLE) — zero dotknięcia prawdziwego
+    # runs/ tej maszyny.
+    original_status_path = job_scheduler.STATUS_PATH
+    original_history_path = job_scheduler.HISTORY_PATH
+    original_current_role = job_scheduler.CURRENT_ROLE
+    original_discover_roles = job_scheduler.discover_roles
+    original_status_path_for_role = job_scheduler._status_path_for_role
+    original_history_path_for_role = job_scheduler._history_path_for_role
+    try:
+        with tempfile.TemporaryDirectory() as tmp3:
+            tmp3 = Path(tmp3)
+            job_scheduler.STATUS_PATH = tmp3 / "status_dev.json"
+            job_scheduler.HISTORY_PATH = tmp3 / "history_dev.jsonl"
+            job_scheduler.CURRENT_ROLE = "dev"
+            job_scheduler.discover_roles = lambda *a, **k: ["dev", "checker"]
+
+            job_scheduler.STATUS_PATH.write_text('{"runner_loop": {"last_status": "ok"}}', encoding="utf-8")
+            job_scheduler.HISTORY_PATH.write_text(
+                '{"id": "d1", "name": "runner_loop", "run_at": "2026-08-29T10:00:00+00:00", "status": "ok"}\n',
+                encoding="utf-8")
+            (tmp3 / "scheduler_status_checker.json").write_text(
+                '{"repo_auto_improver": {"last_status": "ok"}}', encoding="utf-8")
+            (tmp3 / "run_history_checker.jsonl").write_text(
+                '{"id": "c1", "name": "repo_auto_improver", "run_at": "2026-08-29T11:00:00+00:00", "status": "ok"}\n',
+                encoding="utf-8")
+            job_scheduler._status_path_for_role = lambda rola: tmp3 / f"scheduler_status_{rola}.json"
+            job_scheduler._history_path_for_role = lambda rola: tmp3 / f"run_history_{rola}.jsonl"
+
+            state = dashboard.build_state()
+        checks.append(("build_state zwraca jobs/status/history",
+                       set(state) == {"jobs", "status", "history"} and isinstance(state["jobs"], list)))
+        checks.append(("build_state: status zawiera joby OBU ról, każdy oznaczony swoją rolą",
+                       state["status"].get("runner_loop", {}).get("role") == "dev"
+                       and state["status"].get("repo_auto_improver", {}).get("role") == "checker"))
+        checks.append(("build_state: historia zawiera przebiegi OBU ról, najnowszy pierwszy",
+                       len(state["history"]) == 2 and state["history"][0]["name"] == "repo_auto_improver"
+                       and state["history"][0]["role"] == "checker"
+                       and state["history"][1]["role"] == "dev"))
+    finally:
+        job_scheduler.STATUS_PATH = original_status_path
+        job_scheduler.HISTORY_PATH = original_history_path
+        job_scheduler.CURRENT_ROLE = original_current_role
+        job_scheduler.discover_roles = original_discover_roles
+        job_scheduler._status_path_for_role = original_status_path_for_role
+        job_scheduler._history_path_for_role = original_history_path_for_role
 
     # 13. build_tasks zwraca strukturę zadań (grupowanie po zadaniu, read-only).
     tasks = dashboard.build_tasks()
