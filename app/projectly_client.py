@@ -56,6 +56,17 @@ def _load_config():
         return yaml.safe_load(f) or {}
 
 
+def is_ai_account_name(name, cfg=None):
+    """Czy `name` to nazwa konta AI (bota) w Projectly, wg reguły z
+    config/projectly.yaml (ai_account). Funkcja modułowa, bo pytają o to także
+    moduły bez klienta pod ręką — np. task_feedback_requester, który nie może
+    poprosić bota o feedback z pracy bota."""
+    ai = (cfg if cfg is not None else _load_config()).get("ai_account", {})
+    if ai.get("by") == "type":
+        return False  # gdy MCP wystawi 'type' — dołożyć obsługę tutaj
+    return bool(name) and str(name).startswith(ai.get("name_prefix", "AI - "))
+
+
 def _load_role():
     if ROLE_CONFIG_PATH.exists():
         try:
@@ -180,11 +191,7 @@ class ProjectlyClient:
             self._refresh_directory()
 
     def _is_ai_account(self, name):
-        ai = self._cfg.get("ai_account", {})
-        if ai.get("by") == "type":
-            return False  # gdy MCP wystawi 'type' — dołożyć obsługę tutaj
-        prefix = ai.get("name_prefix", "AI - ")
-        return bool(name) and name.startswith(prefix)
+        return is_ai_account_name(name, self._cfg)
 
     def _own_account_id(self):
         self._ensure_directory()
@@ -225,7 +232,14 @@ class ProjectlyClient:
 
     def _resolve_person_id(self, alias_or_name):
         """Alias z config (pawel/bot/unassigned_pool) albo wprost nazwa osoby
-        -> id osoby w Projectly. Zwraca None, gdy nieznana/celowo bez przypisania."""
+        -> id osoby w Projectly. Zwraca None, gdy nieznana/celowo bez przypisania.
+
+        Nazwa PODANA, ale nieznaleziona w katalogu, jest RAPORTOWANA (jak
+        brakujące konta AI w _polled_account_ids): create_task bez assigneeIds
+        przypisuje zadanie wg uprawnień tokenu, czyli kontu AI, które je
+        utworzyło — eskalacja wtedy wraca do bota zamiast trafić do człowieka
+        (żywy incydent, patrz meta_task_guard.py). Literówka w nazwie nie może
+        wyglądać jak świadomy brak przypisania."""
         self._ensure_directory()
         aliases = self._cfg.get("people_aliases", {})
         name = aliases.get(alias_or_name, alias_or_name)
@@ -234,7 +248,12 @@ class ProjectlyClient:
             name = account_name
         if not name:
             return None
-        return self._people_by_name.get(str(name).lower())
+        person_id = self._people_by_name.get(str(name).lower())
+        if not person_id:
+            print(f"[Projectly] Osoby '{name}' nie ma w katalogu Projectly — zadanie powstanie BEZ "
+                  f"przypisania (trafi do konta z tokenu). Sprawdź people_aliases / "
+                  f"escalation_default_assignee w config/projectly.yaml.")
+        return person_id
 
     def _project_id_by_name(self, project_name):
         self._ensure_directory()

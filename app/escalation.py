@@ -14,15 +14,20 @@ Powiązania budują widoczny ciąg oryginał -> eskalacja -> kontynuacja
 zadania źródłowego (get_new_tasks niesie je w polu 'project_id').
 """
 
+import meta_task_guard
 import state_store
 
 
 def escalate_to_human(task, reason, client, options=None, assignee="pawel"):
     """Tworzy w Projectly osobne zadanie przypisane do człowieka — NIE tylko
-    komentarz (PLAN-WDROZENIA.md sekcja 4). Zwraca ID nowo utworzonego zadania."""
+    komentarz (PLAN-WDROZENIA.md sekcja 4). Zwraca ID nowo utworzonego zadania.
+
+    Tytuł buduje meta_task_guard, więc jest IDEMPOTENTNY: eskalacja zadania,
+    które samo jest eskalacją, nie dokleja kolejnego "Wymaga decyzji:" (opis
+    incydentu w meta_task_guard.py)."""
     from datetime import datetime, timezone
 
-    title = f"Wymaga decyzji: {task['title']}"
+    title = meta_task_guard.escalation_title(task["title"])
     description_lines = [
         f"Zadanie źródłowe: {task['task_id']}",
         f"Co jest potrzebne: {reason}",
@@ -75,7 +80,7 @@ def continuation_task_creator(original_task, human_decision_text, client):
     dla agenta z decyzją wbudowaną w kontekst (PLAN-WDROZENIA.md sekcja 4)."""
     from datetime import datetime, timezone
 
-    title = f"Kontynuacja: {original_task['title']}"
+    title = meta_task_guard.continuation_title(original_task["title"])
     description = (
         f"Zadanie źródłowe: {original_task['task_id']}\n"
         f"Decyzja człowieka: {human_decision_text}\n"

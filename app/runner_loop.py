@@ -33,6 +33,7 @@ import document_builder
 import executor
 import heartbeat
 import kill_switch
+import meta_task_guard
 import poprawka_materialu
 import live_status_publisher
 import risk_classifier
@@ -51,6 +52,10 @@ HINT_TO_ACTION = {
     "yellow": "report_build",
     "red": "budget_change",
 }
+
+# Status zadania odłożonego, bo należy do człowieka (eskalacja, prośba o
+# feedback) — patrz _pomin_zadanie_dla_czlowieka.
+WAITING_HUMAN = "waiting_human"
 
 
 def now_iso():
@@ -124,7 +129,29 @@ def process_task(task, policy, routing, client):
     return result
 
 
+def _pomin_zadanie_dla_czlowieka(task):
+    """Zadanie META, które agent sam założył DLA CZŁOWIEKA (eskalacja, prośba o
+    feedback), wraca w get_new_tasks, gdy Projectly przypisało je do konta AI
+    (create_task z pustym assigneeIds przypisuje wg uprawnień tokenu). Runner
+    nie ma czego tu wykonać — decyzję podejmuje człowiek — więc odkłada je bez
+    komentarza i bez zmiany statusu w Projectly. Bez tego progu agent eskalował
+    własną eskalację w kółko, doklejając kolejny przedrostek do tytułu
+    (meta_task_guard.py opisuje pełny przebieg incydentu).
+
+    Ślad w dzienniku zapisujemy RAZ na zadanie, nie co cykl pollowania —
+    inaczej jedno odłożone zadanie generowałoby setki wpisów dziennie."""
+    task_id = task["task_id"]
+    znane = state_store.get_task(task_id)
+    if not znane or znane.get("status") != WAITING_HUMAN:
+        state_store.upsert_task(task_id, payload=task, status=WAITING_HUMAN, now=now_iso())
+        state_store.record_event(task_id, "escalation_task_skipped", meta_task_guard.SKIP_REASON, now_iso())
+    return {"task_id": task_id, "risk": None, "owner": None, "status": WAITING_HUMAN}
+
+
 def _process_task_core(task, policy, routing, client):
+    if meta_task_guard.is_for_human(task):
+        return _pomin_zadanie_dla_czlowieka(task)
+
     task_id = task["task_id"]
     now = now_iso()
 

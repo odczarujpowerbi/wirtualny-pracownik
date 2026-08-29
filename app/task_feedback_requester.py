@@ -27,10 +27,17 @@ wewnątrz firmy (Paweł/Aldona), NIE bezpośrednio do assignee zadania.
 import json
 from pathlib import Path
 
+import meta_task_guard
 from email_draft_generator import generate_draft
-from projectly_client import get_client
+from projectly_client import get_client, is_ai_account_name
 
 ASKED_PATH = Path(__file__).parent / "runs" / "feedback_requested.json"
+
+# Feedback o wykonanej pracy ocenia CZŁOWIEK. Gdy zadanie wykonało konto AI
+# (albo nie ma przypisania), prośba idzie do tego aliasu, a nie z powrotem do
+# bota — inaczej zadanie feedbackowe wracało do runnera w get_new_tasks i
+# napędzało pętlę meta-zadań (opis incydentu w meta_task_guard.py).
+FEEDBACK_HUMAN_ALIAS = "pawel"
 
 FEEDBACK_COMMENT = (
     "👋 Krótki feedback do tego zadania: ile realnie zajęło (jeśli różni się "
@@ -51,7 +58,24 @@ def _save_asked(asked, path=ASKED_PATH):
 
 
 def find_tasks_needing_feedback(tasks, already_asked):
-    return [t for t in tasks if t.get("status") == "done" and t["task_id"] not in already_asked]
+    """Zamknięte zadania, o które jeszcze nie pytaliśmy. Zadania META założone
+    przez agenta (eskalacje, wcześniejsze prośby o feedback, kontynuacje) są
+    pomijane — prośba o feedback do prośby o feedback tylko mnoży zadania i
+    zaśmieca kolejkę człowieka."""
+    return [
+        t for t in tasks
+        if t.get("status") == "done"
+        and t["task_id"] not in already_asked
+        and not meta_task_guard.is_meta_task(t)
+    ]
+
+
+def _feedback_assignee(task):
+    """Kto ma odpowiedzieć na prośbę o feedback — patrz FEEDBACK_HUMAN_ALIAS."""
+    assignee = task.get("assignee")
+    if not assignee or is_ai_account_name(assignee):
+        return FEEDBACK_HUMAN_ALIAS
+    return assignee
 
 
 def request_feedback_for_task(task, client=None, send_email=True):
@@ -59,9 +83,9 @@ def request_feedback_for_task(task, client=None, send_email=True):
 
     client.post_comment(task["task_id"], FEEDBACK_COMMENT)
     feedback_task_id = client.create_task(
-        title=f"Feedback: {task['title']}",
+        title=meta_task_guard.feedback_title(task["title"]),
         description=FEEDBACK_COMMENT,
-        assigned_to=task.get("assignee", "unassigned_pool"),
+        assigned_to=_feedback_assignee(task),
         parent_task_id=task["task_id"],
         project_id=task.get("project_id"),
         relation_type="kontynuacja",
