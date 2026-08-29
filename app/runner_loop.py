@@ -217,16 +217,20 @@ def _process_task_core(task, policy, routing, client):
     state_store.record_event(task_id, "prompt_safety_check", str(prompt_check), now_iso())
     if not prompt_check["safe"]:
         owner, _ = task_router.route_task(task["title"], routing)
-        escalate_to_human(task, f"Wykryto podejrzaną treść: {prompt_check['detail']}", client)
+        status = "needs_approval"
+        komentarz = _comment_escalated(owner, prompt_check["detail"])
+        # Folder/link PRZED eskalacją (żądanie właściciela 29.08.2026: link ma
+        # być na GÓRZE opisu zadania dla człowieka, nie tylko doklejony
+        # później jako komentarz na oryginale).
+        folder = _save_result_to_onedrive(task, status, komentarz)
+        escalate_to_human(task, f"Wykryto podejrzaną treść: {prompt_check['detail']}", client,
+                          severity="red", folder_link=sharepoint_link.folder_url(folder))
         state_store.log_decision(
             task_id, agent="pawel", decision="escalate",
             reason=f"prompt injection: {prompt_check['detail']}", now=now_iso(), event_type="escalation")
-        status = "needs_approval"
         state_store.upsert_task(task_id, payload=task, status=status, assigned_to=owner, risk_level="red", now=now_iso())
-        komentarz = _comment_escalated(owner, prompt_check["detail"])
         client.post_comment(task_id, komentarz)
         client.update_status(task_id, status)
-        _save_result_to_onedrive(task, status, komentarz)
         return {"task_id": task_id, "risk": "red", "owner": owner, "status": status}
 
     # Agent sterujący decyduje, czy to zadanie jest za duże/niejasne, żeby
@@ -330,16 +334,23 @@ def _process_task_core(task, policy, routing, client):
     # subagenta nie ustawia `real` (executor.execute() zwrócił None).
     if execution_result.get("executed") is False:
         reason = execution_result["acceptance_notes"]
-        escalate_to_human(task, reason, client)
+        komentarz = _comment_escalated(owner, reason)
+        folder = _save_result_to_onedrive(task, "needs_approval", komentarz, execution_result)
+        escalate_to_human(task, reason, client, severity="red", folder_link=sharepoint_link.folder_url(folder))
         state_store.log_decision(task_id, agent="pawel", decision="escalate", reason=reason,
                                  now=now_iso(), event_type="escalation")
         state_store.upsert_task(task_id, payload=task, status="needs_approval",
                                 assigned_to=owner, risk_level=risk, now=now_iso())
-        komentarz = _comment_escalated(owner, reason)
         client.post_comment(task_id, komentarz)
         client.update_status(task_id, "needs_approval")
-        _save_result_to_onedrive(task, "needs_approval", komentarz, execution_result)
         return {"task_id": task_id, "risk": risk, "owner": owner, "status": "needs_approval"}
+
+    # Folder OneDrive/SharePoint — obliczany raz, NAJWCZEŚNIEJ w tej gałęzi,
+    # gdzie faktycznie jest potrzebny (żeby escalate_to_human dostał link na
+    # GÓRĘ opisu, patrz niżej) — wspólny epilog (linia z `folder = folder or
+    # ...`) już go nie liczy drugi raz (podwójne liczenie kosztu klasyfikacji
+    # w output_decider.decide() przez _save_result_to_onedrive).
+    folder = None
 
     if already_subtask:
         # Decyzja właściciela 25.08.2026: podzadania z dekompozycji są z natury
@@ -357,10 +368,12 @@ def _process_task_core(task, policy, routing, client):
 
     elif risk == "red":
         reason = "Czerwona akcja — poza zakresem tego szkieletu, brak jeszcze zdefiniowanej bounded_red do sprawdzenia."
-        escalate_to_human(task, reason, client)
+        comment = _comment_escalated(owner, reason)
+        folder = _save_result_to_onedrive(task, "needs_approval", comment, execution_result)
+        escalate_to_human(task, reason, client, severity="red", folder_link=sharepoint_link.folder_url(folder))
         state_store.log_decision(task_id, agent="pawel", decision="escalate", reason=reason,
                                  now=now_iso(), event_type="escalation")
-        status, comment = "needs_approval", _comment_escalated(owner, reason)
+        status = "needs_approval"
 
     elif risk == "green" and not _has_effect(execution_result):
         # Zielone bez realnego efektu (np. sam odczyt) — szybka ścieżka, bez bramki.
@@ -399,10 +412,12 @@ def _process_task_core(task, policy, routing, client):
             skill_usage_logger.log_usage(task_id, "quality_gate", "failure", reason)
         else:
             reason = _gate_failure_reason(gate)
-            escalate_to_human(task, reason, client)
+            comment = _comment_escalated(owner, reason)
+            folder = _save_result_to_onedrive(task, "needs_approval", comment, execution_result)
+            escalate_to_human(task, reason, client, folder_link=sharepoint_link.folder_url(folder))
             state_store.log_decision(task_id, agent="pawel", decision="escalate", reason=reason,
                                      now=now_iso(), event_type="escalation")
-            status, comment = "needs_approval", _comment_escalated(owner, reason)
+            status = "needs_approval"
             skill_usage_logger.log_usage(task_id, "quality_gate", "failure", reason)
 
     state_store.upsert_task(task_id, payload=task, status=status, assigned_to=owner, risk_level=risk, now=now_iso())
@@ -422,7 +437,10 @@ def _process_task_core(task, policy, routing, client):
     # do folderu z materiałami — bez tego trzeba było szukać folderu ręcznie po
     # task_id). Plik w folderze budowany jest z `comment` SPRZED doklejenia tego
     # linku (nie ma sensu, żeby plik linkował do samego siebie).
-    folder = _save_result_to_onedrive(task, status, comment, execution_result)
+    # `folder or ...`: gałęzie red-risk/gate-failure wyżej już policzyły folder
+    # (potrzebny WCZEŚNIEJ, na link u góry opisu zadania eskalacji) — nie liczyć
+    # drugi raz (podwójny koszt klasyfikacji w output_decider.decide()).
+    folder = folder or _save_result_to_onedrive(task, status, comment, execution_result)
     link = sharepoint_link.folder_url(folder)
     if link:
         comment += f"\n\n📁 Materiały: {link}"

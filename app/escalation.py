@@ -24,12 +24,34 @@ zmiana JEDNEGO configu, nie kodu. Fail-soft: błąd wysyłki nie blokuje
 eskalacji (zadanie w Projectly to główny, trwały kanał — mail jest dodatkiem).
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import email_client
 import state_store
-from projectly_client import PRIORITY_PARKING, effective_priority
+from projectly_client import PRIORITY_BIEZACE, PRIORITY_PRIORYTET, effective_priority
 from projectly_client import _load_config as _load_projectly_config
+
+# Terminy zadań dla człowieka (decyzja właściciela 29.08.2026): tylko dwa
+# poziomy pilności, priorytet/bieżące — parking/backlog nie dotyczą zadań,
+# na które bot CZEKA (to inna sytuacja niż "opcjonalne"/"do przemyślenia").
+ESCALATION_DEADLINE_DAYS = {"red": 1, "normal": 3}
+
+
+def _glowne_zadanie_id(task):
+    """ID zadania GŁÓWNEGO (projektu), pod którym mają wisieć WSZYSTKIE
+    zadania dotyczące jednej sprawy — eskalacje dla człowieka i kontynuacje
+    dla bota (żądanie właściciela 29.08.2026: "żeby dało się to wszystko
+    podpiąć pod jedno główne id"). Hierarchia jest dziś DOKŁADNIE dwupoziomowa
+    (task_decomposer.decompose nigdy nie dzieli podzadania dalej — patrz
+    `already_subtask` w runner_loop.py), więc jeśli `task` SAMO jest
+    podzadaniem, jego `parent_task_id` JEST już zadaniem głównym. Gdy `task`
+    nie ma parent_task_id, ono samo jest zadaniem głównym."""
+    return task.get("parent_task_id") or task["task_id"]
+
+
+def _due_date(severity):
+    dni = ESCALATION_DEADLINE_DAYS.get(severity, ESCALATION_DEADLINE_DAYS["normal"])
+    return (datetime.now(timezone.utc) + timedelta(days=dni)).date().isoformat()
 
 
 def _wyslij_powiadomienie_eskalacji(task, reason, new_task_id, assignee):
@@ -68,7 +90,7 @@ def _escalation_default_assignee():
         return "pawel"
 
 
-def escalate_to_human(task, reason, client, options=None, assignee=None):
+def escalate_to_human(task, reason, client, options=None, assignee=None, severity="normal", folder_link=None):
     """Tworzy w Projectly osobne zadanie przypisane do człowieka — NIE tylko
     komentarz (PLAN-WDROZENIA.md sekcja 4) — i wysyła mail powiadomienia
     (adresaci: config/email_safety.yaml). Zwraca ID nowo utworzonego zadania.
@@ -76,6 +98,23 @@ def escalate_to_human(task, reason, client, options=None, assignee=None):
     assignee: alias (patrz people_aliases) albo wprost nazwa osoby. Gdy
     pominięty (None), używa config/projectly.yaml escalation_default_assignee
     — patrz _escalation_default_assignee.
+
+    severity="red" (prompt injection / czerwone ryzyko / worker odmówił z
+    powodów bezpieczeństwa) -> priorytet (5), termin 1 dzień. severity="normal"
+    (domyślne — np. bramka jakości nie przepuściła po próbie poprawy) ->
+    bieżące (4), termin 3 dni. Decyzja właściciela 29.08.2026: zadanie DLA
+    CZŁOWIEKA ma tylko te dwa poziomy pilności (nie parking/backlog — bot
+    faktycznie NA NIE CZEKA, to nie jest "opcjonalne").
+
+    folder_link: URL folderu SharePoint z materiałami zadania źródłowego, gdy
+    już dostępny (runner_loop.py woła _save_result_to_onedrive PRZED tą
+    funkcją) — wstawiany jako PIERWSZA linia opisu (żądanie właściciela
+    29.08.2026: "u góry opisu zadania"), żeby człowiek nie musiał go szukać.
+
+    parent_task_id wskazuje na ZADANIE GŁÓWNE (_glowne_zadanie_id), nie na
+    `task` wprost — gdy `task` samo jest podzadaniem, eskalacja ma wisieć pod
+    tym samym głównym zadaniem co reszta pracy nad tą sprawą (żądanie
+    właściciela 29.08.2026: jedno wspólne id, pod którym widać całą sprawę).
 
     Nie dokłada prefiksu drugi raz, gdy zadanie źródłowe JUŻ jest eskalacją
     (żywy bug 25-26.08.2026: tytuł narastał z każdą rundą — "Wymaga decyzji:
@@ -87,7 +126,10 @@ def escalate_to_human(task, reason, client, options=None, assignee=None):
         title = original_title
     else:
         title = f"{ESCALATION_TITLE_PREFIX}{original_title}"
-    description_lines = [
+    description_lines = []
+    if folder_link:
+        description_lines.append(f"📁 Materiały: {folder_link}")
+    description_lines += [
         f"Zadanie źródłowe: {task['task_id']}",
         f"Co jest potrzebne: {reason}",
     ]
@@ -99,13 +141,14 @@ def escalate_to_human(task, reason, client, options=None, assignee=None):
         title,
         description,
         assigned_to=assignee,
-        parent_task_id=task["task_id"],
+        parent_task_id=_glowne_zadanie_id(task),
         project_id=task.get("project_id"),
         relation_type="eskalacja",
-        # parking (29.08.2026, decyzja właściciela): zadanie czeka na decyzję
-        # człowieka, więc bot nie ma go samo z siebie odbierać jako "do zrobienia
-        # teraz" — patrz runner_loop._efektywny_priorytet/kolejka po priorytecie.
-        priority=PRIORITY_PARKING,
+        # priorytet/bieżące (29.08.2026, decyzja właściciela) — zamiast dawnego
+        # sztywnego PARKING: severity="red" (bezpieczeństwo) -> priorytet + 1
+        # dzień, reszta -> bieżące + 3 dni (patrz ESCALATION_DEADLINE_DAYS).
+        priority=PRIORITY_PRIORYTET if severity == "red" else PRIORITY_BIEZACE,
+        due_date=_due_date(severity),
     )
     now = datetime.now(timezone.utc).isoformat()
     state_store.record_event(task["task_id"], "escalated_to_human", f"{new_id}: {reason}", now)
@@ -139,14 +182,23 @@ def human_response_validator(comment_text, expected_kind="decision"):
     return {"sufficient": True, "reason": "Odpowiedź zawiera treść dłuższą niż nic."}
 
 
-def continuation_task_creator(original_task, human_decision_text, client):
+def continuation_task_creator(escalation_task, human_decision_text, client):
     """Po pozytywnej weryfikacji odpowiedzi człowieka — tworzy nowe zadanie
-    dla agenta z decyzją wbudowaną w kontekst (PLAN-WDROZENIA.md sekcja 4)."""
+    dla agenta z decyzją wbudowaną w kontekst (PLAN-WDROZENIA.md sekcja 4).
+
+    `escalation_task` to ZADANIE ESKALACJI (to, które człowiek właśnie
+    zamknął), NIE oryginalne zadanie robocze sprzed eskalacji — wywołujący
+    (escalation_watcher.py) czyta je wprost z Projectly, więc niesie własne
+    `parent_task_id` ustawione przez escalate_to_human na ZADANIE GŁÓWNE
+    (_glowne_zadanie_id, WS2a). Kontynuacja wisi więc pod tym samym głównym
+    zadaniem co eskalacja, nie pod eskalacją samą w sobie — żądanie
+    właściciela 29.08.2026: cała sprawa (eskalacje + kontynuacje bota) widoczna
+    pod JEDNYM id zadania głównego."""
     from datetime import datetime, timezone
 
-    title = f"Kontynuacja: {original_task['title']}"
+    title = f"Kontynuacja: {escalation_task['title']}"
     description = (
-        f"Zadanie źródłowe: {original_task['task_id']}\n"
+        f"Zadanie eskalacji: {escalation_task['task_id']}\n"
         f"Decyzja człowieka: {human_decision_text}\n"
         f"Kontynuuj wykonanie z tą decyzją wbudowaną w kontekst."
     )
@@ -154,16 +206,16 @@ def continuation_task_creator(original_task, human_decision_text, client):
         title,
         description,
         assigned_to="bot",
-        parent_task_id=original_task["task_id"],
-        project_id=original_task.get("project_id"),
+        parent_task_id=_glowne_zadanie_id(escalation_task),
+        project_id=escalation_task.get("project_id"),
         relation_type="kontynuacja",
-        # Dziedziczy priorytet oryginalnego zadania (decyzja człowieka je
-        # odblokowała, praca ma wrócić na taki sam poziom pilności jak przed
-        # eskalacją) — fallback "bieżące", gdy oryginał go nie niósł.
-        # effective_priority(), NIE `task.get("priority") or ...` — priority=0
-        # (PARKING) jest falsy i zostałby błędnie podbity do BIEŻĄCE.
-        priority=effective_priority(original_task),
+        # Dziedziczy priorytet zadania eskalacji (decyzja człowieka je
+        # odblokowała, praca ma wrócić na taki sam poziom pilności) — fallback
+        # "bieżące", gdy eskalacja go nie niosła. effective_priority(), NIE
+        # `task.get("priority") or ...` — priority=0 (PARKING) jest falsy i
+        # zostałby błędnie podbity do BIEŻĄCE.
+        priority=effective_priority(escalation_task),
     )
     now = datetime.now(timezone.utc).isoformat()
-    state_store.record_event(original_task["task_id"], "continuation_created", new_id, now)
+    state_store.record_event(escalation_task["task_id"], "continuation_created", new_id, now)
     return new_id

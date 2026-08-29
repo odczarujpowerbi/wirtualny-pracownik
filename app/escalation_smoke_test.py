@@ -27,10 +27,10 @@ class _FakeProjectlyClient:
         self.utworzone = []
 
     def create_task(self, title, description, assigned_to, parent_task_id=None,
-                    project_id=None, relation_type="eskalacja", priority=None):
+                    project_id=None, relation_type="eskalacja", priority=None, due_date=None):
         self.utworzone.append({"title": title, "description": description, "assigned_to": assigned_to,
                               "parent_task_id": parent_task_id, "project_id": project_id,
-                              "relation_type": relation_type, "priority": priority})
+                              "relation_type": relation_type, "priority": priority, "due_date": due_date})
         return f"ESK-{len(self.utworzone)}"
 
 
@@ -98,32 +98,80 @@ def run():
         checks.append(("escalate_to_human: BRAK podwójnego prefiksu, gdy zadanie już nim jest",
                        projectly_stack.utworzone[0]["title"] == "Wymaga decyzji: Zadanie testowe"))
 
-        # --- 1c. Priorytet zadania eskalacji: PARKING (0) - czeka na decyzję
-        # człowieka, bot nie ma go samo z siebie odbierać jako "do zrobienia teraz".
-        checks.append(("escalate_to_human: zadanie eskalacji ma priorytet PARKING (0)",
-                       projectly.utworzone[0]["priority"] == projectly_client.PRIORITY_PARKING))
+        # --- 1c. Priorytet/termin zadania eskalacji (29.08.2026, decyzja
+        # właściciela): TYLKO priorytet/bieżące (nie parking) - severity="red"
+        # (domyślne w teście 1 to "normal") -> priorytet + termin 1 dzień;
+        # domyślne severity="normal" -> bieżące + termin 3 dni.
+        import datetime as _dt
+        dzis = _dt.datetime.now(_dt.timezone.utc).date()
+        checks.append(("escalate_to_human: domyślnie (severity='normal') -> priorytet BIEŻĄCE (4)",
+                       projectly.utworzone[0]["priority"] == projectly_client.PRIORITY_BIEZACE))
+        checks.append(("escalate_to_human: domyślnie -> termin za 3 dni",
+                       projectly.utworzone[0]["due_date"] == (dzis + _dt.timedelta(days=3)).isoformat()))
 
-        # --- 1d. continuation_task_creator: dziedziczy priorytet oryginału,
-        # fallback "bieżące" gdy oryginał go nie niósł.
+        projectly_red = _FakeProjectlyClient()
+        escalation.escalate_to_human(TASK, "Wykryto prompt injection.", projectly_red,
+                                     assignee="pawel", severity="red")
+        checks.append(("escalate_to_human: severity='red' -> priorytet PRIORYTET (5)",
+                       projectly_red.utworzone[0]["priority"] == projectly_client.PRIORITY_PRIORYTET))
+        checks.append(("escalate_to_human: severity='red' -> termin za 1 dzień",
+                       projectly_red.utworzone[0]["due_date"] == (dzis + _dt.timedelta(days=1)).isoformat()))
+
+        # --- 1c-bis. Reparenting do zadania GŁÓWNEGO (żądanie właściciela
+        # 29.08.2026): gdy `task` SAMO jest podzadaniem (ma parent_task_id),
+        # eskalacja ma wisieć pod zadaniem GŁÓWNYM, nie pod tym podzadaniem. ---
+        projectly_sub = _FakeProjectlyClient()
+        subtask = {"task_id": "SUB-1", "title": "Podzadanie", "project_id": "PROJ-1", "parent_task_id": "GLOWNE-1"}
+        escalation.escalate_to_human(subtask, "Brak informacji.", projectly_sub, assignee="pawel")
+        checks.append(("escalate_to_human: eskalacja PODZADANIA wisi pod zadaniem GŁÓWNYM, nie pod podzadaniem",
+                       projectly_sub.utworzone[0]["parent_task_id"] == "GLOWNE-1"))
+
+        projectly_glowne = _FakeProjectlyClient()
+        escalation.escalate_to_human(TASK, "Brak informacji.", projectly_glowne, assignee="pawel")
+        checks.append(("escalate_to_human: eskalacja zadania GŁÓWNEGO (bez parent_task_id) wisi pod samym sobą",
+                       projectly_glowne.utworzone[0]["parent_task_id"] == TASK["task_id"]))
+
+        # --- 1c-ter. Link do folderu SharePoint na GÓRZE opisu, gdy podany. ---
+        projectly_link = _FakeProjectlyClient()
+        escalation.escalate_to_human(TASK, "Brak dostępu.", projectly_link, assignee="pawel",
+                                     folder_link="https://example.sharepoint.com/folder")
+        checks.append(("escalate_to_human: folder_link -> pierwsza linia opisu",
+                       projectly_link.utworzone[0]["description"].splitlines()[0]
+                       == "📁 Materiały: https://example.sharepoint.com/folder"))
+        checks.append(("escalate_to_human: BRAK folder_link -> opis bez zmian (zaczyna się od 'Zadanie źródłowe')",
+                       projectly.utworzone[0]["description"].splitlines()[0].startswith("Zadanie źródłowe")))
+
+        # --- 1d. continuation_task_creator(escalation_task, ...): dziedziczy
+        # priorytet ZADANIA ESKALACJI (to, które człowiek właśnie zamknął),
+        # fallback "bieżące" gdy eskalacja go nie niosła.
         projectly_kont = _FakeProjectlyClient()
-        oryginal_z_priorytetem = {**TASK, "priority": projectly_client.PRIORITY_PRIORYTET}
-        escalation.continuation_task_creator(oryginal_z_priorytetem, "Zatwierdzam.", projectly_kont)
-        checks.append(("continuation_task_creator: dziedziczy priorytet oryginalnego zadania",
+        eskalacja_z_priorytetem = {**TASK, "priority": projectly_client.PRIORITY_PRIORYTET}
+        escalation.continuation_task_creator(eskalacja_z_priorytetem, "Zatwierdzam.", projectly_kont)
+        checks.append(("continuation_task_creator: dziedziczy priorytet zadania eskalacji",
                        projectly_kont.utworzone[0]["priority"] == projectly_client.PRIORITY_PRIORYTET))
 
         projectly_kont_bez = _FakeProjectlyClient()
         escalation.continuation_task_creator(TASK, "Zatwierdzam.", projectly_kont_bez)
-        checks.append(("continuation_task_creator: brak priorytetu w oryginale -> fallback BIEŻĄCE (4)",
+        checks.append(("continuation_task_creator: brak priorytetu w eskalacji -> fallback BIEŻĄCE (4)",
                        projectly_kont_bez.utworzone[0]["priority"] == projectly_client.PRIORITY_BIEZACE))
 
         # --- 1e. Żywy bug znaleziony 29.08.2026: `priority or BIEŻĄCE` traktuje
         # priority=0 (PARKING) jako falsy i błędnie podbija zaparkowane zadanie
-        # do BIEŻĄCE. Oryginał z priorytetem PARKING musi zostać na PARKING.
+        # do BIEŻĄCE. Eskalacja z priorytetem PARKING musi zostać na PARKING.
         projectly_kont_parking = _FakeProjectlyClient()
-        oryginal_zaparkowany = {**TASK, "priority": projectly_client.PRIORITY_PARKING}
-        escalation.continuation_task_creator(oryginal_zaparkowany, "Zatwierdzam.", projectly_kont_parking)
-        checks.append(("continuation_task_creator: priority=0 (PARKING) w oryginale NIE jest podbijane do BIEŻĄCE",
+        eskalacja_zaparkowana = {**TASK, "priority": projectly_client.PRIORITY_PARKING}
+        escalation.continuation_task_creator(eskalacja_zaparkowana, "Zatwierdzam.", projectly_kont_parking)
+        checks.append(("continuation_task_creator: priority=0 (PARKING) w eskalacji NIE jest podbijane do BIEŻĄCE",
                        projectly_kont_parking.utworzone[0]["priority"] == projectly_client.PRIORITY_PARKING))
+
+        # --- 1f. continuation_task_creator: reparenting do zadania GŁÓWNEGO —
+        # eskalacja niesie parent_task_id ustawiony przez escalate_to_human na
+        # GŁÓWNE zadanie (WS2a) - kontynuacja ma wisieć pod tym samym id.
+        projectly_kont_glowne = _FakeProjectlyClient()
+        eskalacja_z_glownym = {**TASK, "task_id": "ESK-9", "parent_task_id": "GLOWNE-1"}
+        escalation.continuation_task_creator(eskalacja_z_glownym, "Zatwierdzam.", projectly_kont_glowne)
+        checks.append(("continuation_task_creator: kontynuacja wisi pod zadaniem GŁÓWNYM eskalacji, nie pod eskalacją",
+                       projectly_kont_glowne.utworzone[0]["parent_task_id"] == "GLOWNE-1"))
 
         # --- 2. event escalated_to_human zapisany w dzienniku ---
         conn = state_store.get_connection()
