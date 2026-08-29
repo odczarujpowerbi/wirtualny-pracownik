@@ -48,10 +48,17 @@ ZASADY POPRAWKI:
 
 
 def popraw(material, uwagi, zadanie="", ask=None):
-    """Zwraca {available, material, cost_usd, powod}. Nigdy nie rzuca.
+    """Zwraca {available, material, cost_usd, powod, brak_danych}. Nigdy nie rzuca.
 
     available=False oznacza: nie da się poprawić samą redakcją (albo brak modelu) —
-    wtedy wywołujący eskaluje jak dotąd."""
+    wtedy wywołujący eskaluje jak dotąd.
+
+    brak_danych=True to węższy przypadek: model odpowiedział NIE_DA_SIE_POPRAWIC,
+    czyli stwierdził wprost, że uwaga wymaga danych, których w materiale nie ma.
+    To diagnoza ZADANIA, nie materiału, i wywołujący ma ją odróżnić od awarii
+    modelu (bez tego runner eskalował do człowieka zadanie, o którym już wiedział,
+    że jest źle postawione — żywy incydent "Feedback: Feedback: Dodanie godzin
+    do aplikacji")."""
     # Domyślne "ask" chowa poziom modelu (low — nanoszenie konkretnej listy
     # zastrzeżeń jest z definicji mechaniczne), zamiast wymagać go w publicznej
     # sygnaturze popraw() — tak nikt przez pomyłkę nie wywoła tego na wysokim poziomie.
@@ -59,7 +66,7 @@ def popraw(material, uwagi, zadanie="", ask=None):
     material = (material or "").strip()
     uwagi = [u for u in (uwagi or []) if str(u).strip()]
     if not material or not uwagi:
-        return {"available": False, "material": "", "cost_usd": 0.0,
+        return {"available": False, "material": "", "cost_usd": 0.0, "brak_danych": False,
                 "powod": "Brak materiału albo brak konkretnych uwag do naniesienia."}
 
     prompt = PROMPT.format(zadanie=zadanie or "(brak opisu zadania)",
@@ -68,11 +75,11 @@ def popraw(material, uwagi, zadanie="", ask=None):
     try:
         wynik = ask(prompt)
     except Exception as exc:  # noqa: BLE001 — brak modelu nie może wywalić pętli
-        return {"available": False, "material": "", "cost_usd": 0.0,
+        return {"available": False, "material": "", "cost_usd": 0.0, "brak_danych": False,
                 "powod": f"Wywołanie modelu nie powiodło się: {type(exc).__name__}: {exc}"}
 
     if not wynik or not wynik.get("available"):
-        return {"available": False, "material": "", "cost_usd": 0.0,
+        return {"available": False, "material": "", "cost_usd": 0.0, "brak_danych": False,
                 "powod": (wynik or {}).get("detail", "Model niedostępny.")}
 
     tekst = (wynik.get("text") or "").strip()
@@ -80,14 +87,14 @@ def popraw(material, uwagi, zadanie="", ask=None):
                                          input_chars=len(prompt), output_chars=len(tekst))
     if tekst.startswith("NIE_DA_SIE_POPRAWIC"):
         powod = tekst.split(":", 1)[1].strip() if ":" in tekst else tekst
-        return {"available": False, "material": "", "cost_usd": koszt,
+        return {"available": False, "material": "", "cost_usd": koszt, "brak_danych": True,
                 "powod": f"Poprawka redakcyjna nie wystarczy: {powod}"}
 
     if not tekst:
-        return {"available": False, "material": "", "cost_usd": koszt,
+        return {"available": False, "material": "", "cost_usd": koszt, "brak_danych": False,
                 "powod": "Model zwrócił pustą poprawkę."}
 
-    return {"available": True, "material": tekst, "cost_usd": koszt, "powod": ""}
+    return {"available": True, "material": tekst, "cost_usd": koszt, "brak_danych": False, "powod": ""}
 
 
 def main():

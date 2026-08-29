@@ -45,6 +45,8 @@ def run():
         ask=_ask("NIE_DA_SIE_POPRAWIC: w materiale nie ma kursu USD"))
     checks.append(("Gdy uwaga wymaga nowych danych -> poprawka odmawia, nie zmyśla",
                    brak_danych["available"] is False and "USD" in brak_danych["powod"]))
+    checks.append(("Odmowa 'brakuje danych' oznaczona flagą, nie zgadywana z tekstu powodu",
+                   brak_danych["brak_danych"] is True))
 
     checks.append(("Brak uwag -> brak poprawki (nie wołamy modelu bez powodu)",
                    poprawka_materialu.popraw("cokolwiek", [], ask=_ask("x"))["available"] is False))
@@ -55,6 +57,8 @@ def run():
         "tekst", ["uwaga"],
         ask=lambda p: {"available": False, "text": None, "source": None, "detail": "Brak modelu."})
     checks.append(("Brak modelu -> available=False, bez wyjątku", bez_modelu["available"] is False))
+    checks.append(("Awaria modelu to NIE jest diagnoza 'brakuje danych'",
+                   bez_modelu["brak_danych"] is False))
 
     # --- rozpoznanie: wada materiału czy źle postawione zadanie ---
     zle_zadanie = runner_loop._zadanie_zle_postawione(
@@ -66,6 +70,12 @@ def run():
         {"acceptance_notes": "Kurs EUR wynosi 4,3165 zł."},
         {"concerns": ["Brak jednostki przy liczbie."]})
     checks.append(("Drobna wada redakcyjna NIE jest problemem zadania", wada_materialu is False))
+
+    jawna_diagnoza = runner_loop._zadanie_zle_postawione(
+        {"acceptance_notes": "Raport o braku danych plus szablon do wypełnienia."},
+        {"concerns": ["Wynik nie odpowiada zamówieniu."], "zadanie_zle_postawione": True})
+    checks.append(("Jawna diagnoza z pętli poprawek bije heurystykę po słowach kluczowych",
+                   jawna_diagnoza is True))
 
     # --- pętla: poprawiony materiał przechodzi bramkę ---
     oryginalna_bramka = runner_loop.bot_gustaw_bramka.run_gate
@@ -101,6 +111,24 @@ def run():
             {"passed": False, "summary": "brak jednostki", "concerns": ["Brak jednostki."]})
         checks.append(("Nieskuteczna poprawka nie kręci się w kółko (limit prób)",
                        gate["passed"] is False and przebiegi["n"] <= runner_loop.MAX_POPRAWEK))
+
+        # Poprawka mówi wprost, jakich danych brakuje — to diagnoza ZADANIA i musi
+        # dojść do runnera. Wcześniej ginęła w logu, a zadanie szło na eskalację do
+        # człowieka z pytaniem, na które nikt nie umiał odpowiedzieć.
+        runner_loop.poprawka_materialu.popraw = lambda material, uwagi, zadanie="", ask=None: {
+            "available": False, "material": "", "cost_usd": 0.002, "brak_danych": True,
+            "powod": "Poprawka redakcyjna nie wystarczy: brakuje estymacji i czasu realnego."}
+        gate, _ = runner_loop._popraw_i_sprawdz_ponownie(
+            {"task_id": "T-3", "title": "Feedback: Dodanie godzin do aplikacji"},
+            {"acceptance_notes": "Raport o braku danych plus szablon.", "cost_usd": 0.0},
+            {"passed": False, "summary": "odrzucone", "concerns": ["Wynik nie odpowiada zamówieniu."]})
+        checks.append(("Brak danych z poprawki oznacza zadanie jako źle postawione",
+                       runner_loop._zadanie_zle_postawione(
+                           {"acceptance_notes": "Raport o braku danych plus szablon."}, gate) is True))
+        checks.append(("Powód braku danych dopisany do zastrzeżeń (człowiek widzi, czego zabrakło)",
+                       any("brakuje estymacji" in c for c in gate["concerns"])))
+        checks.append(("Pierwotne zastrzeżenia bramki zachowane",
+                       "Wynik nie odpowiada zamówieniu." in gate["concerns"]))
     finally:
         runner_loop.bot_gustaw_bramka.run_gate = oryginalna_bramka
         runner_loop.poprawka_materialu.popraw = oryginalna_poprawka

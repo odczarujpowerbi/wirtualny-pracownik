@@ -370,6 +370,12 @@ def _popraw_i_sprawdz_ponownie(task, execution_result, gate):
             state_store.log_decision(task["task_id"], agent="patrycja", decision="poprawka_nieudana",
                                      reason=wynik["powod"], now=now_iso(),
                                      cost_usd=wynik.get("cost_usd", 0.0))
+            if wynik.get("brak_danych"):
+                # Poprawka powiedziała wprost, jakich danych brakuje. To diagnoza
+                # ZADANIA — dopisujemy ją do zastrzeżeń i oznaczamy bramkę, żeby
+                # zadanie poszło ścieżką "zamknięte z feedbackiem", a nie na
+                # eskalację do człowieka z pytaniem, na które nikt nie odpowie.
+                gate = {**gate, "concerns": [*uwagi, wynik["powod"]], "zadanie_zle_postawione": True}
             return gate, execution_result
 
         execution_result = {**execution_result, "acceptance_notes": wynik["material"],
@@ -393,6 +399,9 @@ def _zadanie_zle_postawione(execution_result, gate):
     """Czy problem leży w ZADANIU (brak danych, niejasne polecenie), a nie w materiale.
     Wtedy poprawka redakcyjna nic nie da i nie ma po co zakładać zadania dla człowieka —
     wystarczy zamknąć z informacją, czego zabrakło."""
+    # Jawna diagnoza z pętli poprawek bije heurystykę po słowach kluczowych.
+    if gate.get("zadanie_zle_postawione"):
+        return True
     material = (execution_result.get("acceptance_notes") or "").lower()
     if material.startswith("nie wykonano"):
         return True
