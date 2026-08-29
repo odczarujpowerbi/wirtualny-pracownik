@@ -53,9 +53,18 @@ def _migrate(conn):
 
 def get_connection():
     """Publiczny dostęp do połączenia — do zapytań, których nie pokrywają
-    gotowe funkcje pomocnicze poniżej (np. agregacje w cost_tracker.py)."""
+    gotowe funkcje pomocnicze poniżej (np. agregacje w cost_tracker.py).
+
+    WAL + timeout dodane 29.08.2026: od tej daty kilka procesów (dev/checker/
+    marketing, patrz BOT_ROLE) może pisać do TEGO SAMEGO runs/state.db
+    równocześnie (wcześniej zawsze pisał tylko jeden proces). Domyślny tryb
+    dziennika SQLite (rollback journal) blokuje CAŁĄ bazę na czas zapisu i ma
+    krótki, domyślny timeout ("database is locked" przy zbiegu w czasie).
+    WAL pozwala na równoczesny odczyt podczas zapisu, timeout=30 daje
+    zapisowi dużo czasu na czekanie zamiast od razu rzucać wyjątkiem."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript(SCHEMA)
     with conn:
         _migrate(conn)

@@ -22,6 +22,7 @@ zachowania (fail-soft, jak `_load_role()` w `projectly_client.py`).
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -31,7 +32,16 @@ from dotenv import load_dotenv
 def _current_role(role_path=None):
     """Kopia logiki _load_role() z projectly_client.py — nie importujemy
     stamtąd, żeby uniknąć zależności cyklicznej (projectly_client importuje
-    ten moduł, nie na odwrót). role_path wstrzykiwalny (testowalność)."""
+    ten moduł, nie na odwrót). role_path wstrzykiwalny (testowalność).
+
+    Zmienna środowiskowa BOT_ROLE ma pierwszeństwo nad config/role.json —
+    dodane 29.08.2026, żeby kilka procesów job_scheduler.py na TEJ SAMEJ
+    maszynie/repo (dev/checker/marketing) mogło działać pod różnymi rolami
+    bez współdzielenia (i nadpisywania sobie) jednego pliku role.json.
+    Uruchomienie bez BOT_ROLE zachowuje się dokładnie jak wcześniej (czyta
+    role.json, domyślnie "dev")."""
+    if os.environ.get("BOT_ROLE"):
+        return os.environ["BOT_ROLE"]
     role_path = role_path or Path(__file__).parent / "config" / "role.json"
     if role_path.exists():
         try:

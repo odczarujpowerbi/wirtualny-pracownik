@@ -19,7 +19,22 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-LOCK_PATH = Path(__file__).parent / "runs" / "job_scheduler.lock"
+import env_bootstrap
+
+
+def _lock_path_for_role(role):
+    """Blokada per ROLA (nie globalna) — dodane 29.08.2026: kilka procesów
+    job_scheduler.py na tej samej maszynie/repo (dev/checker/marketing, patrz
+    BOT_ROLE w env_bootstrap._current_role) mają pilnować SIEBIE nawzajem
+    osobno, nie dzielić jednego pliku blokady — inaczej drugi bot nigdy by
+    nie wystartował, myśląc że pierwszy już działa. Rola "dev" (domyślna,
+    stan sprzed tej zmiany) zachowuje DOKŁADNIE tę samą nazwę pliku co
+    wcześniej — zero zmiany zachowania dla istniejącego, jedynego bota."""
+    suffix = "" if role == "dev" else f"_{role}"
+    return Path(__file__).parent / "runs" / f"job_scheduler{suffix}.lock"
+
+
+LOCK_PATH = _lock_path_for_role(env_bootstrap._current_role())
 
 
 def _now_iso():

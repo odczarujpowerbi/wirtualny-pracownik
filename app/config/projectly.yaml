@@ -14,10 +14,18 @@ ai_account:
   type_value: "AI"         # używane dopiero gdy by = type
 
 # Mapa: rola maszyny (config/role.json, bootstrap_register.py) -> nazwa konta
-# AI w Projectly. Dev i Marketing istnieją dziś; reszta to plan (ZESPOL-BOTOW.md).
+# AI w Projectly. Dev, Marketing i Checker istnieją dziś; reszta to plan (ZESPOL-BOTOW.md).
 role_to_account:
   dev: "AI - Dev"
   marketing: "AI - Marketing"
+  # "Checker" (decyzja właściciela 29.08.2026): osobne konto dla bota, który
+  # ma dostęp do repozytorium i może je zmieniać (repo_auto_improver.py) -
+  # świadomie ODDZIELONE od dev/marketing, żeby ta zdolność (edycja/nadpisanie
+  # repo) nie była dostępna z żadnego innego konta/roli. Nazwa BEZ spacji
+  # wokół myślnika ("AI-Checker") — tak dokładnie założone w Projectly,
+  # niespójne z resztą ("AI - Dev" itd.), ale to tylko string dopasowywany
+  # 1:1 do katalogu osób (_resolve_person_id), nie wzorzec.
+  checker: "AI-Checker"
   admin: "AI - Admin"          # planowane
   asystent: "AI - Asystent"    # planowane
   strateg: "AI - Strateg"      # planowane

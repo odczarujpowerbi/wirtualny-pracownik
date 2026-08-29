@@ -7,9 +7,11 @@ plikach TYMCZASOWYCH, nie dotyka prawdziwego runs/mock_comments.json.
 """
 
 import json
+import os
 import tempfile
 from pathlib import Path
 
+import projectly_client
 from projectly_client import MAX_COMMENTS_PER_TASK, MockProjectlyClient, ProjectlyClient
 
 
@@ -144,6 +146,28 @@ def test_update_status_maps_przeniesione_literally():
     print("OK  update_status('przeniesione') mapuje na Projectly status 'przeniesione', nie in_progress")
 
 
+def test_load_role_bot_role_env_var_overrides_role_json(tmp_path=None):
+    # BOT_ROLE dodane 29.08.2026 (ten sam mechanizm co env_bootstrap._current_role,
+    # celowo zduplikowany zamiast importu - patrz komentarz przy _load_role) -
+    # kilka procesow (dev/checker/marketing) na jednej maszynie nie moga
+    # wspoldzielic jednego role.json bez wyscigu.
+    original_path = projectly_client.ROLE_CONFIG_PATH
+    tmp = Path(tempfile.mkdtemp()) / "role.json"
+    tmp.write_text(json.dumps({"role": "dev"}), encoding="utf-8")
+    projectly_client.ROLE_CONFIG_PATH = tmp
+    original_env = os.environ.get("BOT_ROLE")
+    os.environ["BOT_ROLE"] = "checker"
+    try:
+        assert projectly_client._load_role() == "checker"
+    finally:
+        projectly_client.ROLE_CONFIG_PATH = original_path
+        if original_env is None:
+            os.environ.pop("BOT_ROLE", None)
+        else:
+            os.environ["BOT_ROLE"] = original_env
+    print("OK  _load_role(): BOT_ROLE w środowisku ma pierwszeństwo nad role.json")
+
+
 if __name__ == "__main__":
     test_self_heal_from_corrupt_json()
     test_atomic_save_no_leftover_tmp()
@@ -153,4 +177,5 @@ if __name__ == "__main__":
     test_create_task_parent_task_id_still_uses_zbot_link_tasks()
     test_map_task_exposes_parent_task_id_and_subtask_count()
     test_update_status_maps_przeniesione_literally()
+    test_load_role_bot_role_env_var_overrides_role_json()
     print("\nWszystkie testy MockProjectlyClient przeszły.")

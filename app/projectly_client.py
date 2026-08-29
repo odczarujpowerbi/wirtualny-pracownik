@@ -60,6 +60,12 @@ def _load_config():
 
 
 def _load_role():
+    """BOT_ROLE ma pierwszeństwo nad config/role.json — patrz
+    env_bootstrap._current_role() (kopia tej samej logiki, ten sam powód:
+    kilka procesów na jednej maszynie/repo pod różnymi rolami bez
+    współdzielenia jednego pliku)."""
+    if os.environ.get("BOT_ROLE"):
+        return os.environ["BOT_ROLE"]
     if ROLE_CONFIG_PATH.exists():
         try:
             return json.loads(ROLE_CONFIG_PATH.read_text(encoding="utf-8")).get("role", "dev")

@@ -91,6 +91,17 @@ def run():
         else:
             sys.modules.pop("psutil", None)
 
+    # 7. _lock_path_for_role: rola "dev" (domyślna, stan sprzed 29.08.2026)
+    # daje DOKŁADNIE tę samą nazwę pliku co wcześniej (zero zmiany zachowania
+    # dla istniejącego, jedynego bota); inna rola -> osobny plik, żeby
+    # kilka procesów (dev/checker/marketing) nie dzieliło jednej blokady.
+    checks.append(("_lock_path_for_role('dev') -> nazwa BEZ sufiksu (wsteczna zgodność)",
+                   lock._lock_path_for_role("dev").name == "job_scheduler.lock"))
+    checks.append(("_lock_path_for_role('checker') -> osobny plik z sufiksem",
+                   lock._lock_path_for_role("checker").name == "job_scheduler_checker.lock"))
+    checks.append(("_lock_path_for_role: dev i checker to RÓŻNE ścieżki",
+                   lock._lock_path_for_role("dev") != lock._lock_path_for_role("checker")))
+
     print("\n--- Wynik testu dymnego scheduler_lock ---")
     all_passed = True
     for name, passed in checks:

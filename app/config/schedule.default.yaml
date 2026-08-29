@@ -143,7 +143,23 @@ jobs:
     wlaczeniem, zeby pierwszy przebieg NIE dzialal retroaktywnie na starym szumie
     testowym (~150 zdarzen z 19-24.08.2026, w tym powtarzajace sie zadanie mock
     "PRJ-0001" i rekordy notebook_intake "NB-*" - test/dev, nie realne incydenty).
+    Rola "checker" (29.08.2026, decyzja wlasciciela) - zdolnosc do zmiany repo ma
+    byc dostepna WYLACZNIE z osobnego procesu/konta ("AI-Checker" w Projectly),
+    nie z procesu dev - odpala go tylko scheduler uruchomiony z BOT_ROLE=checker.
   module: repo_auto_improver
   function: run_repo_improvement_cycle
   interval_seconds: 120
   enabled: true
+  role: checker
+- name: runner_loop_checker
+  description: Ta sama funkcja co job "runner_loop" (runner_loop.run_once) -
+    osobny wpis, zeby proces uruchomiony z BOT_ROLE=checker mogl rowniez
+    wykonywac wlasne, drobne zadania operacyjne przypisane do konta "AI-Checker"
+    w Projectly (nie tylko naprawiac repo) - decyzja wlasciciela 29.08.2026.
+    Konto/zakres zadan wynika WYLACZNIE z roli procesu (BOT_ROLE), nie z tego
+    wpisu - patrz config/projectly.yaml role_to_account.
+  module: runner_loop
+  function: run_once
+  interval_seconds: 30
+  enabled: true
+  role: checker

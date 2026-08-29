@@ -68,13 +68,41 @@ def _watchdog_timeout_exceeded(started_at, now, limit_seconds):
     plikowej. True = wątek żyje dłużej niż limit, traktujemy go jako zawieszony."""
     return started_at is not None and (now - started_at).total_seconds() > limit_seconds
 
+
+def _job_runs_under_role(job, role):
+    """Wyodrębnione z run_scheduler() dla testowalności. Job bez pola "role"
+    jest "dev" domyślnie (wsteczna zgodność, stan sprzed 29.08.2026) — patrz
+    komentarz przy wywołaniu w run_scheduler()."""
+    return job.get("role", "dev") == role
+
 SCHEDULE_PATH = Path(__file__).parent / "config" / "schedule.yaml"
 # Szablon SLEDZONY w gicie. schedule.yaml (LIVE) jest poza gitem (.gitignore),
 # bo aplikacja go zapisuje w runtime (dashboard/CLI) - gdyby byl sledzony,
 # kazdy git pull konfliktowalby. Rozdzial: SZABLON w repo, LIVE lokalnie.
 DEFAULT_SCHEDULE_PATH = Path(__file__).parent / "config" / "schedule.default.yaml"
-STATUS_PATH = Path(__file__).parent / "runs" / "scheduler_status.json"
-HISTORY_PATH = Path(__file__).parent / "runs" / "run_history.jsonl"
+
+CURRENT_ROLE = env_bootstrap._current_role()
+
+
+def _status_path_for_role(role):
+    """Stan/historia SĄ per rola (dodane 29.08.2026) — kilka procesów
+    job_scheduler.py na tej samej maszynie/repo (dev/checker/marketing, patrz
+    BOT_ROLE) pisałyby inaczej do TYCH SAMYCH plików bez wiedzy o sobie
+    nawzajem (read-modify-write całego JSON-a — realna utrata ostatniej
+    aktualizacji przy równoczesnym zapisie dwóch procesów). Rola "dev"
+    (domyślna, stan sprzed tej zmiany) zachowuje DOKŁADNIE tę samą nazwę
+    pliku co wcześniej."""
+    suffix = "" if role == "dev" else f"_{role}"
+    return Path(__file__).parent / "runs" / f"scheduler_status{suffix}.json"
+
+
+def _history_path_for_role(role):
+    suffix = "" if role == "dev" else f"_{role}"
+    return Path(__file__).parent / "runs" / f"run_history{suffix}.jsonl"
+
+
+STATUS_PATH = _status_path_for_role(CURRENT_ROLE)
+HISTORY_PATH = _history_path_for_role(CURRENT_ROLE)
 
 # scheduler_status.json trzyma tylko OSTATNI przebieg każdego zadania.
 # run_history.jsonl to dziennik dopisywany co przebieg (jeden JSON na linię),
@@ -315,7 +343,8 @@ def run_scheduler(tick_seconds=5, schedule_path=SCHEDULE_PATH):
     threads = {}
     thread_started_at = {}
 
-    print(f"job_scheduler.py wystartował — sprawdzanie harmonogramu co {tick_seconds}s (config: {schedule_path})")
+    print(f"job_scheduler.py wystartował jako rola '{CURRENT_ROLE}' — sprawdzanie harmonogramu "
+          f"co {tick_seconds}s (config: {schedule_path})")
     try:
         while True:
             if kill_switch.is_active():
@@ -332,6 +361,14 @@ def run_scheduler(tick_seconds=5, schedule_path=SCHEDULE_PATH):
 
             for job in jobs:
                 if not job.get("enabled", True):
+                    continue
+                # Filtr roli (dodane 29.08.2026): TYLKO proces z rolą jobu
+                # (np. "checker" dla repo_auto_improver.py — bot z dostępem do
+                # repozytorium, świadomie ODDZIELONY od reszty) go odpala. Bez
+                # tego kilka procesów na jednej maszynie/repo dublowałoby te
+                # same joby (potrójny monitoring/digest/alert) zamiast dzielić
+                # się zakresem.
+                if not _job_runs_under_role(job, CURRENT_ROLE):
                     continue
                 name = job["name"]
                 last = state.get(name)
