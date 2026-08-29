@@ -102,6 +102,27 @@ def run():
     checks.append(("_lock_path_for_role: dev i checker to RÓŻNE ścieżki",
                    lock._lock_path_for_role("dev") != lock._lock_path_for_role("checker")))
 
+    # 8. is_running(role): sprawdzenie BEZ mutacji, dla DOWOLNEJ roli naraz —
+    # dodane 29.08.2026 dla przycisków "uruchom agenta X" w dashboard.py.
+    import tempfile
+    from pathlib import Path
+    tmp_role_dir = Path(tempfile.mkdtemp())
+    original_lock_path_for_role = lock._lock_path_for_role
+    lock._lock_path_for_role = lambda role: tmp_role_dir / f"job_scheduler_{role}.lock"
+    try:
+        _install_fake_psutil(alive_pids={999}, cmdlines={999: "python job_scheduler.py --tick 2"})
+        checks.append(("is_running: brak pliku blokady -> False", lock.is_running("checker") is False))
+
+        (tmp_role_dir / "job_scheduler_checker.lock").write_text('{"pid": 999}', encoding="utf-8")
+        checks.append(("is_running: żywy proces -> True", lock.is_running("checker") is True))
+        checks.append(("is_running: INNA rola bez pliku -> False (nie myli ról)",
+                       lock.is_running("marketing") is False))
+
+        _install_fake_psutil(alive_pids=set(), cmdlines={})
+        checks.append(("is_running: martwy proces (plik zostaje) -> False", lock.is_running("checker") is False))
+    finally:
+        lock._lock_path_for_role = original_lock_path_for_role
+
     print("\n--- Wynik testu dymnego scheduler_lock ---")
     all_passed = True
     for name, passed in checks:

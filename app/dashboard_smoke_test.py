@@ -215,6 +215,67 @@ def run():
                    health.get("control") in ("running", "paused", "stopped")
                    and "queue_depth" in health and "cost_today_usd" in health))
 
+    # 18-22. Przyciski "uruchom agenta X" (dodane 29.08.2026, do testowania) —
+    # zero realnego spawnowania procesów: scheduler_lock.is_running i
+    # dashboard._launch_process podmienione atrapami.
+    import scheduler_lock
+    original_agent_bat_files = dashboard.AGENT_BAT_FILES
+    original_is_running = scheduler_lock.is_running
+    original_launch_process = dashboard._launch_process
+    uruchomienia = []
+    dashboard._launch_process = lambda cmd, cwd: uruchomienia.append((cmd, cwd))
+
+    with tempfile.TemporaryDirectory() as tmp4:
+        tmp4 = Path(tmp4)
+        bat_dev = tmp4 / "dev.bat"
+        bat_dev.write_text("@echo off\n", encoding="utf-8")
+        bat_checker = tmp4 / "checker.bat"
+        bat_checker.write_text("@echo off\n", encoding="utf-8")
+        dashboard.AGENT_BAT_FILES = {
+            "dev": bat_dev, "checker": bat_checker, "marketing": tmp4 / "brak-tego-pliku.bat",
+        }
+        try:
+            # 18. build_agents: status każdej roli wg scheduler_lock.is_running.
+            scheduler_lock.is_running = lambda role: role == "dev"
+            agenci = dashboard.build_agents()
+            stany = {a["role"]: a["running"] for a in agenci["agents"]}
+            checks.append(("build_agents: zwraca status KAŻDEJ znanej roli, zgodny z is_running",
+                           stany == {"dev": True, "checker": False, "marketing": False}))
+
+            # 19. start_agent: rola już działająca -> NIE odpala nowego procesu.
+            wynik_juz_dziala = dashboard.start_agent("dev")
+            checks.append(("start_agent: agent już działający -> started=False, BRAK nowego procesu",
+                           wynik_juz_dziala["started"] is False and len(uruchomienia) == 0))
+
+            # 20. start_agent: rola nieznana -> błąd czytelny, bez wyjątku.
+            wynik_nieznana = dashboard.start_agent("nieistniejąca-rola")
+            checks.append(("start_agent: nieznana rola -> started=False, komunikat, bez wyjątku",
+                           wynik_nieznana["started"] is False and "Nieznana rola" in wynik_nieznana["message"]))
+
+            # 21. start_agent: brak pliku .bat -> błąd czytelny (error case).
+            wynik_brak_pliku = dashboard.start_agent("marketing")
+            checks.append(("start_agent: brak pliku .bat -> started=False, BRAK nowego procesu",
+                           wynik_brak_pliku["started"] is False and len(uruchomienia) == 0))
+
+            # 22. start_agent: rola NIE działająca, plik istnieje -> odpala proces.
+            wynik_start = dashboard.start_agent("checker")
+            checks.append(("start_agent: agent nieaktywny + plik istnieje -> started=True, proces odpalony",
+                           wynik_start["started"] is True and len(uruchomienia) == 1
+                           and str(bat_checker) in uruchomienia[0][0]))
+
+            # 23. start_all_agents: agreguje wynik dla WSZYSTKICH ról naraz.
+            uruchomienia.clear()
+            wynik_wszystkie = dashboard.start_all_agents()
+            checks.append(("start_all_agents: zwraca wynik dla każdej znanej roli",
+                           set(wynik_wszystkie["results"]) == {"dev", "checker", "marketing"}))
+            checks.append(("start_all_agents: 'dev' już działał (started=False), 'marketing' bez pliku (started=False)",
+                           wynik_wszystkie["results"]["dev"]["started"] is False
+                           and wynik_wszystkie["results"]["marketing"]["started"] is False))
+        finally:
+            scheduler_lock.is_running = original_is_running
+            dashboard.AGENT_BAT_FILES = original_agent_bat_files
+            dashboard._launch_process = original_launch_process
+
     print("\n--- Wynik testu dymnego dashboardu ---")
     all_passed = True
     for name, passed in checks:

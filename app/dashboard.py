@@ -11,17 +11,24 @@ To celowo mały serwer na bibliotece standardowej Pythona (http.server) —
 zero nowych zależności. Cała logika harmonogramu i historii siedzi w
 job_scheduler.py; ten plik to tylko cienka warstwa HTTP nad nim:
 
-    GET  /              -> strona dashboard.html
-    GET  /api/state     -> zadania + status + historia przebiegów (JSON)
-    POST /api/schedule  -> zmiana interwału / włączenia / opisu jednego zadania
-    POST /api/run       -> uruchom jedno zadanie natychmiast (poza harmonogramem)
+    GET  /                    -> strona dashboard.html
+    GET  /api/state           -> zadania + status + historia przebiegów (JSON)
+    POST /api/schedule        -> zmiana interwału / włączenia / opisu jednego zadania
+    POST /api/run             -> uruchom jedno zadanie natychmiast (poza harmonogramem)
+    GET  /api/agents          -> status (działa/nie) każdego bota (dev/checker/marketing)
+    POST /api/agents/start    -> odpala PROCES joba wskazanej roli (jeśli nie działa)
+    POST /api/agents/start-all -> to samo dla wszystkich ról naraz
 
 Serwer słucha TYLKO na 127.0.0.1 (localhost) — nie jest wystawiony na sieć.
 'Uruchom teraz' odpala wyłącznie zadania zadeklarowane w schedule.yaml,
-nigdy dowolny kod.
+nigdy dowolny kod. 'Uruchom agenta' (dodane 29.08.2026, do testowania)
+odpala WYŁĄCZNIE jeden z trzech znanych .bat-ów (AGENT_BAT_FILES), nigdy
+dowolną ścieżkę z requestu.
 """
 
 import json
+import subprocess
+import sys
 import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -33,12 +40,68 @@ import job_scheduler
 import kill_switch
 import live_status_publisher
 import notebook_intake
+import scheduler_lock
 import state_store
 import usage_monitor
 
 HOST = "127.0.0.1"
 PORT = 8787
 HTML_PATH = Path(__file__).parent / "dashboard.html"
+
+# Przyciski "uruchom agenta X" (dodane 29.08.2026, na wyraźną prośbę
+# właściciela — do testowania: chce móc odpalić każdego bota osobno, bez
+# grzebania w Harmonogramie zadań Windows/terminalu). Repo root = katalog
+# NADRZĘDNY wobec app/ (ten plik jest w app/, .bat-y w korzeniu repo, ten
+# sam układ co start-agent.bat/start-agent-checker.bat/start-agent-marketing.bat).
+REPO_ROOT = Path(__file__).parent.parent
+AGENT_BAT_FILES = {
+    "dev": REPO_ROOT / "start-agent.bat",
+    "checker": REPO_ROOT / "start-agent-checker.bat",
+    "marketing": REPO_ROOT / "start-agent-marketing.bat",
+}
+
+
+def _launch_process(cmd, cwd):
+    """Jedyne miejsce faktycznie odpalające nowy proces — wyodrębnione, żeby
+    testy dymne mogły to podmienić atrapą zamiast naprawdę spawnować proces
+    (ten sam wzorzec co repo_auto_improver._run/agentic_worker._run).
+    DETACHED_PROCESS + CREATE_NO_WINDOW (tylko Windows): proces przeżywa
+    zamknięcie tego dashboardu/przeglądarki i nie otwiera widocznego okna
+    konsoli — ma działać w tle jak uruchomiony przez Harmonogram zadań."""
+    kwargs = {}
+    if sys.platform == "win32":
+        kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW
+    subprocess.Popen(cmd, cwd=str(cwd), **kwargs)
+
+
+def build_agents():
+    """Status (działa/nie działa) każdego z trzech botów na tej maszynie —
+    do panelu 'Agenci' w dashboardzie. is_running() to prawdziwy test
+    żywotności procesu (scheduler_lock.py), nie tylko obecność pliku."""
+    return {"agents": [{"role": rola, "running": scheduler_lock.is_running(rola)}
+                       for rola in AGENT_BAT_FILES]}
+
+
+def start_agent(role):
+    """Odpala proces job_scheduler.py dla WSKAZANEJ roli (przez jej .bat),
+    jeśli jeszcze nie działa. Zwraca {"started": bool, "message": str} —
+    nigdy nie rzuca, błąd trafia do message (ten sam wzorzec co _run_safely)."""
+    if role not in AGENT_BAT_FILES:
+        return {"started": False, "message": f"Nieznana rola '{role}'."}
+    if scheduler_lock.is_running(role):
+        return {"started": False, "message": f"Agent '{role}' już działa."}
+    bat_path = AGENT_BAT_FILES[role]
+    if not bat_path.exists():
+        return {"started": False, "message": f"Brak pliku startowego: {bat_path}"}
+    try:
+        _launch_process(["cmd", "/c", str(bat_path)], cwd=REPO_ROOT)
+    except OSError as exc:
+        return {"started": False, "message": f"Nie udało się uruchomić agenta '{role}': {exc}"}
+    return {"started": True, "message": f"Uruchamiam agenta '{role}'…"}
+
+
+def start_all_agents():
+    return {"results": {rola: start_agent(rola) for rola in AGENT_BAT_FILES}}
 
 
 def build_state():
@@ -147,6 +210,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._send_json(build_tasks())
         elif parsed.path == "/api/health":
             self._send_json(build_health())
+        elif parsed.path == "/api/agents":
+            self._send_json(build_agents())
         elif parsed.path == "/api/run-log":
             self._handle_run_log(parse_qs(parsed.query))
         else:
@@ -173,6 +238,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._handle_add_task()
             elif self.path == "/api/control":
                 self._handle_control()
+            elif self.path == "/api/agents/start":
+                self._handle_agent_start()
+            elif self.path == "/api/agents/start-all":
+                self._send_json({"data": start_all_agents()})
             else:
                 self._send_error("not_found", "Nieznana ścieżka.", status=404)
         except ValueError as exc:
@@ -195,6 +264,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
             raise ValueError(f"Brak zadania '{name}' w harmonogramie.")
         threading.Thread(target=_run_safely, args=(name,), daemon=True).start()
         self._send_json({"data": {"message": f"Uruchomiono '{name}' w tle."}}, status=202)
+
+    def _handle_agent_start(self):
+        body = self._read_json_body()
+        role = body.get("role")
+        if not role:
+            raise ValueError("Brak pola 'role'.")
+        self._send_json({"data": start_agent(role)})
 
     def _handle_add_task(self):
         """Dopisuje zadanie do notatnika (inbox/zadania.txt) i od razu je przetwarza

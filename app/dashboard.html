@@ -65,6 +65,15 @@
   .ctrl-btns { display:flex; gap:8px; flex-wrap:wrap; }
   button.danger { background:var(--err); border-color:var(--err); color:#fff; }
 
+  /* Panel agentów (dev/checker/marketing) - przyciski "uruchom" per bot. */
+  .agents { display:flex; align-items:center; gap:10px; padding:12px 16px; flex-wrap:wrap; }
+  .agent-chip { display:flex; align-items:center; gap:8px; padding:6px 12px; border:1px solid var(--line);
+                border-radius:999px; }
+  .agent-dot { width:9px; height:9px; border-radius:50%; flex:none; }
+  .agent-dot.on { background:var(--ok); }
+  .agent-dot.off { background:var(--off); }
+  .agent-name { font-weight:600; font-size:13px; text-transform:capitalize; }
+
   /* Formularz dodawania zadania. */
   .addtask { padding:14px 16px; }
   .addtask-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
@@ -147,6 +156,9 @@
       <button id="btn-start">Start</button>
     </div>
   </div>
+
+  <h2>Agenci (dev / checker / marketing)</h2>
+  <div class="card agents" id="agents"></div>
 
   <h2>Dodaj zadanie</h2>
   <div class="card addtask">
@@ -326,6 +338,61 @@ async function loadHealth() {
   try {
     const res = await fetch("/api/health");
     renderHealth(await res.json());
+  } catch (e) { /* cicho */ }
+}
+
+// ---- Panel agentów: dev/checker/marketing, przyciski "uruchom" per bot ----
+async function startAgent(role, button) {
+  button.disabled = true;
+  try {
+    const res = await fetch("/api/agents/start", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error ? json.error.message : "Błąd uruchomienia agenta");
+    toast(json.data.message || "OK");
+    setTimeout(loadAgents, 2000);
+  } catch (e) { toast(e.message, true); }
+  finally { button.disabled = false; }
+}
+
+async function startAllAgents(button) {
+  button.disabled = true;
+  try {
+    const res = await fetch("/api/agents/start-all", { method: "POST" });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error ? json.error.message : "Błąd uruchomienia agentów");
+    const komunikaty = Object.entries(json.data.results).map(([rola, w]) => `${rola}: ${w.message}`);
+    toast(komunikaty.join(" · "));
+    setTimeout(loadAgents, 2000);
+  } catch (e) { toast(e.message, true); }
+  finally { button.disabled = false; }
+}
+
+function buildAgentChip(agent) {
+  const btn = el("button", { class: "primary", text: agent.running ? "Działa" : "▶ Uruchom" });
+  btn.disabled = agent.running;
+  btn.addEventListener("click", () => startAgent(agent.role, btn));
+  return el("div", { class: "agent-chip" }, [
+    el("span", { class: `agent-dot ${agent.running ? "on" : "off"}` }),
+    el("span", { class: "agent-name", text: agent.role }),
+    btn,
+  ]);
+}
+
+function renderAgents(agents) {
+  const box = document.getElementById("agents");
+  const btnAll = el("button", { class: "primary", text: "▶ Uruchom wszystkich" });
+  btnAll.addEventListener("click", () => startAllAgents(btnAll));
+  box.replaceChildren(...agents.map(buildAgentChip), btnAll);
+}
+
+async function loadAgents() {
+  try {
+    const res = await fetch("/api/agents");
+    const json = await res.json();
+    renderAgents(json.agents || []);
   } catch (e) { /* cicho */ }
 }
 
@@ -655,9 +722,11 @@ makeResizable(document.getElementById("jobs"), "cols-jobs-v1");
 makeResizable(document.getElementById("history"), "cols-history-v1");
 load();
 loadHealth();
+loadAgents();
 setInterval(refresh, REFRESH_MS);
 setInterval(loadTasks, TASKS_REFRESH_MS);
 setInterval(loadHealth, TASKS_REFRESH_MS);
+setInterval(loadAgents, TASKS_REFRESH_MS);
 </script>
 </body>
 </html>

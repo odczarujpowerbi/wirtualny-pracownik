@@ -41,13 +41,17 @@ def _now_iso():
     return datetime.now(timezone.utc).isoformat()
 
 
-def _read():
-    if not LOCK_PATH.exists():
+def _read_path(path):
+    if not path.exists():
         return None
     try:
-        return json.loads(LOCK_PATH.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8"))
     except (ValueError, OSError):
         return None
+
+
+def _read():
+    return _read_path(LOCK_PATH)
 
 
 def _write(record):
@@ -74,6 +78,16 @@ def _is_alive(record):
     # PID mógł zostać oddany innemu procesowi (np. po restarcie maszyny) —
     # potwierdzamy, że to wciąż job_scheduler.py, nie zgadujemy po samym PID.
     return "job_scheduler" in cmdline
+
+
+def is_running(role):
+    """Czy proces job_scheduler.py DLA TEJ ROLI (dev/checker/marketing/...)
+    realnie żyje — nie tylko czy istnieje plik blokady, prawdziwy test przez
+    _is_alive (patrz jego docstring). Dodane 29.08.2026 dla dashboard.py:
+    przyciski 'uruchom agenta X' muszą wiedzieć, czy dany agent już działa,
+    zanim spróbują odpalić nowy proces (żeby nie dublować)."""
+    record = _read_path(_lock_path_for_role(role))
+    return record is not None and _is_alive(record)
 
 
 def acquire(pid=None):
