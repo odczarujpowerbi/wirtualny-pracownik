@@ -83,10 +83,20 @@ live_status:
   page_title_template: "Status na żywo — {role}"
 
 # Projekt dla zadań infrastrukturalnych bez naturalnego projektu źródłowego
-# (alerty system_health_monitor.py, zadania naprawcze kacper_monitor.py) —
-# create_task w realnym Projectly wymaga project_id, a te moduły nie mają
-# zadania źródłowego, z którego by je wzięły.
+# (alerty system_health_monitor.py, zadania naprawcze kacper_monitor.py,
+# zadanie kontrolne remote_control.py) — create_task w realnym Projectly
+# wymaga project_id, a te moduły nie mają zadania źródłowego, z którego by
+# je wzięły.
 default_admin_project: "Administracyjne"
+
+# Nadpisanie per ROLA (dodane 29.08.2026) — konto "AI-Checker" nie ma dostępu
+# do projektu "Administracyjne" w Projectly (inny zakres uprawnień niż dev/
+# marketing), tylko do "Usprawnienia". Bez tego wpisu default_admin_project_id()
+# zwracałoby None dla roli checker (nazwa nierozpoznana w JEGO katalogu
+# projektów) i np. remote_control.py nigdy nie utworzyłby zadania kontrolnego
+# dla tej roli. Rola bez wpisu tutaj używa globalnego default_admin_project.
+default_admin_project_by_role:
+  checker: "Usprawnienia"
 
 # --- Mapowanie schematu Projectly -> kontrakt wewnętrzny (get_new_tasks) ---
 # risk_level_hint NIE istnieje w Projectly; brak -> runner klasyfikuje jako

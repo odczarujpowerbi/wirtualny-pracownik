@@ -407,11 +407,18 @@ class ProjectlyClient:
 
     def default_admin_project_id(self):
         """project_id dla zadań bez naturalnego projektu źródłowego (alerty
-        system_health_monitor.py, naprawcze kacper_monitor.py) — config
-        default_admin_project (nazwa), rozwiązywana jak każda inna nazwa
-        projektu. None, gdy nieskonfigurowany albo nierozpoznany (wywołujący
-        wtedy nie twory zadania w Projectly, tylko loguje/publikuje status)."""
-        name = self._cfg.get("default_admin_project")
+        system_health_monitor.py, naprawcze kacper_monitor.py, kontrolne
+        remote_control.py) — config default_admin_project (nazwa), rozwiązywana
+        jak każda inna nazwa projektu. None, gdy nieskonfigurowany albo
+        nierozpoznany (wywołujący wtedy nie twory zadania w Projectly, tylko
+        loguje/publikuje status).
+
+        default_admin_project_by_role (29.08.2026) ma pierwszeństwo dla TEJ
+        roli — różne konta AI mają różny zakres widocznych projektów (np.
+        "AI-Checker" nie widzi "Administracyjne", tylko "Usprawnienia"),
+        więc jedna globalna nazwa nie mogła wystarczyć wszystkim rolom."""
+        name = self._cfg.get("default_admin_project_by_role", {}).get(self._role) \
+            or self._cfg.get("default_admin_project")
         return self._project_id_by_name(name) if name else None
 
     def create_task(self, title, description, assigned_to, parent_task_id=None, project_id=None,

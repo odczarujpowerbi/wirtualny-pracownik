@@ -146,6 +146,51 @@ def test_update_status_maps_przeniesione_literally():
     print("OK  update_status('przeniesione') mapuje na Projectly status 'przeniesione', nie in_progress")
 
 
+class _FakeMCPClientProjekty:
+    """Atrapa MCP: list_projects z zadanym zestawem projektów (żadnych osób) -
+    do testu default_admin_project_id() dla roli z ograniczonym zakresem."""
+    def __init__(self, projects):
+        self._projects = projects
+
+    def call_tool(self, name, arguments=None):
+        if name == "list_projects":
+            return {"people": [], "projects": self._projects}
+        return {}
+
+
+def test_default_admin_project_id_uses_role_override():
+    # Konto "AI-Checker" (29.08.2026) nie widzi "Administracyjne", tylko
+    # "Usprawnienia" - default_admin_project_by_role musi wygrać dla roli
+    # checker, zamiast zwracac None (brak "Administracyjne" w JEGO katalogu).
+    client = ProjectlyClient(api_key="fake-token", base_url="http://fake.local/mcp")
+    client._role = "checker"
+    client._cfg = {
+        "default_admin_project": "Administracyjne",
+        "default_admin_project_by_role": {"checker": "Usprawnienia"},
+    }
+    client._mcp = _FakeMCPClientProjekty([
+        {"id": "PROJ-USPR", "name": "Usprawnienia", "status": "active"},
+    ])
+
+    assert client.default_admin_project_id() == "PROJ-USPR"
+    print("OK  default_admin_project_id(): rola 'checker' uzywa nadpisania z default_admin_project_by_role")
+
+
+def test_default_admin_project_id_falls_back_to_global_for_role_without_override():
+    client = ProjectlyClient(api_key="fake-token", base_url="http://fake.local/mcp")
+    client._role = "dev"
+    client._cfg = {
+        "default_admin_project": "Administracyjne",
+        "default_admin_project_by_role": {"checker": "Usprawnienia"},
+    }
+    client._mcp = _FakeMCPClientProjekty([
+        {"id": "PROJ-ADMIN", "name": "Administracyjne", "status": "active"},
+    ])
+
+    assert client.default_admin_project_id() == "PROJ-ADMIN"
+    print("OK  default_admin_project_id(): rola BEZ nadpisania nadal uzywa globalnego default_admin_project")
+
+
 def test_set_task_feedback_sends_cost_usd_to_update_task():
     # costUsd (29.08.2026, docs/MCP-STATUS-I-KOSZTY.md sekcja 2) - koszt PER
     # ZADANIE, rozbicie kosztow per agent jako suma jego zadan w Projectly.
@@ -202,6 +247,8 @@ if __name__ == "__main__":
     test_create_task_parent_task_id_still_uses_zbot_link_tasks()
     test_map_task_exposes_parent_task_id_and_subtask_count()
     test_update_status_maps_przeniesione_literally()
+    test_default_admin_project_id_uses_role_override()
+    test_default_admin_project_id_falls_back_to_global_for_role_without_override()
     test_set_task_feedback_sends_cost_usd_to_update_task()
     test_set_task_feedback_omits_cost_usd_when_not_given()
     test_load_role_bot_role_env_var_overrides_role_json()
