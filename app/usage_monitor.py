@@ -75,6 +75,71 @@ def over_threshold(podsumowanie, threshold=THRESHOLD_PAUSE_PERCENT):
     return procent is not None and procent >= threshold
 
 
+# Po ilu godzinach od PIERWSZEGO wykrycia przekroczenia progu bot ma wznowic
+# przyjmowanie nowych zadan BEZ WZGLEDU na to, czy % akurat spadl (decyzja
+# wlasciciela 30.08.2026: "po 4h od alertu bot powinien na nowo zaczac dzialac
+# i przywrocic kolejke"). Bez tego wznowienie zalezaloby WYLACZNIE od
+# naturalnego "starzenia sie" okna 5h (BLOCK_HOURS) - w praktyce bardzo bliskie,
+# ale nie identyczne, i niejawne (wlasciciel nie widzialby jednego, pewnego
+# terminu powrotu).
+RESUME_AFTER_HOURS = 4
+
+PAUSE_STATE_DIR = Path(__file__).parent / "runs"
+
+
+def _pause_state_path(role=None):
+    suffix = "" if not role or role == "dev" else f"_{role}"
+    return PAUSE_STATE_DIR / f"usage_pause_state{suffix}.json"
+
+
+def _load_pause_state(path):
+    if path.exists():
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            pass
+    return {}
+
+
+def _save_pause_state(state, path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def should_pause_for_usage(role=None, now=None, podsumowanie=None):
+    """Decyzja "czy wstrzymać nowe zadania z powodu zużycia", Z ZEGAREM
+    POWROTU: pierwsze wykrycie przekroczenia progu zapisuje znacznik czasu
+    (per rola, runs/usage_pause_state<_rola>.json); po RESUME_AFTER_HOURS (4h)
+    od TEGO znacznika funkcja zwraca False (wznów) BEZ WZGLĘDU na aktualny %.
+    Spadek poniżej progu przed upływem 4h też czyści znacznik (naturalny powrót,
+    nie trzeba czekać do końca okna). Nigdy nie rzuca."""
+    now = now or datetime.now(timezone.utc)
+    podsumowanie = podsumowanie if podsumowanie is not None else summary()
+    path = _pause_state_path(role)
+    state = _load_pause_state(path)
+
+    if not over_threshold(podsumowanie):
+        if state.get("first_crossed_at"):
+            _save_pause_state({}, path)
+        return False
+
+    pierwsze = state.get("first_crossed_at")
+    if not pierwsze:
+        _save_pause_state({"first_crossed_at": now.isoformat()}, path)
+        return True
+
+    try:
+        minelo = now - datetime.fromisoformat(pierwsze)
+    except ValueError:
+        _save_pause_state({"first_crossed_at": now.isoformat()}, path)
+        return True
+
+    if minelo >= timedelta(hours=RESUME_AFTER_HOURS):
+        _save_pause_state({}, path)
+        return False
+    return True
+
+
 def _now():
     return datetime.now(timezone.utc)
 

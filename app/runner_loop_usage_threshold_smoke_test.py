@@ -1,10 +1,11 @@
 """
 Test dymny progu zuzycia limitu (usage_monitor, runner_loop.run_once) —
-zadanie wlasciciela 29.08.2026: przy >=85% (usage_monitor.over_threshold)
-runner ma konczyc zadania w kolejce, nowych nie przyjmowac, i opublikowac
-status na zywo z jawna notatka.
+zadanie wlasciciela 29-30.08.2026: przy >=85% (usage_monitor.should_pause_for_usage)
+runner ma konczyc zadania w kolejce, nowych nie przyjmowac, opublikowac status
+na zywo z jawna notatka, i wznowic automatycznie po ustalonym czasie (4h) od
+pierwszego przekroczenia, bez wzgledu na aktualny % (RESUME_AFTER_HOURS).
 
-Zero sieci: control.RUNS_DIR izolowany (pauza/kill switch), usage_monitor.over_threshold
+Zero sieci: control.RUNS_DIR izolowany (pauza/kill switch), usage_monitor.should_pause_for_usage
 podmieniony atrapa (nie zalezy od realnego ~/.claude/powerline/usage/today.json
 tej maszyny), klient Projectly to lekka atrapa.
 
@@ -42,7 +43,7 @@ def run():
     tmp = Path(tempfile.mkdtemp())
     original_runs_dir = control.RUNS_DIR
     original_stop_flag = kill_switch.STOP_FLAG_PATH
-    original_over_threshold = usage_monitor.over_threshold
+    original_should_pause = usage_monitor.should_pause_for_usage
     original_summary = usage_monitor.summary
 
     try:
@@ -52,7 +53,7 @@ def run():
         # --- 1. Zużycie POWYŻEJ progu -> run_once() zwraca [] BEZ pobierania
         # nowych zadań, publikuje status z jawną notatką o wstrzymaniu. ---
         usage_monitor.summary = lambda: {"available": True, "block_budget_used_pct": 198.2}
-        usage_monitor.over_threshold = lambda s: True
+        usage_monitor.should_pause_for_usage = lambda role=None, podsumowanie=None: True
         client_over = _FakeClient()
         wynik_over = runner_loop.run_once(client=client_over)
         checks.append(("run_once: zużycie >= progu -> pusty wynik, BRAK pobrania zadań", wynik_over == []))
@@ -60,11 +61,13 @@ def run():
                        len(client_over.published) == 1))
         checks.append(("run_once: status niesie jawną notatkę o wstrzymaniu (zużycie)",
                        "Zużycie limitu" in client_over.published[0][1].get("detail", "")))
+        checks.append(("run_once: notatka wspomina automatyczne wznowienie (4h)",
+                       "4" in client_over.published[0][1].get("detail", "")))
 
         # --- 2. Zużycie PONIŻEJ progu -> run_once() przechodzi dalej (pobiera
         # zadania normalnie — tu: pusta kolejka, więc kończy się szybko, ale
         # BEZ wczesnego returnu z powodu zużycia). ---
-        usage_monitor.over_threshold = lambda s: False
+        usage_monitor.should_pause_for_usage = lambda role=None, podsumowanie=None: False
         client_ok = _FakeClient()
         runner_loop.run_once(client=client_ok)
         checks.append(("run_once: zużycie < progu -> BRAK wczesnego wyjścia z powodu zużycia "
@@ -73,7 +76,7 @@ def run():
     finally:
         control.RUNS_DIR = original_runs_dir
         kill_switch.STOP_FLAG_PATH = original_stop_flag
-        usage_monitor.over_threshold = original_over_threshold
+        usage_monitor.should_pause_for_usage = original_should_pause
         usage_monitor.summary = original_summary
 
     print("\n--- Wynik testu dymnego progu zużycia (runner_loop) ---")

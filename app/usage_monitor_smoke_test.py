@@ -11,7 +11,7 @@ Wpina sie automatycznie w self_check.py.
 
 import json
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import usage_monitor
@@ -91,10 +91,54 @@ def test_over_threshold_wymaga_swiadomej_konfiguracji():
     print("OK  over_threshold blokuje WYLACZNIE po swiadomej konfiguracji budzetu okna 5h")
 
 
+def test_should_pause_for_usage_zegar_4h():
+    """Decyzja wlasciciela 30.08.2026: po RESUME_AFTER_HOURS (4h) od PIERWSZEGO
+    wykrycia przekroczenia progu bot ma wznowic BEZ WZGLEDU na aktualny % -
+    jawny, przewidywalny termin powrotu, nie tylko "az samo sie zestarzeje
+    okno 5h". Naturalny spadek % PRZED uplywem 4h tez wznawia od razu."""
+    original_path = usage_monitor.BLOCK_BUDGET_PATH
+    original_state_dir = usage_monitor.PAUSE_STATE_DIR
+    tmp_dir = Path(tempfile.mkdtemp())
+    try:
+        usage_monitor.BLOCK_BUDGET_PATH = tmp_dir / "usage_block_budget_usd.txt"
+        usage_monitor.BLOCK_BUDGET_PATH.write_text("15.0", encoding="utf-8")
+        usage_monitor.PAUSE_STATE_DIR = tmp_dir / "runs"
+
+        wysokie = {"available": True, "block_budget_used_pct": 198.2}
+        t0 = datetime(2026, 8, 30, 8, 0, 0, tzinfo=timezone.utc)
+
+        # Pierwsze wykrycie -> True, zapisuje znacznik czasu.
+        assert usage_monitor.should_pause_for_usage(role="test-a", now=t0, podsumowanie=wysokie) is True
+        stan = json.loads(usage_monitor._pause_state_path("test-a").read_text(encoding="utf-8"))
+        assert stan.get("first_crossed_at") == t0.isoformat(), stan
+
+        # 3h50min pozniej, nadal wysokie zuzycie -> nadal True (jeszcze nie 4h).
+        t1 = t0 + timedelta(hours=3, minutes=50)
+        assert usage_monitor.should_pause_for_usage(role="test-a", now=t1, podsumowanie=wysokie) is True
+
+        # Dokladnie 4h pozniej, zuzycie NADAL wysokie (198%) -> mimo to False
+        # (uplynal ustalony czas) - znacznik wyczyszczony.
+        t2 = t0 + timedelta(hours=4)
+        assert usage_monitor.should_pause_for_usage(role="test-a", now=t2, podsumowanie=wysokie) is False
+        assert usage_monitor._pause_state_path("test-a").read_text(encoding="utf-8").strip() == "{}"
+
+        # Osobna rola ("test-b") ma WLASNY, niezalezny zegar.
+        assert usage_monitor.should_pause_for_usage(role="test-b", now=t0, podsumowanie=wysokie) is True
+        niskie = {"available": True, "block_budget_used_pct": 5.0}
+        # Naturalny spadek ponizej progu PRZED 4h -> False od razu, znacznik czyszczony.
+        assert usage_monitor.should_pause_for_usage(role="test-b", now=t1, podsumowanie=niskie) is False
+        assert usage_monitor._pause_state_path("test-b").read_text(encoding="utf-8").strip() == "{}"
+    finally:
+        usage_monitor.BLOCK_BUDGET_PATH = original_path
+        usage_monitor.PAUSE_STATE_DIR = original_state_dir
+    print("OK  should_pause_for_usage: wznawia po 4h bez wzgledu na %, albo wczesniej gdy zuzycie naturalnie spadnie")
+
+
 if __name__ == "__main__":
     test_window_excludes_old()
     test_today_sums_all()
     test_summary_estimates()
     test_missing_file()
     test_over_threshold_wymaga_swiadomej_konfiguracji()
+    test_should_pause_for_usage_zegar_4h()
     print("\nWszystkie testy monitora zuzycia przeszly.")

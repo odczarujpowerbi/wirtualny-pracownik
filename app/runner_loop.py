@@ -651,18 +651,26 @@ def run_once(client=None):
     # wyżej, ale to osobna metryka (usage_monitor, 5h/subskrypcja, nie dzienny
     # koszt AI). Status na żywo TEJ roli dostaje jawną notatkę — użytkownik ma
     # zobaczyć wprost "dlaczego" w statusie konta, nie tylko w logu procesu.
+    rola = env_bootstrap._current_role()
     usage = usage_monitor.summary()
-    if usage_monitor.over_threshold(usage):
+    # should_pause_for_usage() (nie surowe over_threshold()): decyzja właściciela
+    # 30.08.2026 — po RESUME_AFTER_HOURS (4h) od PIERWSZEGO wykrycia przekroczenia
+    # bot ma wznowić przyjmowanie zadań bez względu na to, czy % akurat spadł
+    # (jawny, przewidywalny termin powrotu — nie tylko "aż samo się zestarzeje
+    # okno 5h"). Naturalny spadek % PRZED upływem 4h też wznawia od razu.
+    if usage_monitor.should_pause_for_usage(role=rola, podsumowanie=usage):
         procent = usage.get("block_budget_used_pct")
         print(
             f"Zużycie limitu ≥{usage_monitor.THRESHOLD_PAUSE_PERCENT}% ({procent}%) — "
-            "runner kończy zadania w kolejce, nowych nie przyjmuje do odnowienia limitu."
+            f"runner kończy zadania w kolejce, nowych nie przyjmuje (wznowienie automatyczne "
+            f"po {usage_monitor.RESUME_AFTER_HOURS}h od pierwszego przekroczenia albo wcześniej, gdy zużycie spadnie)."
         )
         heartbeat.write_heartbeat(current_task_id=None, extra={"usage": usage})
         live_status_publisher.publish(
-            client, role=env_bootstrap._current_role(),
+            client, role=rola,
             detail=f"⏸️ Zużycie limitu ≥{usage_monitor.THRESHOLD_PAUSE_PERCENT}% ({procent}%) — "
-                   "kończę zadania w kolejce, nowych nie przyjmuję do odnowienia limitu.",
+                   f"kończę zadania w kolejce, nowych nie przyjmuję. Wznowienie automatyczne "
+                   f"po {usage_monitor.RESUME_AFTER_HOURS}h od pierwszego przekroczenia (albo wcześniej, gdy zużycie spadnie).",
         )
         return []
 
