@@ -4,7 +4,10 @@ zadania (i task_decomposer.py zdecydował NIE dzielić go dalej), tu zadanie
 faktycznie się WYKONUJE: Claude Code z realnym Read/Write/Edit + Skill.
 
 Zapis plików ZOSTAJE ograniczony do WŁASNEGO folderu zadania
-(runs/agentic_tasks/<task_id>_<tytuł>/) — nigdy do reszty repo/maszyny. Od
+(runs/agentic_tasks/<task_id>_<tytuł>/) ORAZ (29.08.2026, decyzja właściciela)
+folderu TEGO SAMEGO zadania na SharePoint/OneDrive (Zadania-Agenta/<task_id>_...,
+gdy ONEDRIVE_TASKS_ROOT skonfigurowany — patrz _onedrive_task_folder) — nigdy
+do reszty repo/maszyny. Od
 25.08.2026 (decyzja właściciela) subagent ma NATOMIAST swobodny dostęp do
 internetu (WebFetch/WebSearch, bez allowlisty domen) — to jest INNA oś
 ograniczeń niż zapis plików (potwierdzone: tool_registry.check_call dla
@@ -36,6 +39,7 @@ execution_result["executed"] is False — nigdy cichy fałszywy sukces.
 import os
 import re
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 
 import bot_content_check
@@ -96,6 +100,39 @@ def _kontekst_projektu_blok(task, client):
     return f"Projekt: {nazwa}" if nazwa else ""
 
 
+def _onedrive_task_folder(task):
+    """Folder OneDrive/SharePoint (biblioteka 'Wirtualny pracownik', root_folder
+    'Zadania-Agenta' — config/sharepoint.yaml) TEGO zadania — decyzja właściciela
+    29.08.2026: subagent ma mieć zapis TAKŻE tam, nie tylko we własnym lokalnym
+    folderze roboczym (dziś jedyny wynik trafiał tam dopiero PO fakcie, przez
+    output_decider.build_file w runner_loop._save_result_to_onedrive).
+
+    Kopia logiki wyszukania/nazwania folderu z runner_loop._save_result_to_onedrive
+    (NIE importować stamtąd — cykliczny import: runner_loop już importuje
+    agentic_worker). Ten sam wzorzec duplikacji co _slug() w tym pliku.
+    Idempotentne: jeśli runner_loop już utworzył ten folder wcześniej (albo
+    utworzy go PÓŹNIEJ, po zakończeniu subagenta), oba trafiają w TEN SAM
+    folder (dopasowanie po prefiksie task_id/parent_task_id).
+
+    Fail-soft: brak ONEDRIVE_TASKS_ROOT / OneDrive niezsynchronizowane na tej
+    maszynie -> None — subagent dostaje wtedy TYLKO swój lokalny folder roboczy,
+    jak przed tą zmianą."""
+    root = os.environ.get("ONEDRIVE_TASKS_ROOT")
+    if not root:
+        return None
+    root_path = Path(root)
+    if not root_path.parent.exists():
+        return None
+    effective_id = task.get("parent_task_id") or task.get("task_id") or "zadanie"
+    istniejace = sorted(root_path.glob(f"{effective_id}_*")) if root_path.exists() else []
+    if istniejace:
+        return istniejace[0]
+    data = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    nowy_folder = root_path / f"{effective_id}_{data}_{_slug(task.get('title', ''))}"
+    nowy_folder.mkdir(parents=True, exist_ok=True)
+    return nowy_folder
+
+
 def _kontekst_rodzenstwa_blok(task):
     """Inne podzadania tego samego zadania głównego — ustawiane przez
     runner_loop.py w task["sibling_tasks"]. Fail-soft: brak/puste -> ''."""
@@ -108,7 +145,7 @@ def _kontekst_rodzenstwa_blok(task):
     return f"Inne podzadania tego samego zadania głównego:\n{linie}"
 
 
-def _build_prompt(task, plan_text, folder, client=None):
+def _build_prompt(task, plan_text, folder, client=None, sharepoint_folder=None):
     bloki_kontekstu = [
         blok for blok in (
             _kontekst_firmy_blok(task),
@@ -118,6 +155,13 @@ def _build_prompt(task, plan_text, folder, client=None):
         if blok
     ]
     kontekst = ("\n\n".join(bloki_kontekstu) + "\n\n") if bloki_kontekstu else ""
+    sharepoint_akapit = (
+        f"\n\nMasz TAKŻE zapis do folderu '{sharepoint_folder}' (ten sam folder zadania na "
+        "SharePoint/OneDrive, do którego trafi finalny wynik) — jeśli zadanie wymaga "
+        "dostarczenia realnego pliku (np. arkusz, dokument, zestawienie), zapisz go TAM "
+        "wprost, oprócz opisu w wyniku.md w bieżącym katalogu."
+        if sharepoint_folder else ""
+    )
     return (
         kontekst +
         f"Zadanie: {task.get('title', '')}\n"
@@ -133,6 +177,7 @@ def _build_prompt(task, plan_text, folder, client=None):
         "nie opis planu ani streszczenie tego, co zamierzasz zrobić. WOLNO Ci "
         "wyłącznie MODYFIKOWAĆ/EDYTOWAĆ istniejące pliki i DODAWAĆ nowe — "
         "NIGDY nie usuwaj żadnego pliku (decyzja właściciela repozytorium)."
+        + sharepoint_akapit
     )
 
 
@@ -166,7 +211,8 @@ def run(task, thinking, client=None):
     if not kontrakt["allowed"]:
         return _odmowa(kontrakt["reason"], cost_usd=ocena_planu["cost_usd"])
 
-    prompt = _build_prompt(task, plan_text, folder, client)
+    sharepoint_folder = _onedrive_task_folder(task)
+    prompt = _build_prompt(task, plan_text, folder, client, sharepoint_folder=sharepoint_folder)
     if prompt.startswith("-"):
         # Żywy incydent 25.08.2026: kontekst firmy (kontekst_firmy.zbuduj) zaczyna
         # się od "--- KONTEKST FIRMY ---", a CLI Claude Code parsuje pierwszy
@@ -180,6 +226,11 @@ def run(task, thinking, client=None):
     # co w task_thinker._think_via_claude_code: obecność klucza wyłącza
     # connectory `claude login`, `claude -p` kończy się kodem 1.
     env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
+    # --add-dir jest WARIADYCZNE (patrz komentarz niżej) — drugi katalog dopisany
+    # do TEJ SAMEJ grupy argumentów, nie osobna flaga. Folder OneDrive/SharePoint
+    # (decyzja właściciela 29.08.2026) dopisany TYLKO gdy faktycznie się rozwiązał
+    # (fail-soft — patrz _onedrive_task_folder).
+    dodatkowe_foldery = [str(folder)] + ([str(sharepoint_folder)] if sharepoint_folder else [])
     try:
         result = subprocess.run(
             # Prompt zaraz po --model: --allowedTools i --add-dir są WARIADYCZNE
@@ -196,7 +247,8 @@ def run(task, thinking, client=None):
             # bez allowlisty domen. Klikanie po UI zostaje wyłącznie dla
             # browser_worker.py, który ma odrębną, ograniczoną allowlistę.
             [claude_exe, "-p", "--model", model, prompt, "--permission-mode", "acceptEdits",
-             "--allowedTools", "Read Write Edit Skill WebFetch WebSearch", "--add-dir", str(folder)],
+             "--allowedTools", "Read Write Edit Skill WebFetch WebSearch",
+             "--add-dir", *dodatkowe_foldery],
             cwd=str(folder),
             capture_output=True,
             text=True,
@@ -230,8 +282,9 @@ def run(task, thinking, client=None):
         "tool": "agentic_task",
         "executed": True,
         "acceptance_notes": tresc,
-        "source_note": f"Subagent Claude Code, Read/Write/Edit ograniczone do {folder.name}/.",
-        "output": {"folder": str(folder)},
+        "source_note": f"Subagent Claude Code, Read/Write/Edit ograniczone do {folder.name}/"
+                       + (f" i folderu SharePoint/OneDrive {sharepoint_folder.name}/." if sharepoint_folder else "."),
+        "output": {"folder": str(folder), "sharepoint_folder": str(sharepoint_folder) if sharepoint_folder else None},
         "functional_checks": [{"name": f"Plik {RESULT_FILENAME} zapisany i niepusty",
                                "type": "nonempty_file", "target": str(wynik_path)}],
     }

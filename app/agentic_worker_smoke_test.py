@@ -9,6 +9,7 @@ Użycie:
     python agentic_worker_smoke_test.py
 """
 
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -36,6 +37,14 @@ def run():
     original_find_claude = task_thinker._find_claude
     original_run = agentic_worker.subprocess.run
     original_workspace = agentic_worker.WORKSPACE_DIR
+    # task_thinker (importowany przez agentic_worker) ładuje env_bootstrap, więc
+    # ONEDRIVE_TASKS_ROOT to na tej maszynie PRAWDZIWA ścieżka OneDrive/SharePoint
+    # — żywy incydent 29.08.2026, znaleziony przy pisaniu TEGO testu: bez izolacji
+    # ponizej _onedrive_task_folder() tworzyła NAPRAWDĘ foldery "T-AGENT_..."/
+    # "T-RODZIC_..." w realnym OneDrive użytkownika przy każdym uruchomieniu tego
+    # testu (self_check.py odpala go co godzinę). Posprzątane ręcznie raz —
+    # test MUSI usuwać ten zmienną środowiskową na czas przebiegu.
+    original_onedrive_root = os.environ.pop("ONEDRIVE_TASKS_ROOT", None)
 
     try:
         tmp = Path(tempfile.mkdtemp())
@@ -172,11 +181,56 @@ def run():
                            wynik_bez_klienta["executed"] is True))
         finally:
             agentic_worker.kontekst_firmy.zbuduj = original_zbuduj
+
+        # 9. ONEDRIVE_TASKS_ROOT skonfigurowany (żądanie właściciela 29.08.2026:
+        # subagent ma TAKŻE zapis do folderu zadania na SharePoint/OneDrive,
+        # nie tylko do własnego lokalnego folderu roboczego) -> DRUGI --add-dir,
+        # prompt wspomina ten folder, wywołanie idempotentne (nie tworzy duplikatu).
+        onedrive_tmp = Path(tempfile.mkdtemp()) / "Zadania-Agenta"
+        onedrive_tmp.mkdir(parents=True)
+        os.environ["ONEDRIVE_TASKS_ROOT"] = str(onedrive_tmp)
+        try:
+            agentic_worker.subprocess.run = _fake_run_success
+            wynik_onedrive = agentic_worker.run(TASK, THINKING_OK)
+            foldery_utworzone = list(onedrive_tmp.glob("T-AGENT_*"))
+            checks.append(("ONEDRIVE_TASKS_ROOT ustawiony: dokładnie JEDEN folder zadania utworzony",
+                           len(foldery_utworzone) == 1))
+            checks.append(("ONEDRIVE_TASKS_ROOT ustawiony: komenda niesie OBA foldery (lokalny + SharePoint)",
+                           captured["cmd"].count(str(foldery_utworzone[0])) == 1
+                           and captured["cmd"].count(captured["cwd"]) == 1))
+            checks.append(("ONEDRIVE_TASKS_ROOT ustawiony: prompt wspomina folder SharePoint",
+                           str(foldery_utworzone[0]) in captured["cmd"][4]))
+            checks.append(("ONEDRIVE_TASKS_ROOT ustawiony: source_note wspomina folder SharePoint",
+                           "SharePoint/OneDrive" in wynik_onedrive["source_note"]))
+            checks.append(("ONEDRIVE_TASKS_ROOT ustawiony: output niesie sharepoint_folder",
+                           wynik_onedrive["output"]["sharepoint_folder"] == str(foldery_utworzone[0])))
+
+            # Drugie wywołanie (to samo zadanie) -> BRAK duplikatu folderu (dopasowanie po prefiksie).
+            agentic_worker.run(TASK, THINKING_OK)
+            checks.append(("ONEDRIVE_TASKS_ROOT ustawiony: drugie wywołanie NIE dubluje folderu",
+                           len(list(onedrive_tmp.glob("T-AGENT_*"))) == 1))
+        finally:
+            os.environ.pop("ONEDRIVE_TASKS_ROOT", None)
+
+        # 10. Brak ONEDRIVE_TASKS_ROOT (domyślnie, jak przed tą zmianą) -> TYLKO
+        # jeden --add-dir, BEZ wzmianki o SharePoint w prompt/source_note.
+        wynik_bez_onedrive = agentic_worker.run(TASK, THINKING_OK)
+        checks.append(("Brak ONEDRIVE_TASKS_ROOT: tylko JEDEN --add-dir (fail-soft, jak dawniej)",
+                       captured["cmd"].count("--add-dir") == 1
+                       and captured["cmd"][captured["cmd"].index("--add-dir") + 1] == captured["cwd"]))
+        checks.append(("Brak ONEDRIVE_TASKS_ROOT: BRAK wzmianki o SharePoint w source_note",
+                       "SharePoint" not in wynik_bez_onedrive["source_note"]))
+        checks.append(("Brak ONEDRIVE_TASKS_ROOT: output.sharepoint_folder = None",
+                       wynik_bez_onedrive["output"]["sharepoint_folder"] is None))
     finally:
         bot_content_check.judge = original_judge
         task_thinker._find_claude = original_find_claude
         agentic_worker.subprocess.run = original_run
         agentic_worker.WORKSPACE_DIR = original_workspace
+        if original_onedrive_root is None:
+            os.environ.pop("ONEDRIVE_TASKS_ROOT", None)
+        else:
+            os.environ["ONEDRIVE_TASKS_ROOT"] = original_onedrive_root
 
     print("\n--- Wynik testu dymnego agentic_worker ---")
     all_passed = True
