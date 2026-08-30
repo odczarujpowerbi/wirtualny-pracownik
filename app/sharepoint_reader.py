@@ -1,23 +1,26 @@
 """
-Odczyt READ-ONLY dowolnej witryny SharePoint tej samej organizacji — żądanie
-właściciela 29.08.2026: "każdy agent i subagent [ma mieć] do odczytu, bez
-zapisu, oczywiście za wyjątkiem uprawnień do Zarządcze".
+Odczyt READ-ONLY witryn SharePoint tej samej organizacji — żądanie właściciela
+29.08.2026: "każdy agent i subagent [ma mieć] do odczytu, bez zapisu,
+oczywiście za wyjątkiem uprawnień do Zarządcze".
 
 Warstwa POLITYKI nad sharepoint_client.py (czysta hydraulika Graph) — ten
-moduł decyduje CO wolno przeczytać (host tej samej organizacji, witryna nie na
-liście wykluczeń config/sharepoint.yaml -> read_access.denied_site_paths),
-sharepoint_client.py tylko wykonuje odczyt.
+moduł decyduje CO wolno przeczytać, sharepoint_client.py tylko wykonuje odczyt.
+
+MODEL DOSTĘPU: ALLOWLIST, nie denylist — czytelne są WYŁĄCZNIE witryny wpisane
+do rejestru `config/sharepoint_sites.yaml` (ten sam plik budowany już wcześniej
+ręcznie przez właściciela: adresy witryn, do których aplikacja Graph ma
+POTWIERDZONY dostęp — patrz jego nagłówek). Powód zmiany z pierwotnego
+"denylist na całej organizacji" (29.08.2026, ta sama sesja): sprawdzone na
+żywo, że aplikacja NIE MA Sites.Read.All (403 na site-search) — realnie umie
+czytać TYLKO witryny z tego rejestru, więc denylist na "dowolnej" witrynie
+dawałby fałszywe poczucie dostępu tam, gdzie i tak przyszłoby 403.
+`config/sharepoint.yaml -> read_access.denied_site_paths` (np. "Zarządcze")
+zostaje jako DODATKOWA warstwa (defense-in-depth) — nawet gdyby ktoś kiedyś
+dopisał zakazaną witrynę do rejestru przez pomyłkę, denylist i tak zablokuje.
 
 Zapis pozostaje WYŁĄCZNIE przez sharepoint_client.get_sharepoint_client()
 (jedna, skonfigurowana witryna) — ten moduł nigdy nie woła upload_file/
 ensure_folder.
-
-UCZCIWA GRANICA (zależność zewnętrzna): odczyt witryny INNEJ niż domyślna
-(config/sharepoint.yaml site_path) wymaga, żeby aplikacja Graph miała nadane
-Sites.Read.All (cała organizacja) albo Sites.Selected z jawnym dostępem do
-KAŻDEJ dodatkowej witryny — to nadaje administrator Azure AD (admin consent),
-nie ten kod. Dopóki nie jest nadane, wywołania dla innych witryn zwrócą 403
-(SharePointWriteError z sharepoint_client.py) — fail-closed, nie cichy błąd.
 """
 
 import re
@@ -30,6 +33,7 @@ import yaml
 import sharepoint_client
 
 CONFIG_PATH = Path(__file__).parent / "config" / "sharepoint.yaml"
+SITES_REGISTRY_PATH = Path(__file__).parent / "config" / "sharepoint_sites.yaml"
 
 # Rozszerzenia traktowane jako plik tekstowy (read_text) — inaczej, brak
 # rozszerzenia albo rozszerzenie binarne (.docx/.pdf/.xlsx) -> listing folderu.
@@ -40,6 +44,10 @@ def _load_config():
     return yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8")) or {}
 
 
+def _load_sites_registry():
+    return yaml.safe_load(SITES_REGISTRY_PATH.read_text(encoding="utf-8")) or {}
+
+
 def _normalizuj(text):
     """Porównanie bez wielkości liter i polskich znaków diakrytycznych —
     "Zarządcze"/"Zarzadcze"/"ZARZĄDCZE" mają wyjść na to samo."""
@@ -47,9 +55,22 @@ def _normalizuj(text):
     return bez_diakrytykow.lower()
 
 
+def find_registered_site(site_path, registry=None):
+    """Wpis rejestru (config/sharepoint_sites.yaml -> sites) o dokładnie tym
+    site_path, albo None gdy witryna nie jest zarejestrowana — czytelne są
+    WYŁĄCZNIE zarejestrowane witryny (allowlist), patrz docstring modułu."""
+    registry = registry if registry is not None else _load_sites_registry()
+    aktualna = _normalizuj(site_path or "")
+    for wpis in (registry.get("sites") or {}).values():
+        if _normalizuj(wpis.get("site_path", "")) == aktualna:
+            return wpis
+    return None
+
+
 def is_site_denied(site_path, config=None):
-    """Czy site_path jest na liście wykluczeń (denied_site_paths) — dokładne
-    dopasowanie ALBO prefiks (np. '/sites/Zarzadcze/Podfolder' też wykluczony)."""
+    """Dodatkowa warstwa (defense-in-depth) NIEZALEŻNA od rejestru allowlist —
+    dokładne dopasowanie ALBO prefiks (np. '/sites/Zarzadcze/Podfolder' też
+    wykluczony)."""
     config = config or _load_config()
     zakazane = [_normalizuj(p) for p in (config.get("read_access") or {}).get("denied_site_paths", [])]
     aktualna = _normalizuj(site_path or "")
@@ -85,8 +106,10 @@ def parse_sharepoint_url(url):
 
 
 def read_sharepoint_url(url):
-    """Odczyt (listing folderu ALBO treść pliku tekstowego) pod dowolnym
-    adresem SharePoint tej samej organizacji. Zwraca dict:
+    """Odczyt (listing folderu ALBO treść pliku tekstowego) pod adresem
+    SharePoint — WYŁĄCZNIE dla witryn zarejestrowanych w
+    config/sharepoint_sites.yaml (allowlist) i nie na liście wykluczeń
+    (config/sharepoint.yaml -> read_access.denied_site_paths). Zwraca dict:
         {"available": bool, "detail": str, "kind": "listing"|"file"|None,
          "items": [...] albo None, "text": str albo None}
     Nigdy nie rzuca — błąd trafia do "detail", available=False (ten sam wzorzec
@@ -97,21 +120,30 @@ def read_sharepoint_url(url):
                                               "(oczekiwany układ https://<host>/sites/<nazwa>/...).",
                 "kind": None, "items": None, "text": None}
 
-    config = _load_config()
-    wlasny_host = config.get("site_host")
+    registry = _load_sites_registry()
+    wlasny_host = registry.get("site_host")
     if wlasny_host and rozlozony["site_host"].lower() != wlasny_host.lower():
         return {"available": False,
                 "detail": f"Host '{rozlozony['site_host']}' spoza organizacji "
                           f"('{wlasny_host}') — odczyt dozwolony wyłącznie w obrębie własnej organizacji.",
                 "kind": None, "items": None, "text": None}
 
-    if is_site_denied(rozlozony["site_path"], config):
+    if is_site_denied(rozlozony["site_path"]):
         return {"available": False,
                 "detail": f"Witryna '{rozlozony['site_path']}' jest na liście wykluczeń "
                           "(config/sharepoint.yaml -> read_access.denied_site_paths) — odmowa.",
                 "kind": None, "items": None, "text": None}
 
-    client = sharepoint_client.get_sharepoint_client_for_site(rozlozony["site_host"], rozlozony["site_path"])
+    wpis = find_registered_site(rozlozony["site_path"], registry)
+    if wpis is None:
+        return {"available": False,
+                "detail": f"Witryna '{rozlozony['site_path']}' nie jest w rejestrze dostępnych witryn "
+                          "(config/sharepoint_sites.yaml) — dopisz ją tam, jeśli aplikacja Graph ma "
+                          "do niej dostęp, inaczej odczyt i tak zwróci 403.",
+                "kind": None, "items": None, "text": None}
+
+    client = sharepoint_client.get_sharepoint_client_for_site(
+        rozlozony["site_host"], rozlozony["site_path"], library=wpis.get("library"))
     if client is None:
         return {"available": False, "detail": "Brak sekretów MS_GRAPH_*/msal — odczyt SharePoint niedostępny.",
                 "kind": None, "items": None, "text": None}

@@ -177,14 +177,16 @@ tools:
     risk: green
     description: >
       Odczyt (listing folderu ALBO treść pliku tekstowego, NIGDY zapis) z
-      DOWOLNEJ witryny SharePoint tej samej organizacji (host poniżej) —
-      decyzja właściciela 29.08.2026: każdy agent ma mieć odczyt do wszystkich
-      witryn firmy, z wyjątkiem listy wykluczeń w config/sharepoint.yaml ->
-      read_access.denied_site_paths (np. witryna "Zarządcze"). Realizacja przez
-      sharepoint_reader.py + sharepoint_client.py (Microsoft Graph). Zależność
-      zewnętrzna: odczyt witryny INNEJ niż domyślna (sharepoint_upload) wymaga
-      uprawnienia Sites.Read.All/Sites.Selected nadanego aplikacji Graph przez
-      administratora Azure AD — bez tego wywołanie zwróci 403, nie cichy błąd.
+      witrynach SharePoint tej samej organizacji (host poniżej) — decyzja
+      właściciela 29.08.2026: każdy agent ma mieć odczyt do witryn firmy
+      zarejestrowanych w config/sharepoint_sites.yaml (allowlist, dostęp
+      zweryfikowany na żywo: Wirtualny-pracownik, Organizacja,
+      ProjektyRaportowania, AplikacjeClaude, SprzedazMarketing,
+      Administracja), z wyjątkiem listy wykluczeń w config/sharepoint.yaml ->
+      read_access.denied_site_paths ("Zarządcze" — potwierdzone przez
+      właściciela). Realizacja przez sharepoint_reader.py + sharepoint_client.py
+      (Microsoft Graph). Nowa witryna firmy = nowy wpis w sharepoint_sites.yaml,
+      inaczej odczyt zwraca jawną odmowę "brak w rejestrze", nie próbuje na ślepo.
     allowed_domains:
       - odczarujlowcode.sharepoint.com
     source_names:

@@ -12,6 +12,12 @@
 # Użycie w kodzie: sharepoint_client.SharePointClient(client_id, secret, tenant,
 # site_host, site_path, library=...) — ten sam klient co dla app/config/sharepoint.yaml,
 # tylko inny site_path/library z tego rejestru.
+#
+# Od 29.08.2026: to jest TAKŻE allowlist odczytu dla sharepoint_reader.py —
+# agent/subagent może odczytać WYŁĄCZNIE witryny wpisane tutaj (plus muszą
+# ominąć denylist w app/config/sharepoint.yaml -> read_access, np. "Zarządcze").
+# Nowa witryna z potwierdzonym dostępem = nowy wpis tutaj, inaczej odczyt
+# zwróci "brak w rejestrze" zamiast próbować i dostać 403.
 
 site_host: odczarujlowcode.sharepoint.com
 

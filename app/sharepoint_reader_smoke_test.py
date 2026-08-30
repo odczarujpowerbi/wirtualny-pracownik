@@ -1,12 +1,13 @@
 """
-Test dymny sharepoint_reader.py — odczyt READ-ONLY dowolnej witryny SharePoint
-firmowej organizacji, z wyjątkiem witryn na liście wykluczeń (żądanie
-właściciela 29.08.2026: "każdy agent i subagent [ma mieć] do odczytu, bez
-zapisu, oczywiście za wyjątkiem uprawnień do Zarządcze").
+Test dymny sharepoint_reader.py — odczyt READ-ONLY witryn SharePoint firmowej
+organizacji, ALLOWLIST (config/sharepoint_sites.yaml — rejestr witryn z
+potwierdzonym dostępem aplikacji Graph, dostarczony przez właściciela), z
+DODATKOWYM wykluczeniem "Zarządcze" (config/sharepoint.yaml -> read_access).
 
 Zero sieci: sharepoint_client.get_sharepoint_client_for_site podmieniony
-atrapą, config/sharepoint.yaml czytany PRAWDZIWY (denylist "Zarzadcze" musi
-tam być — to jest test integracji z realnym plikiem configu, nie tylko logiki).
+atrapą. config/sharepoint.yaml i config/sharepoint_sites.yaml czytane
+PRAWDZIWE — to jest test integracji z realnymi plikami configu, nie tylko logiki
+(m.in. "SprzedazMarketing" MUSI być w rejestrze, "Zarzadcze" MUSI być wykluczone).
 
 Użycie:
     python sharepoint_reader_smoke_test.py
@@ -16,6 +17,10 @@ import sys
 
 import sharepoint_client
 import sharepoint_reader as sr
+
+# Prawdziwa, zarejestrowana witryna (config/sharepoint_sites.yaml) — używana
+# jako przykład "dozwolona witryna" we wszystkich testach happy-path poniżej.
+DOZWOLONA_WITRYNA = "/sites/SprzedazMarketing"
 
 
 class _FakeSharePointClient:
@@ -45,12 +50,12 @@ def run():
     try:
         # --- 1. parse_sharepoint_url: rozkład standardowego adresu /sites/<nazwa>/... ---
         rozlozony = sr.parse_sharepoint_url(
-            "https://odczarujlowcode.sharepoint.com/sites/Sprzedaz/Shared%20Documents/Umowy/umowa.md")
+            f"https://odczarujlowcode.sharepoint.com{DOZWOLONA_WITRYNA}/Shared%20Documents/Umowy/umowa.md")
         checks.append(("parse_sharepoint_url: rozpoznaje host/site_path/remote_path",
                        rozlozony == {"site_host": "odczarujlowcode.sharepoint.com",
-                                    "site_path": "/sites/Sprzedaz", "remote_path": "Umowy/umowa.md"}))
+                                    "site_path": DOZWOLONA_WITRYNA, "remote_path": "Umowy/umowa.md"}))
 
-        rozlozony_root = sr.parse_sharepoint_url("https://odczarujlowcode.sharepoint.com/sites/Sprzedaz/")
+        rozlozony_root = sr.parse_sharepoint_url(f"https://odczarujlowcode.sharepoint.com{DOZWOLONA_WITRYNA}/")
         checks.append(("parse_sharepoint_url: sam root witryny -> remote_path pusty",
                        rozlozony_root["remote_path"] == ""))
 
@@ -59,16 +64,20 @@ def run():
         checks.append(("parse_sharepoint_url: sharepoint.com bez /sites/... -> None",
                        sr.parse_sharepoint_url("https://odczarujlowcode.sharepoint.com/losowa/sciezka") is None))
 
-        # --- 2. is_site_denied: dopasowanie dokładne i po prefiksie, odporne na
-        # wielkość liter i polskie znaki (Zarzadcze == Zarządcze == ZARZĄDCZE). ---
+        # --- 2. find_registered_site / is_site_denied: rejestr (allowlist) +
+        # dodatkowe wykluczenie (denylist), odporne na wielkość liter/ogonki. ---
+        checks.append(("find_registered_site: prawdziwa witryna z rejestru -> wpis znaleziony",
+                       sr.find_registered_site(DOZWOLONA_WITRYNA) is not None))
+        checks.append(("find_registered_site: witryna spoza rejestru -> None",
+                       sr.find_registered_site("/sites/NieistniejacaWitryna") is None))
         checks.append(("is_site_denied: '/sites/Zarzadcze' (config, bez ogonków) -> True",
                        sr.is_site_denied("/sites/Zarzadcze")))
         checks.append(("is_site_denied: '/sites/ZARZĄDCZE' (wielkość liter + ogonek) -> True",
                        sr.is_site_denied("/sites/ZARZĄDCZE")))
         checks.append(("is_site_denied: podfolder zakazanej witryny też wykluczony",
                        sr.is_site_denied("/sites/Zarzadcze/Finanse")))
-        checks.append(("is_site_denied: inna witryna -> False",
-                       sr.is_site_denied("/sites/Sprzedaz") is False))
+        checks.append(("is_site_denied: dozwolona witryna -> False",
+                       sr.is_site_denied(DOZWOLONA_WITRYNA) is False))
 
         # --- 3. read_sharepoint_url: witryna zakazana -> odmowa, BEZ wołania klienta. ---
         wolania = []
@@ -81,11 +90,21 @@ def run():
         checks.append(("read_sharepoint_url: odmowa niesie powód (lista wykluczeń)",
                        "wykluczeń" in wynik_zakazane["detail"]))
 
-        # --- 4. read_sharepoint_url: witryna DOZWOLONA, plik tekstowy -> odczyt treści. ---
+        # --- 3b. read_sharepoint_url: witryna NIE w rejestrze (allowlist) ->
+        # odmowa, BEZ wołania klienta — nawet gdy nie jest jawnie zakazana. ---
+        wynik_niezarejestrowana = sr.read_sharepoint_url(
+            "https://odczarujlowcode.sharepoint.com/sites/NieistniejacaWitryna/plik.md")
+        checks.append(("read_sharepoint_url: witryna spoza rejestru -> available=False, BRAK wołania klienta",
+                       wynik_niezarejestrowana["available"] is False and wolania == []))
+        checks.append(("read_sharepoint_url: odmowa niesie powód (brak w rejestrze)",
+                       "rejestrze" in wynik_niezarejestrowana["detail"]))
+
+        # --- 4. read_sharepoint_url: witryna DOZWOLONA (w rejestrze), plik
+        # tekstowy -> odczyt treści. ---
         sharepoint_client.get_sharepoint_client_for_site = (
             lambda *a, **k: _FakeSharePointClient(files={"Umowy/umowa.md": "Treść umowy testowej."}))
         wynik_plik = sr.read_sharepoint_url(
-            "https://odczarujlowcode.sharepoint.com/sites/Sprzedaz/Shared%20Documents/Umowy/umowa.md")
+            f"https://odczarujlowcode.sharepoint.com{DOZWOLONA_WITRYNA}/Shared%20Documents/Umowy/umowa.md")
         checks.append(("read_sharepoint_url: witryna dozwolona, plik .md -> available=True, kind='file'",
                        wynik_plik["available"] is True and wynik_plik["kind"] == "file"))
         checks.append(("read_sharepoint_url: treść pliku w wyniku",
@@ -98,7 +117,7 @@ def run():
                 {"name": "Archiwum", "is_folder": True, "web_url": "https://x/Archiwum"},
             ]))
         wynik_folder = sr.read_sharepoint_url(
-            "https://odczarujlowcode.sharepoint.com/sites/Sprzedaz/Shared%20Documents/Umowy")
+            f"https://odczarujlowcode.sharepoint.com{DOZWOLONA_WITRYNA}/Shared%20Documents/Umowy")
         checks.append(("read_sharepoint_url: folder (bez rozszerzenia pliku tekstowego) -> kind='listing'",
                        wynik_folder["available"] is True and wynik_folder["kind"] == "listing"
                        and len(wynik_folder["items"]) == 2))
@@ -108,12 +127,13 @@ def run():
         checks.append(("read_sharepoint_url: URL spoza wzorca SharePoint -> available=False",
                        wynik_zle["available"] is False and "Nie rozpoznano" in wynik_zle["detail"]))
 
-        # --- 7. read_sharepoint_url: błąd Graph (403 spoza denylist, np. brak
-        # nadanego Sites.Read.All) -> available=False, powód z wyjątku, nie wyjątek. ---
+        # --- 7. read_sharepoint_url: błąd Graph (403, np. brak faktycznie
+        # nadanego dostępu mimo wpisu w rejestrze) -> available=False, powód
+        # z wyjątku, nie wyjątek. ---
         sharepoint_client.get_sharepoint_client_for_site = (
             lambda *a, **k: _FakeSharePointClient(raise_on={"Umowy"}))
         wynik_403 = sr.read_sharepoint_url(
-            "https://odczarujlowcode.sharepoint.com/sites/Sprzedaz/Shared%20Documents/Umowy")
+            f"https://odczarujlowcode.sharepoint.com{DOZWOLONA_WITRYNA}/Shared%20Documents/Umowy")
         checks.append(("read_sharepoint_url: błąd Graph (403) -> available=False, BEZ wyjątku",
                        wynik_403["available"] is False and "403" in wynik_403["detail"]))
     finally:
