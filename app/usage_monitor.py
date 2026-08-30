@@ -136,9 +136,20 @@ def _avg_task_cost(default_from_records):
     return default_from_records, "srednia z ostatnich wywolan Claude"
 
 
-def summary(path=USAGE_PATH, block_budget_usd=DEFAULT_BLOCK_BUDGET_USD, now=None):
+def summary(path=USAGE_PATH, block_budget_usd=None, now=None):
     """Zbiorczy widok dla dashboardu i eskalacji: zuzycie 5h/dzis + estymacja
-    ile zadan jeszcze zmiescimy w budzecie okna 5h."""
+    ile zadan jeszcze zmiescimy w budzecie okna 5h.
+
+    block_budget_usd=None (domyslne) -> realny budzet wlasciciela z
+    BLOCK_BUDGET_PATH, gdy skonfigurowany, inaczej DEFAULT_BLOCK_BUDGET_USD
+    (placeholder do WYSWIETLENIA, patrz over_threshold). Zywy bug znaleziony
+    29.08.2026 przy ustawianiu realnego budzetu: parametr domyslny wiazacy sie
+    RAZ przy imporcie modulu (block_budget_usd=DEFAULT_BLOCK_BUDGET_USD w
+    sygnaturze) nigdy by nie zobaczyl pozniej utworzonego BLOCK_BUDGET_PATH -
+    ten sam wzorzec bledu co state_store.DB_PATH/ASKED_PATH gdzie indziej w
+    repo, naprawiony tu przez odczyt WEWNATRZ ciala funkcji."""
+    if block_budget_usd is None:
+        block_budget_usd = _skonfigurowany_budzet_usd() or DEFAULT_BLOCK_BUDGET_USD
     records = load_records(path)
     if not records:
         return {"available": False,
