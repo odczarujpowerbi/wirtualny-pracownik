@@ -73,7 +73,7 @@ def run():
     try:
         przebiegi = {"n": 0}
 
-        def _bramka(task, execution_result, config=None):
+        def _bramka(task, execution_result, config=None, context=None):
             przebiegi["n"] += 1
             if "18°C" in (execution_result.get("acceptance_notes") or ""):
                 return {"passed": True, "summary": "OK po poprawce", "concerns": []}

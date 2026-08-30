@@ -24,7 +24,7 @@ THINKING_OK = {"ok": True, "reasoning": "Plan: przeanalizować dane i napisać p
 
 
 def _atrapa_judge(aligned, reasoning="ok", cost_usd=0.01):
-    return lambda task, content, mode="wynik": {"aligned": aligned, "reasoning": reasoning,
+    return lambda task, content, mode="wynik", context=None: {"aligned": aligned, "reasoning": reasoning,
                                                 "cost_usd": cost_usd, "source": "claude_code"}
 
 

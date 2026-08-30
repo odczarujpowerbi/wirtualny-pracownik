@@ -21,6 +21,7 @@ zadanie i tak trafia wtedy do eskalacji/poprawki, nie ginie po cichu.
 
 import json
 
+import context_cache
 import cost_estimator
 import task_thinker
 from bot_common import verdict
@@ -29,8 +30,9 @@ BOT = "content"
 RELEVANT_TOOLS_DEFAULT = ["agentic_task"]
 
 
-def _build_prompt(task, content, mode):
+def _build_prompt(task, content, mode, context_text=None):
     kontekst = (
+        (f"{context_text}\n\n" if context_text else "") +
         f"Zadanie: {task.get('title', '')}\n"
         f"Cel: {task.get('expected_result', '')}\n"
         f"Kryteria akceptacji: {task.get('acceptance_criteria', '')}\n"
@@ -70,13 +72,18 @@ def _parse_verdict(text):
     return {"aligned": data["aligned"], "reasoning": str(data.get("reasoning") or "").strip()}
 
 
-def judge(task, content, mode="wynik"):
+def judge(task, content, mode="wynik", context=None):
     """Ocenia zgodność `content` (plan albo wynik) z zadaniem. Zwraca
-    {"aligned", "reasoning", "cost_usd", "source"}. Nigdy nie rzuca."""
+    {"aligned", "reasoning", "cost_usd", "source"}. Nigdy nie rzuca.
+
+    context: kesz projektów/etapów/wiedzy z context_cache.py (decyzja
+    właściciela 30.08.2026: bot oceniający ma zawsze znać projekt/etap zadania
+    i wiedzę agenta) — opcjonalny, brak/None pomija ten blok promptu."""
     if not content or not content.strip():
         return {"aligned": False, "reasoning": "Brak treści do oceny.", "cost_usd": 0.0, "source": None}
 
-    prompt = _build_prompt(task, content, mode)
+    context_text = context_cache.context_block(context, task) if context else None
+    prompt = _build_prompt(task, content, mode, context_text=context_text)
     odpowiedz = task_thinker.ask_model(prompt, caller="bot_content_check.review")
     if not odpowiedz.get("available") or not odpowiedz.get("text"):
         return {"aligned": False, "reasoning": "Brak modelu — nie mogę ocenić zgodności.",
@@ -94,7 +101,7 @@ def judge(task, content, mode="wynik"):
     return {**werdykt, "cost_usd": cost_usd, "source": odpowiedz.get("source")}
 
 
-def review(task, execution_result, config=None):
+def review(task, execution_result, config=None, context=None):
     """Wejście zgodne z resztą bramki jakości (bot_gustaw_bramka.py:REGISTRY).
     Pomija (skipped) zadania, których narzędzie nie jest na liście
     config.relevant_tools — ocena treści nie ma sensu np. dla walidacji PBIP."""
@@ -104,7 +111,7 @@ def review(task, execution_result, config=None):
     if tool not in relevant:
         return verdict(BOT, "skipped", 0.3, f"Narzędzie '{tool}' poza zakresem oceny treści.")
 
-    ocena = judge(task, execution_result.get("acceptance_notes"), mode="wynik")
+    ocena = judge(task, execution_result.get("acceptance_notes"), mode="wynik", context=context)
     if ocena["aligned"]:
         return verdict(BOT, "approved", 0.8, ocena["reasoning"])
     return verdict(BOT, "rejected", 0.8, ocena["reasoning"], concerns=[ocena["reasoning"]])

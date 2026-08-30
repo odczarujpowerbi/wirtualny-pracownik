@@ -29,6 +29,7 @@ import env_bootstrap  # wczytuje .env / secrets/.env (patrz .env.example, bootst
 import agentic_worker
 import bot_gustaw_bramka
 import control
+import context_cache
 import cost_tracker
 import executor
 import heartbeat
@@ -148,11 +149,11 @@ def _save_result_to_onedrive(task, status, comment, execution_result=None):
         return None
 
 
-def process_task(task, policy, routing, client):
+def process_task(task, policy, routing, client, context=None):
     """Przetwarza zadanie i oznacza DOMKNIĘCIE BLOKU (block_closed) przy statusie
     końcowym — to granica bezpiecznego resetu kontekstu: brief kolejnych zadań nie
     wciąga zamkniętego (task_brief_builder). Audyt zostaje, kontekst przestaje ciągnąć."""
-    result = _process_task_core(task, policy, routing, client)
+    result = _process_task_core(task, policy, routing, client, context)
     if result and result.get("status") in ("done", "needs_approval", "przeniesione"):
         state_store.record_event(result["task_id"], "block_closed", result["status"], now_iso())
     return result
@@ -168,7 +169,11 @@ def process_task(task, policy, routing, client):
 DUPLICATE_GUARD_MINUTES = 15
 
 
-def _process_task_core(task, policy, routing, client):
+def _process_task_core(task, policy, routing, client, context=None):
+    """context: kesz projektów/etapów/wiedzy z context_cache.py (decyzja
+    właściciela 30.08.2026), odświeżony RAZ na cykl w run_once() — przekazywany
+    dalej do agentic_worker.run/bot_gustaw_bramka.run_gate, żeby subagent i boty
+    oceniające zawsze znały projekt/etap zadania i wiedzę agenta."""
     task_id = task["task_id"]
     now = now_iso()
 
@@ -312,7 +317,7 @@ def _process_task_core(task, policy, routing, client):
             event_type="execution", cost_usd=real.get("cost_usd", 0.0),
         )
     elif thinking.get("ok"):
-        agentic = agentic_worker.run(task, thinking, client)
+        agentic = agentic_worker.run(task, thinking, client, context=context)
         execution_result = {**agentic, "thinking": thinking,
                             "cost_usd": agentic.get("cost_usd", 0.0) + thinking.get("cost_usd", 0.0)}
         state_store.log_decision(
@@ -387,7 +392,7 @@ def _process_task_core(task, policy, routing, client):
         # Żółte ORAZ zielone z efektem (zrzut/plik/testy) przechodzą pełną bramkę
         # jakości (Gustaw): Bartek, Franek, Oskar — zanim człowiek dostanie
         # odpowiedź jako gotową.
-        gate = bot_gustaw_bramka.run_gate(task, execution_result)
+        gate = bot_gustaw_bramka.run_gate(task, execution_result, context=context)
         state_store.log_decision(
             task_id, agent="gustaw",
             decision="gate_passed" if gate["passed"] else "gate_failed",
@@ -396,7 +401,7 @@ def _process_task_core(task, policy, routing, client):
         # bramki są konkretne ("brak jednostki", "miały być trzy zdania"), więc
         # odsyłanie ich właścicielowi to przerzucanie na niego pracy agenta.
         if not gate["passed"]:
-            gate, execution_result = _popraw_i_sprawdz_ponownie(task, execution_result, gate)
+            gate, execution_result = _popraw_i_sprawdz_ponownie(task, execution_result, gate, context=context)
 
         if gate["passed"]:
             status, comment = "done", _comment_gate_passed(owner, gate, execution_result)
@@ -531,7 +536,7 @@ _SYGNALY_ZLEGO_ZADANIA = (
 )
 
 
-def _popraw_i_sprawdz_ponownie(task, execution_result, gate):
+def _popraw_i_sprawdz_ponownie(task, execution_result, gate, context=None):
     """Nanosi zastrzeżenia bramki na materiał i puszcza go przez bramkę jeszcze raz.
 
     Zwraca (gate, execution_result) — po poprawce albo bez zmian, gdy poprawka się
@@ -560,7 +565,7 @@ def _popraw_i_sprawdz_ponownie(task, execution_result, gate):
             reason="Naniesiono uwagi odbioru: " + "; ".join(uwagi)[:400],
             now=now_iso(), event_type="execution", cost_usd=wynik.get("cost_usd", 0.0))
 
-        gate = bot_gustaw_bramka.run_gate(task, execution_result)
+        gate = bot_gustaw_bramka.run_gate(task, execution_result, context=context)
         state_store.log_decision(
             task["task_id"], agent="gustaw",
             decision="gate_passed" if gate["passed"] else "gate_failed",
@@ -676,6 +681,12 @@ def run_once(client=None):
 
     policy = risk_classifier.load_policy()
     routing = task_router.load_routing()
+    # Kesz projektów/etapów/wiedzy (żądanie właściciela 30.08.2026: boty oceniające
+    # i subagenci mają ZAWSZE znać projekt/etap zadania i wiedzę agenta) —
+    # odświeżany rzadko (domyślnie raz na 24h, context_cache.DEFAULT_MAX_AGE_HOURS),
+    # tanio gdy świeży (sam odczyt pliku). Fail-soft: błąd sieci -> stary kesz/pusty,
+    # nigdy nie blokuje przetwarzania zadań.
+    context = context_cache.refresh_if_stale(client, role=rola)
 
     heartbeat.write_heartbeat(current_task_id=None)
 
@@ -689,7 +700,7 @@ def run_once(client=None):
     results = []
     for task in tasks:
         heartbeat.write_heartbeat(current_task_id=task["task_id"])
-        results.append(process_task(task, policy, routing, client))
+        results.append(process_task(task, policy, routing, client, context=context))
 
     budget = cost_tracker.budget_state()
     heartbeat.write_heartbeat(current_task_id=None, extra={"budget": budget})

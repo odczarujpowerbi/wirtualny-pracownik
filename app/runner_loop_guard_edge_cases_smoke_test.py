@@ -127,7 +127,7 @@ def _test_parent_id_ustawiony_recznie(tmp, checks):
 
     try:
         task_thinker.think = lambda task: THINKING_OK
-        agentic_worker.run = lambda task, thinking, client=None: {
+        agentic_worker.run = lambda task, thinking, client=None, context=None: {
             "cost_usd": 0.0, "tool": "agentic_task", "executed": True,
             "acceptance_notes": "Zrobione (efekt testowy).",
             "functional_checks": [{"name": "test", "type": "nonempty_file", "target": "x"}],

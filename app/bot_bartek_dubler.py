@@ -36,7 +36,11 @@ def _signature(value):
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def review(task, execution_result, config=None):
+def review(task, execution_result, config=None, context=None):
+    """context (kesz projektów/etapów/wiedzy, context_cache.py): PRZYJĘTY dla
+    jednolitego wywołania z bot_gustaw_bramka.run_gate, ale NIEUŻYWANY — kontrola
+    determinizmu jest mechaniczna (porównanie dwóch przebiegów), kontekst
+    biznesowy niczego tu nie zmienia."""
     config = config or {}
     rerun = execution_result.get("rerun")
 

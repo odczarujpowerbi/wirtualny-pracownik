@@ -82,6 +82,25 @@ def run():
             TASK, {"tool": "inny_tool", "acceptance_notes": "x"}, config={"relevant_tools": ["inny_tool"]})
         checks.append(("review(): respektuje config.relevant_tools niestandardowy",
                        werdykt_custom["verdict"] == "approved"))
+
+        # 10. context (context_cache.py, żądanie właściciela 30.08.2026): blok
+        # projekt/etap/wiedza trafia do promptu PRZED treścią zadania, gdy podany.
+        prompty = []
+        task_thinker.ask_model = lambda prompt, caller=None: (
+            prompty.append(prompt) or {"available": True, "text": '{"aligned": true, "reasoning": "OK."}',
+                                       "source": "claude_code", "detail": "OK"})
+        kesz = {"projects": [{"id": "PRJ-1", "name": "LDIT", "stages": []}], "knowledge": []}
+        bot_content_check.judge({**TASK, "project_id": "PRJ-1"}, "Sprzedano 120 sztuk.",
+                                context=kesz)
+        checks.append(("judge(): context -> blok 'Projekt: LDIT' w promptcie",
+                       "Projekt: LDIT" in prompty[-1]))
+        checks.append(("judge(): blok kontekstu PRZED treścią zadania",
+                       prompty[-1].index("Projekt: LDIT") < prompty[-1].index("Zadanie:")))
+
+        prompty.clear()
+        bot_content_check.judge(TASK, "Sprzedano 120 sztuk.", context=None)
+        checks.append(("judge(): context=None -> BRAK bloku 'Projekt:' w promptcie",
+                       "Projekt:" not in prompty[-1]))
     finally:
         task_thinker.ask_model = original_ask_model
 

@@ -350,6 +350,23 @@ class ProjectlyClient:
                 return p.get("name")
         return None
 
+    def list_projects_with_stages(self):
+        """Wszystkie projekty widoczne temu kontu, z listą etapów (id+name) —
+        do context_cache.py (decyzja właściciela 30.08.2026: boty oceniające i
+        subagenci mają zawsze znać projekt I ETAP zadania, nie tylko treść).
+        list_projects zwraca to już w surowym kształcie, tu tylko czytelny
+        podzbiór pól (id/name/stages)."""
+        self._ensure_directory()
+        return [{"id": p.get("id"), "name": p.get("name"), "stages": p.get("stages", [])}
+               for p in self._projects]
+
+    def get_knowledge_base(self):
+        """MCP: zbot_get_knowledge_base — WSZYSTKIE wpisy bazy wiedzy widoczne
+        temu kontu (scope 'self' własne + 'general' firmowe). Do context_cache.py
+        (odświeżane rzadko, nie przy każdym zadaniu — patrz tamten moduł)."""
+        result = self._mcp.call_tool("zbot_get_knowledge_base", {})
+        return result if isinstance(result, dict) else {"entries": []}
+
     @staticmethod
     def _as_task_list(result):
         if isinstance(result, list):
@@ -714,6 +731,15 @@ class MockProjectlyClient:
         """Mock: brak katalogu projektów lokalnie — tylko oznaczenie, że to
         jest ID projektu mock, żeby test_build_prompt mógł pokryć tę ścieżkę."""
         return f"[mock] {project_id}" if project_id else None
+
+    def list_projects_with_stages(self):
+        """Mock: brak katalogu projektów/etapów lokalnie — pusta lista (fail-soft
+        w context_cache.py, nie ma czego udawać bez fixture)."""
+        return []
+
+    def get_knowledge_base(self):
+        """Mock: brak bazy wiedzy lokalnie — pusty kształt kontraktu."""
+        return {"count": 0, "entries": []}
 
     def create_task(self, title, description, assigned_to, parent_task_id=None, project_id=None,
                     relation_type="eskalacja", expected_result=None, acceptance_criteria=None,

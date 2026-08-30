@@ -31,6 +31,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+import context_cache
 import env_bootstrap  # noqa: F401  # wczytuje .env / secrets/.env przed odczytem kluczy
 import model_registry
 import ocr_extract
@@ -48,12 +49,13 @@ OLLAMA_VISION_MODEL = os.environ.get("OLLAMA_VISION_MODEL", "qwen2.5vl:3b")
 OLLAMA_TIMEOUT_SECONDS = 180
 
 
-def _build_prompt(task, ocr_text=None):
+def _build_prompt(task, ocr_text=None, context_text=None):
     ocr_block = ""
     if ocr_text:
         ocr_block = ("\nTekst odczytany ze zrzutu (OCR) — użyj go do sprawdzenia "
                      f"konkretnych liczb/etykiet:\n---\n{ocr_text[:2000]}\n---\n")
     return (
+        (f"{context_text}\n\n" if context_text else "") +
         f"Zadanie: {task.get('title')}\n"
         f"Oczekiwany rezultat: {task.get('expected_result')}\n"
         f"{ocr_block}\n"
@@ -141,7 +143,10 @@ def _parse_json_verdict(answer_text):
     return None
 
 
-def review(task, execution_result, config=None):
+def review(task, execution_result, config=None, context=None):
+    """context: kesz projektów/etapów/wiedzy z context_cache.py (decyzja
+    właściciela 30.08.2026) — opcjonalny, pomijany dla zadań bez zrzutu
+    (skipped wcześniej niż prompt w ogóle powstaje)."""
     config = config or {}
     screenshot_path = execution_result.get("screenshot_path")
 
@@ -175,7 +180,9 @@ def review(task, execution_result, config=None):
     # OCR jako wsparcie: twardo odczytany tekst trafia do promptu, żeby model
     # skonfrontował liczby, a nie tylko "wrażenie". Brak OCR nie blokuje.
     ocr = ocr_extract.extract_text(str(path))
-    prompt = _build_prompt(task, ocr_text=ocr.get("text") if ocr.get("available") else None)
+    context_text = context_cache.context_block(context, task) if context else None
+    prompt = _build_prompt(task, ocr_text=ocr.get("text") if ocr.get("available") else None,
+                           context_text=context_text)
 
     # Chmura jako GŁÓWNY recenzent (pewniejszy na cyfrach), Ollama jako druga opinia.
     answer = _ask_anthropic_vision(prompt, image_b64, media_type)

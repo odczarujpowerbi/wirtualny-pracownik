@@ -92,7 +92,11 @@ def _run_check(check):
         return False, f"test rzucił wyjątek: {exc}"
 
 
-def review(task, execution_result, config=None):
+def review(task, execution_result, config=None, context=None):
+    """context (kesz projektów/etapów/wiedzy, context_cache.py): PRZYJĘTY dla
+    jednolitego wywołania z bot_gustaw_bramka.run_gate, ale NIEUŻYWANY — testy
+    funkcjonalne są deterministyczne (plik istnieje/JSON poprawny/liczba się
+    zgadza), kontekst biznesowy niczego tu nie zmienia."""
     config = config or {}
     checks = execution_result.get("functional_checks") or task.get("functional_checks") or []
 

@@ -64,7 +64,11 @@ def _scope_guard(task, execution_result):
     return None
 
 
-def run_gate(task, execution_result, config=None):
+def run_gate(task, execution_result, config=None, context=None):
+    """context: kesz projektów/etapów/wiedzy z context_cache.py (decyzja
+    właściciela 30.08.2026: boty oceniające mają ZAWSZE znać projekt/etap
+    zadania i wiedzę agenta) — przekazywany jednolicie do każdego bota;
+    Bartek/Franek go przyjmują, ale ignorują (mechaniczne testy)."""
     cfg = config or load_gate_config()
     gate = cfg.get("gate", {})
     bots_cfg = cfg.get("bots", {})
@@ -87,7 +91,7 @@ def run_gate(task, execution_result, config=None):
         if review_fn is None:
             continue
         try:
-            verdicts.append(review_fn(task, execution_result, bot_cfg))
+            verdicts.append(review_fn(task, execution_result, bot_cfg, context=context))
         except Exception as exc:  # noqa: BLE001 — jeden zawodny bot nie może ubić bramki
             verdicts.append(verdict(name, "rejected", 0.5, f"Bot się wywalił: {exc}",
                                     concerns=[f"Wyjątek w bocie {name}."]))

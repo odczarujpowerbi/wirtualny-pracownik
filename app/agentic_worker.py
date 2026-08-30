@@ -43,6 +43,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import bot_content_check
+import context_cache
 import cost_estimator
 import kontekst_firmy
 import model_registry
@@ -87,6 +88,18 @@ def _kontekst_firmy_blok(task):
         return kontekst_firmy.zbuduj(tekst_zadania)
     except Exception:  # noqa: BLE001 — kontekst jest dodatkiem, nie warunkiem wykonania
         return ""
+
+
+def _kontekst_kesza_blok(task, context):
+    """Projekt+etap (bogatsze niż _kontekst_projektu_blok — niesie też nazwę
+    ETAPU) i digest bazy wiedzy, z context_cache.py (decyzja właściciela
+    30.08.2026: subagent ma zawsze znać projekt/etap zadania i wiedzę agenta
+    wrzuconą w Projectly). DODATKOWY blok obok _kontekst_projektu_blok, nie
+    zastępuje go — context=None (kesz jeszcze nieodświeżony/brak klienta w
+    tym wywołaniu) daje po prostu pusty string, fail-soft."""
+    if not context:
+        return ""
+    return context_cache.context_block(context, task)
 
 
 def _kontekst_projektu_blok(task, client):
@@ -145,11 +158,12 @@ def _kontekst_rodzenstwa_blok(task):
     return f"Inne podzadania tego samego zadania głównego:\n{linie}"
 
 
-def _build_prompt(task, plan_text, folder, client=None, sharepoint_folder=None):
+def _build_prompt(task, plan_text, folder, client=None, sharepoint_folder=None, context=None):
     bloki_kontekstu = [
         blok for blok in (
             _kontekst_firmy_blok(task),
             _kontekst_projektu_blok(task, client),
+            _kontekst_kesza_blok(task, context),
             _kontekst_rodzenstwa_blok(task),
         )
         if blok
@@ -181,20 +195,25 @@ def _build_prompt(task, plan_text, folder, client=None, sharepoint_folder=None):
     )
 
 
-def run(task, thinking, client=None):
+def run(task, thinking, client=None, context=None):
     """Wykonuje zadanie przez prawdziwego subagenta. Zwraca execution_result
     (cost_usd, tool, executed, acceptance_notes, output, functional_checks).
     Nigdy nie rzuca — każda awaria degraduje do odmowy/"NIE WYKONANO".
 
     client: opcjonalny ProjectlyClient/MockProjectlyClient — używany TYLKO do
     dociągnięcia nazwy projektu do kontekstu promptu (project_name). Brak/błąd
-    -> fail-soft, ten fragment kontekstu jest po prostu pomijany."""
+    -> fail-soft, ten fragment kontekstu jest po prostu pomijany.
+
+    context: kesz projektów/etapów/wiedzy z context_cache.py (decyzja
+    właściciela 30.08.2026) — opcjonalny, odświeżany PRZEZ WOŁAJĄCEGO
+    (runner_loop.py, raz na cykl), nie tutaj (subagent nie ma sam odpytywać
+    Projectly o kesz przy każdym zadaniu)."""
     plan_text = thinking.get("reasoning") if thinking else None
     if not plan_text:
         return _odmowa("Brak planu (task_thinker.think niedostępny) — nie mogę bezpiecznie "
                        "wykonać zadania bez zweryfikowanego podejścia.")
 
-    ocena_planu = bot_content_check.judge(task, plan_text, mode="plan")
+    ocena_planu = bot_content_check.judge(task, plan_text, mode="plan", context=context)
     if not ocena_planu["aligned"]:
         return _odmowa(f"Plan nie odpowiada zadaniu: {ocena_planu['reasoning']}",
                        cost_usd=ocena_planu["cost_usd"])
@@ -212,7 +231,7 @@ def run(task, thinking, client=None):
         return _odmowa(kontrakt["reason"], cost_usd=ocena_planu["cost_usd"])
 
     sharepoint_folder = _onedrive_task_folder(task)
-    prompt = _build_prompt(task, plan_text, folder, client, sharepoint_folder=sharepoint_folder)
+    prompt = _build_prompt(task, plan_text, folder, client, sharepoint_folder=sharepoint_folder, context=context)
     if prompt.startswith("-"):
         # Żywy incydent 25.08.2026: kontekst firmy (kontekst_firmy.zbuduj) zaczyna
         # się od "--- KONTEKST FIRMY ---", a CLI Claude Code parsuje pierwszy
