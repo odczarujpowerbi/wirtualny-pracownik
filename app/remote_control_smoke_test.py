@@ -146,6 +146,23 @@ def run():
         wynik_brak_projektu = rc.sync(client=client6, role="dev", force=True)
         checks.append(("sync: brak default_admin_project_id -> None, zero utworzonych zadań",
                        wynik_brak_projektu is None and len(client6.utworzone) == 0))
+
+        # --- 9. Samo-naprawa: zadanie kontrolne ZNIKA z Projectly (żywy bug
+        # 29.08.2026 — cache ufał staremu id na zawsze, mechanizm milczał na
+        # zawsze zamiast odtworzyć zadanie). Kolejny sync ma je odtworzyć. ---
+        tmp7 = Path(tempfile.mkdtemp())
+        _isolate(tmp7)
+        rc._state_path_for_role = _temp_state_path_factory(tmp7)
+        client7 = _FakeClient()
+        rc.sync(client=client7, role="dev", force=True)
+        checks.append(("sync: zadanie kontrolne utworzone (przygotowanie testu 9)", len(client7.utworzone) == 1))
+        client7._tasks.clear()  # symuluje ręczne usunięcie zadania w Projectly
+        wynik_po_zniknieciu = rc.sync(client=client7, role="dev", force=True)
+        checks.append(("sync: zadanie zniknęło -> status None (nie zgadujemy), BRAK nowego zadania w TYM przebiegu",
+                       wynik_po_zniknieciu is None and len(client7.utworzone) == 1))
+        wynik_odtworzone = rc.sync(client=client7, role="dev", force=True)
+        checks.append(("sync: NASTĘPNY przebieg odtwarza zadanie kontrolne (samo-naprawa)",
+                       len(client7.utworzone) == 2 and wynik_odtworzone == "todo"))
     finally:
         rc._state_path_for_role = original_state_path_for_role
         control.RUNS_DIR = original_runs_dir

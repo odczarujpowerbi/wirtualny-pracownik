@@ -132,8 +132,18 @@ def sync(client=None, role=None, force=False):
         state_path = _state_path_for_role(role)
         state = _load_state(state_path)
         task_id = _find_or_create_control_task(client, role, state, admin_project_id)
-        _save_state(state, state_path)
         status = _task_status(client, task_id, admin_project_id)
+        if status is None and state.get("task_id") == task_id:
+            # Żywy bug znaleziony 29.08.2026: zadanie kontrolne zniknęło (usunięte
+            # ręcznie/gdzie indziej) — _find_or_create_control_task ufał cache'owi
+            # BEZ WERYFIKACJI, więc mechanizm milczał na zawsze zamiast odtworzyć
+            # zadanie. Czyścimy cache — NASTĘPNY sync utworzy je od nowa (nie
+            # tworzymy TERAZ, żeby jeden przejściowy błąd sieci przy _task_status
+            # nie zaczął mnożyć zadań kontrolnych).
+            print(f"[remote_control] Zadanie kontrolne '{task_id}' ({role}) nie istnieje już w Projectly — "
+                  "utworzę nowe przy następnym sprawdzeniu.")
+            state.pop("task_id", None)
+        _save_state(state, state_path)
     except Exception as exc:  # noqa: BLE001 — błąd sieci/Projectly nie może zmienić stanu pauzy
         print(f"[remote_control] Sprawdzenie zadania kontrolnego nie powiodło się ({role}): {exc}")
         return None
