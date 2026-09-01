@@ -32,6 +32,7 @@ niżej, potem sekcję kategorii. Jeśli i tam nie ma odpowiedzi, dopiero wtedy p
 | Zaktualizować kod na maszynie z GitHub (git pull) | `repo_updater.py` (job w schedulerze: `repo_update`) |
 | Sprawdzić czy sekrety Microsoft Graph (mail) w ogóle łapią token | `python graph_verify.py` (NIE wysyła maila) |
 | Sprawdzić czy dostęp do SharePoint działa | `python sharepoint_verify.py` |
+| Sprawdzić, dlaczego bot NIE WIDZI dodanego zadania | `python queue_verify.py` — kolejka każdej roli + po jakich projektach szuka + LUKI UPRAWNIEŃ kont AI do projektów |
 | Wysłać / zaszkicować maila | `email_client.py` (NIGDY bezpośrednio `microsoft_graph_mail_client.py` — brak przekierowania bezpieczeństwa) |
 | Zapisać wygenerowany plik na SharePoint | `sharepoint_client.py` |
 | Wygenerować raport tabelaryczny (md/csv/xlsx) | `report_builder.py` |

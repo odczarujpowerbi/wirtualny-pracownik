@@ -443,6 +443,13 @@ class ProjectlyClient:
         wanted = set(self._cfg.get("poll", {}).get("project_statuses", ["active"]))
         return [p for p in self._projects if p.get("status") in wanted]
 
+    def polled_project_names(self):
+        """Nazwy projektów, po których TA rola realnie szuka swoich zadań —
+        publiczny odpowiednik _pollable_projects() dla queue_verify.py. Rola nie
+        widzi w Projectly wszystkich projektów (uprawnienia konta AI), a to jest
+        najczęstsza przyczyna "dodałem zadanie i bot go nie widzi"."""
+        return [p.get("name") for p in self._pollable_projects()]
+
     # --- Metody kontraktu (jak MockProjectlyClient) ---
 
     def get_new_tasks(self):
@@ -787,6 +794,11 @@ class MockProjectlyClient:
     def list_projects_with_stages(self):
         """Mock: brak katalogu projektów/etapów lokalnie — pusta lista (fail-soft
         w context_cache.py, nie ma czego udawać bez fixture)."""
+        return []
+
+    def polled_project_names(self):
+        """Mock: brak katalogu projektów lokalnie — pusta lista (fail-soft, tak
+        samo jak list_projects_with_stages)."""
         return []
 
     def get_knowledge_base(self):
