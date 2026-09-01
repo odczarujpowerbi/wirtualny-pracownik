@@ -28,14 +28,13 @@ dowolną ścieżkę z requestu.
 """
 
 import json
-import subprocess
-import sys
 import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import agent_launcher
 import control
 import job_scheduler
 import kill_switch
@@ -51,32 +50,13 @@ HTML_PATH = Path(__file__).parent / "dashboard.html"
 
 # Przyciski "uruchom agenta X" (dodane 29.08.2026, na wyraźną prośbę
 # właściciela — do testowania: chce móc odpalić każdego bota osobno, bez
-# grzebania w Harmonogramie zadań Windows/terminalu). Repo root = katalog
-# NADRZĘDNY wobec app/ (ten plik jest w app/, .bat-y w korzeniu repo). "dev"
-# przemianowany z "start-agent.bat" na "start-agent-dev.bat" 29.08.2026 (spójność
-# nazw z checker/marketing/zarząd). "zarzad" (29.08.2026) — czwarta, niezależna
-# rola (konto "AI - Zarząd" w Projectly, wcześniej odbierane przy okazji przez
-# proces dev — patrz config/projectly.yaml poll.extra_accounts).
-REPO_ROOT = Path(__file__).parent.parent
-AGENT_BAT_FILES = {
-    "dev": REPO_ROOT / "start-agent-dev.bat",
-    "checker": REPO_ROOT / "start-agent-checker.bat",
-    "marketing": REPO_ROOT / "start-agent-marketing.bat",
-    "zarzad": REPO_ROOT / "start-agent-zarzad.bat",
-}
-
-
-def _launch_process(cmd, cwd):
-    """Jedyne miejsce faktycznie odpalające nowy proces — wyodrębnione, żeby
-    testy dymne mogły to podmienić atrapą zamiast naprawdę spawnować proces
-    (ten sam wzorzec co repo_auto_improver._run/agentic_worker._run).
-    DETACHED_PROCESS + CREATE_NO_WINDOW (tylko Windows): proces przeżywa
-    zamknięcie tego dashboardu/przeglądarki i nie otwiera widocznego okna
-    konsoli — ma działać w tle jak uruchomiony przez Harmonogram zadań."""
-    kwargs = {}
-    if sys.platform == "win32":
-        kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW
-    subprocess.Popen(cmd, cwd=str(cwd), **kwargs)
+# grzebania w Harmonogramie zadań Windows/terminalu). Mapa rola -> .bat i samo
+# odpalenie procesu przeniesione 01.09.2026 do agent_launcher.py — drugim
+# wywołującym jest agent_supervisor.py (nadzorca), a nie może importować całego
+# panelu operatora tylko po listę czterech .bat-ów. Odwołania idą przez moduł
+# (agent_launcher.X), nie `from ... import X`, żeby podmiana atrapą w testach
+# działała dla wszystkich wywołujących naraz.
+REPO_ROOT = agent_launcher.REPO_ROOT
 
 
 def build_agents():
@@ -89,29 +69,15 @@ def build_agents():
     to, co ma" — dla JEDNEGO bota, nie wszystkich naraz, patrz control.py)."""
     return {"agents": [{"role": rola, "running": scheduler_lock.is_running(rola),
                        "paused": control.is_paused(role=rola)}
-                       for rola in AGENT_BAT_FILES]}
+                       for rola in agent_launcher.AGENT_BAT_FILES]}
 
 
 def start_agent(role):
-    """Odpala proces job_scheduler.py dla WSKAZANEJ roli (przez jej .bat),
-    jeśli jeszcze nie działa. Zwraca {"started": bool, "message": str} —
-    nigdy nie rzuca, błąd trafia do message (ten sam wzorzec co _run_safely)."""
-    if role not in AGENT_BAT_FILES:
-        return {"started": False, "message": f"Nieznana rola '{role}'."}
-    if scheduler_lock.is_running(role):
-        return {"started": False, "message": f"Agent '{role}' już działa."}
-    bat_path = AGENT_BAT_FILES[role]
-    if not bat_path.exists():
-        return {"started": False, "message": f"Brak pliku startowego: {bat_path}"}
-    try:
-        _launch_process(["cmd", "/c", str(bat_path)], cwd=REPO_ROOT)
-    except OSError as exc:
-        return {"started": False, "message": f"Nie udało się uruchomić agenta '{role}': {exc}"}
-    return {"started": True, "message": f"Uruchamiam agenta '{role}'…"}
+    return agent_launcher.start_agent(role)
 
 
 def start_all_agents():
-    return {"results": {rola: start_agent(rola) for rola in AGENT_BAT_FILES}}
+    return {"results": {rola: start_agent(rola) for rola in agent_launcher.AGENT_BAT_FILES}}
 
 
 def pause_or_resume_agent(role, action):
@@ -119,7 +85,7 @@ def pause_or_resume_agent(role, action):
     pauza (control.pause/resume, TEJ roli), nie kill switch: agent kończy
     zadanie, które już ma w toku, i przestaje przyjmować nowe. Zwraca
     {"ok": bool, "message": str} — nigdy nie rzuca (wzorzec _run_safely)."""
-    if role not in AGENT_BAT_FILES:
+    if role not in agent_launcher.AGENT_BAT_FILES:
         return {"ok": False, "message": f"Nieznana rola '{role}'."}
     if action == "pause":
         control.pause(reason="Wyłączony z dashboardu (panel Agenci).", role=role)

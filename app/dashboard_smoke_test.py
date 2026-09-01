@@ -13,6 +13,7 @@ import tempfile
 import types
 from pathlib import Path
 
+import agent_launcher
 import dashboard
 import job_scheduler
 
@@ -217,13 +218,15 @@ def run():
 
     # 18-22. Przyciski "uruchom agenta X" (dodane 29.08.2026, do testowania) —
     # zero realnego spawnowania procesów: scheduler_lock.is_running i
-    # dashboard._launch_process podmienione atrapami.
+    # agent_launcher._launch_process podmienione atrapami (mapa .bat-ow i samo
+    # odpalenie procesu mieszkaja od 01.09.2026 w agent_launcher.py, dashboard
+    # tylko do nich deleguje).
     import scheduler_lock
-    original_agent_bat_files = dashboard.AGENT_BAT_FILES
+    original_agent_bat_files = agent_launcher.AGENT_BAT_FILES
     original_is_running = scheduler_lock.is_running
-    original_launch_process = dashboard._launch_process
+    original_launch_process = agent_launcher._launch_process
     uruchomienia = []
-    dashboard._launch_process = lambda cmd, cwd: uruchomienia.append((cmd, cwd))
+    agent_launcher._launch_process = lambda cmd, cwd: uruchomienia.append((cmd, cwd))
 
     with tempfile.TemporaryDirectory() as tmp4:
         tmp4 = Path(tmp4)
@@ -231,7 +234,7 @@ def run():
         bat_dev.write_text("@echo off\n", encoding="utf-8")
         bat_checker = tmp4 / "checker.bat"
         bat_checker.write_text("@echo off\n", encoding="utf-8")
-        dashboard.AGENT_BAT_FILES = {
+        agent_launcher.AGENT_BAT_FILES = {
             "dev": bat_dev, "checker": bat_checker, "marketing": tmp4 / "brak-tego-pliku.bat",
         }
         try:
@@ -298,8 +301,8 @@ def run():
                 control.RUNS_DIR = original_runs_dir
         finally:
             scheduler_lock.is_running = original_is_running
-            dashboard.AGENT_BAT_FILES = original_agent_bat_files
-            dashboard._launch_process = original_launch_process
+            agent_launcher.AGENT_BAT_FILES = original_agent_bat_files
+            agent_launcher._launch_process = original_launch_process
 
     print("\n--- Wynik testu dymnego dashboardu ---")
     all_passed = True

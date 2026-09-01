@@ -26,6 +26,7 @@ import os
 from pathlib import Path
 
 import yaml
+from dotenv import dotenv_values
 
 import env_bootstrap  # noqa: F401  # wczytuje .env / secrets/.env przed odczytem PROJECTLY_API_KEY
 from mcp_client import MCPClient, MCPError
@@ -234,11 +235,18 @@ class ProjectlyClient:
     """Realna implementacja na MCP. Token/URL z env (PROJECTLY_API_KEY /
     PROJECTLY_BASE_URL), reguły biznesowe z config/projectly.yaml."""
 
-    def __init__(self, api_key=None, base_url=None):
+    def __init__(self, api_key=None, base_url=None, role=None):
+        """`role` jawne (01.09.2026) — dotąd rola klienta brała się WYŁĄCZNIE ze
+        zmiennej BOT_ROLE tego procesu, więc jeden proces mógł rozmawiać z
+        Projectly tylko jako jedna rola. agent_supervisor.py musi odpytać
+        wszystkie cztery role naraz (każda ma własny token i własny projekt
+        administracyjny — patrz default_admin_project_by_role), więc buduje
+        klienta per rola przez client_for_role(). role=None zachowuje
+        dotychczasowe zachowanie co do znaku."""
         self.api_key = api_key or os.environ.get("PROJECTLY_API_KEY")
         self.base_url = base_url or os.environ.get("PROJECTLY_BASE_URL")
         self._cfg = _load_config()
-        self._role = _load_role()
+        self._role = role or _load_role()
         self._mcp = MCPClient(self.base_url, self.api_key)
         self._people_by_id = None      # id -> name
         self._people_by_name = None    # lower(name) -> id
@@ -867,4 +875,23 @@ def get_client():
     api_key = os.environ.get("PROJECTLY_API_KEY")
     if api_key:
         return ProjectlyClient(api_key=api_key, base_url=os.environ.get("PROJECTLY_BASE_URL"))
+    return MockProjectlyClient()
+
+
+def client_for_role(role, secrets_dir=None):
+    """Klient rozmawiający z Projectly jako WSKAZANA rola, niezależnie od roli
+    procesu — token czytany z `secrets/agents/<rola>/.env` (to samo miejsce,
+    które env_bootstrap wstrzykuje do os.environ przy starcie bota, tu tylko
+    czytane bez modyfikowania środowiska procesu; dotenv_values nie dotyka
+    os.environ, więc cztery role nie nadpisują się nawzajem).
+
+    Bez pliku/klucza dla roli zwraca mock — dokładnie jak get_client(), żeby
+    agent_supervisor.py dało się uruchomić na świeżej maszynie bez sekretów.
+    secrets_dir wstrzykiwalny (testowalność, bez dotykania prawdziwych
+    sekretów)."""
+    secrets_dir = Path(secrets_dir) if secrets_dir else Path(__file__).parent / "secrets"
+    values = dotenv_values(secrets_dir / "agents" / role / ".env", encoding="utf-8")
+    api_key = values.get("PROJECTLY_API_KEY")
+    if api_key:
+        return ProjectlyClient(api_key=api_key, base_url=values.get("PROJECTLY_BASE_URL"), role=role)
     return MockProjectlyClient()

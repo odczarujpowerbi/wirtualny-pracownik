@@ -42,7 +42,7 @@ class _FakeClient:
 
 def _isolate(tmp):
     control.RUNS_DIR = tmp
-    rc._last_checked_at = None
+    rc._last_checked_at = {}
 
 
 def _temp_state_path_factory(tmp):
@@ -87,13 +87,20 @@ def run():
         real_task_id2 = client2._tasks[0]["task_id"]
         client2.set_status(real_task_id2, "done")
         status2 = rc.sync(client=client2, role="checker", force=True)
-        checks.append(("sync: status 'done' -> bot WSTRZYMANY", status2 == "done" and control.is_paused() is True))
+        # Asercje sprawdzaja pauze ROLI, o ktora pytal sync (nie roli procesu).
+        # Do 01.09.2026 stalo tu control.is_paused() bez roli i przechodzilo tylko
+        # dlatego, ze sync() wstrzymywal role WLASNEGO PROCESU zamiast tej z
+        # argumentu — czyli test utrwalal blad, ktory blokowal prace wielorolowa.
+        checks.append(("sync: status 'done' -> bot WSTRZYMANY (rola z argumentu, nie rola procesu)",
+                       status2 == "done" and control.is_paused(role="checker") is True))
+        checks.append(("sync: status 'done' -> NIE wstrzymuje CUDZEJ roli (regresja 01.09.2026)",
+                       control.is_paused(role="dev") is False))
 
         # --- 3. Status wraca na 'todo' -> bot WZNOWIONY (bo TEN mechanizm go wstrzymał). ---
         client2.set_status(real_task_id2, "todo")
         status3 = rc.sync(client=client2, role="checker", force=True)
         checks.append(("sync: status wraca na 'todo' -> bot WZNOWIONY (ten sam mechanizm)",
-                       status3 == "todo" and control.is_paused() is False))
+                       status3 == "todo" and control.is_paused(role="checker") is False))
 
         # --- 4. NIE nadpisuje ręcznej pauzy z dashboardu (inny powód). ---
         tmp3 = Path(tempfile.mkdtemp())
@@ -101,10 +108,11 @@ def run():
         rc._state_path_for_role = _temp_state_path_factory(tmp3)
         client3 = _FakeClient()
         rc.sync(client=client3, role="marketing", force=True)
-        control.pause(reason="Wstrzymano z panelu operatora.")  # ręczna pauza, INNY powód
+        control.pause(reason="Wstrzymano z panelu operatora.", role="marketing")  # ręczna pauza, INNY powód
         status4 = rc.sync(client=client3, role="marketing", force=True)  # status wciąż 'todo'
         checks.append(("sync: NIE cofa ręcznej pauzy z dashboardu (inny powód niż marker)",
-                       control.is_paused() is True and control.pause_reason() == "Wstrzymano z panelu operatora."))
+                       control.is_paused(role="marketing") is True
+                       and control.pause_reason(role="marketing") == "Wstrzymano z panelu operatora."))
 
         # --- 5. NIE nadpisuje istniejącego powodu pauzy, gdy status='done' ale
         # bot już wstrzymany z innego powodu (nie dubluje/nie zmienia powodu). ---
@@ -112,7 +120,7 @@ def run():
         client3.set_status(real_task_id3, "done")
         rc.sync(client=client3, role="marketing", force=True)
         checks.append(("sync: status='done', ale już wstrzymany innym powodem -> powód NIETKNIĘTY",
-                       control.pause_reason() == "Wstrzymano z panelu operatora."))
+                       control.pause_reason(role="marketing") == "Wstrzymano z panelu operatora."))
 
         # --- 6. Throttling: bez force, drugie wywołanie w tym samym momencie -> no-op. ---
         tmp4 = Path(tempfile.mkdtemp())
@@ -132,11 +140,11 @@ def run():
         class _BoomClient:
             def default_admin_project_id(self):
                 raise RuntimeError("Symulowany błąd sieci Projectly.")
-        control.pause(reason="stan sprzed błędu")
+        control.pause(reason="stan sprzed błędu", role="dev")
         wynik_bledu = rc.sync(client=_BoomClient(), role="dev", force=True)
         checks.append(("sync: błąd klienta -> zwraca None, BEZ wyjątku, stan pauzy nietknięty",
-                       wynik_bledu is None and control.is_paused() is True
-                       and control.pause_reason() == "stan sprzed błędu"))
+                       wynik_bledu is None and control.is_paused(role="dev") is True
+                       and control.pause_reason(role="dev") == "stan sprzed błędu"))
 
         # --- 8. Brak default_admin_project_id -> fail-closed, brak utworzenia zadania. ---
         tmp6 = Path(tempfile.mkdtemp())
@@ -166,7 +174,7 @@ def run():
     finally:
         rc._state_path_for_role = original_state_path_for_role
         control.RUNS_DIR = original_runs_dir
-        rc._last_checked_at = None
+        rc._last_checked_at = {}
 
     print("\n--- Wynik testu dymnego remote_control ---")
     all_passed = True

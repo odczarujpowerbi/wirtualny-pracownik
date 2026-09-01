@@ -1,5 +1,10 @@
-# Autostart 24/7: uruchamia job_scheduler.py (petla agenta) automatycznie przy
-# zalogowaniu. Dwie drogi, z fallbackiem:
+# Autostart 24/7: uruchamia NADZORCE (agent_supervisor.py) automatycznie przy
+# zalogowaniu. Od 01.09.2026 to jedyny proces startowany automatycznie - sam nie
+# wykonuje zadan, tylko czyta status zadan sterujacych w Projectly i odpala te
+# boty, ktore maja byc wlaczone (wczesniej ten skrypt startowal wprost
+# job_scheduler.py, czyli bota, ktory dzialal i zjadal pamiec niezaleznie od
+# tego, czy mial cokolwiek robic).
+# Dwie drogi, z fallbackiem:
 #   1. Harmonogram zadan Windows (preferowane) - restart przy awarii, bez limitu czasu.
 #   2. Folder Startup (gdy Harmonogram odmawia - realnie napotkane "Odmowa dostepu"
 #      bez admina) - prostszy skrot uruchamiany przy logowaniu.
@@ -10,17 +15,17 @@
 # Uzycie:  powershell -ExecutionPolicy Bypass -File bootstrap_autostart.ps1 [-AppPath ...]
 param(
     [string]$AppPath = (Join-Path $PSScriptRoot "..\..\app"),   # domyslnie folder app/ (ten, w ktorym lezy ten skrypt)
-    [string]$TaskName = "WirtualnyPracownikAI"
+    [string]$TaskName = "WirtualnyPracownikAI-Nadzorca"
 )
 $ErrorActionPreference = "Stop"
 
 $python = (Get-Command python -ErrorAction SilentlyContinue).Path
 if (-not $python) { Write-Host "UWAGA: brak 'python' w PATH - pomijam autostart."; exit 1 }
 
-$script = Join-Path $AppPath "job_scheduler.py"
+$script = Join-Path $AppPath "agent_supervisor.py"
 if (-not (Test-Path $script)) { Write-Host "UWAGA: brak $script - pomijam autostart."; exit 1 }
 
-Write-Host "=== Autostart 24/7 (job_scheduler.py) ==="
+Write-Host "=== Autostart 24/7 (agent_supervisor.py - nadzorca) ==="
 Write-Host "  Python:       $python"
 Write-Host "  Katalog app:  $AppPath"
 
@@ -28,7 +33,7 @@ Write-Host "  Katalog app:  $AppPath"
 $scheduled = $false
 try {
     $user = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-    $action = New-ScheduledTaskAction -Execute $python -Argument "job_scheduler.py" -WorkingDirectory $AppPath
+    $action = New-ScheduledTaskAction -Execute $python -Argument "agent_supervisor.py" -WorkingDirectory $AppPath
     $trigger = New-ScheduledTaskTrigger -AtLogOn -User $user
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
         -StartWhenAvailable -ExecutionTimeLimit ([TimeSpan]::Zero) `
@@ -46,13 +51,13 @@ try {
 # --- Droga 2: folder Startup (fallback) ---
 if (-not $scheduled) {
     $startup = [Environment]::GetFolderPath("Startup")
-    $launcher = Join-Path $startup "WirtualnyPracownikAI.bat"
+    $launcher = Join-Path $startup "WirtualnyPracownikAI-Nadzorca.bat"
     $content = @(
         '@echo off',
-        'REM Autostart Wirtualnego Pracownika (folder Startup - bez admina, przy logowaniu).',
+        'REM Autostart nadzorcy Wirtualnego Pracownika (folder Startup - bez admina, przy logowaniu).',
         'chcp 65001 > nul',
         "cd /d ""$AppPath""",
-        "start ""WirtualnyPracownik"" /min ""$python"" job_scheduler.py"
+        "start ""WirtualnyPracownik - nadzorca"" /min ""$python"" agent_supervisor.py"
     ) -join "`r`n"
     Set-Content -Path $launcher -Value $content -Encoding ASCII
     Write-Host "OK: utworzono skrot autostartu w folderze Startup:" -ForegroundColor Green

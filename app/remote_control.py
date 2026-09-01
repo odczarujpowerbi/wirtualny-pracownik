@@ -52,9 +52,12 @@ CONTROL_DESCRIPTION = (
     "schedulera — przed jakimkolwiek innym zadaniem."
 )
 
-# Throttling w pamięci procesu (nie w pliku) — każdy proces (dev/checker/
-# marketing) ma własny import tego modułu, więc osobny stan throttlingu i tak.
-_last_checked_at = None
+# Throttling w pamięci procesu (nie w pliku), PER ROLA (01.09.2026). Wcześniej
+# jedna wspólna zmienna na cały moduł wystarczała, bo każdy proces bota pytał
+# tylko o SWOJĄ rolę. agent_supervisor.py odpytuje w jednym procesie wszystkie
+# cztery role po kolei — przy wspólnym liczniku pierwsza rola ustawiała go dla
+# wszystkich i trzy pozostałe wracały natychmiast z None (nigdy nie sprawdzone).
+_last_checked_at = {}
 
 
 def _control_task_title(role):
@@ -117,12 +120,12 @@ def sync(client=None, role=None, force=False):
     """Priorytetowy check statusu zadania kontrolnego, tłumaczony na lokalną
     pauzę. Zwraca status zadania (str) albo None (throttled / błąd / zadanie
     nieznalezione / brak admin_project_id). Nigdy nie rzuca."""
-    global _last_checked_at
     role = role or env_bootstrap._current_role()
     now = time.monotonic()
-    if not force and _last_checked_at is not None and now - _last_checked_at < POLL_SECONDS:
+    poprzednio = _last_checked_at.get(role)
+    if not force and poprzednio is not None and now - poprzednio < POLL_SECONDS:
         return None
-    _last_checked_at = now
+    _last_checked_at[role] = now
 
     try:
         client = client or get_client()
@@ -148,12 +151,17 @@ def sync(client=None, role=None, force=False):
         print(f"[remote_control] Sprawdzenie zadania kontrolnego nie powiodło się ({role}): {exc}")
         return None
 
+    # role= przekazywane jawnie do control.* (01.09.2026). Wcześniej te wywołania
+    # szły bez roli, czyli na rolę BIEŻĄCEGO PROCESU — poprawnie, dopóki jedynym
+    # wywołującym był job_scheduler.py (sync(role=CURRENT_ROLE), zawsze własna
+    # rola). agent_supervisor.py pyta o cudze role z jednego procesu i bez tego
+    # sync(role="marketing") wstrzymywałby bota z rolą procesu nadzorcy.
     reason = _pause_reason(role)
     if status == "done":
-        if not control.is_paused():
-            control.pause(reason=reason)
-    elif status is not None and control.is_paused() and control.pause_reason() == reason:
-        control.resume()
+        if not control.is_paused(role=role):
+            control.pause(reason=reason, role=role)
+    elif status is not None and control.is_paused(role=role) and control.pause_reason(role=role) == reason:
+        control.resume(role=role)
     return status
 
 

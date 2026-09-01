@@ -17,6 +17,10 @@ niżej, potem sekcję kategorii. Jeśli i tam nie ma odpowiedzi, dopiero wtedy p
 | Sprawdzić stan WSZYSTKICH zadań cyklicznych naraz | `python job_scheduler.py --status` |
 | Odpalić jedno zadanie cykliczne na żądanie (bez czekania na harmonogram) | `job_scheduler.run_job_by_name(nazwa)` albo przez `dashboard.py` |
 | Podejrzeć historię przebiegów / edytować harmonogram bez YAML-a | `python dashboard.py` → `http://127.0.0.1:8787/` |
+| Sprawdzić, który bot jest WŁĄCZONY (status zadań sterujących w Projectly) | `python agent_supervisor.py --status` |
+| Włączyć/wyłączyć bota | status zadania `🎛️ Kontrola bota: <rola>` w Projectly (Done = wyłączony) albo panel `dashboard.py` → Agenci. Bota odpali sam `agent_supervisor.py` |
+| Uruchomić maszynę tak, jak ma działać na co dzień | `start-nadzorca.bat` (JEDYNY proces startowany przy zalogowaniu; boty odpala nadzorca) |
+| Odpalić jednego bota ręcznie, z pominięciem nadzorcy (diagnostyka) | `start-agent-dev.bat` / `-checker` / `-marketing` / `-zarzad` |
 | Zatrzymać/wstrzymać agenta z panelu (nie awaryjnie) | `control.py` (stany running/paused/stopped) |
 | Zatrzymać WSZYSTKO natychmiast, awaryjnie | `kill_switch.py` (plik-flaga, ostatnia linia obrony) |
 | Ręcznie założyć zadanie testowe w REALNYM Projectly | `python projectly_seed_task.py` |
@@ -69,7 +73,8 @@ niżej, potem sekcję kategorii. Jeśli i tam nie ma odpowiedzi, dopiero wtedy p
 | `cost_tracker.py` | Sumuje koszt AI per zadanie/dzień, wyzwala kill switch po przekroczeniu dziennego limitu. |
 | `cost_estimator.py` | Szacunek kosztu POJEDYNCZEGO wywołania modelu (naprawia dziurę: Claude Code dawał 0.0, kill switch nie widział kosztu). |
 | `kill_switch.py` | Globalny plik-flaga STOP, sprawdzany na starcie pętli i przez workery. Ostatnia linia obrony, nie zamiennik walidacji. |
-| `control.py` | Sterowanie agentem z panelu operatora: running / paused / stopped (mniej brutalne niż kill switch). |
+| `control.py` | Sterowanie agentem z panelu operatora: running / paused / stopped (mniej brutalne niż kill switch). Pauza jest PER ROLA. |
+| `remote_control.py` | Tłumaczy status zadania `🎛️ Kontrola bota: <rola>` w Projectly na lokalną pauzę tej roli. Jedyne źródło prawdy o pauzie zdalnej — `job_scheduler.py` woła to priorytetowo co tick, `agent_supervisor.py` przy każdym przebiegu nadzoru. |
 | `heartbeat.py` / `watchdog.py` | `heartbeat.py` zapisuje `runs/heartbeat.json` co cykl; `watchdog.py` wykrywa jego nieaktualność → `ALERT.flag`. |
 | `poprawka_materialu.py` | Pętla poprawek wg zastrzeżeń bramki jakości — bez tego każda drobna wada kończyła zadanie eskalacją. |
 | `tool_registry.py` | "Czy TO narzędzie z TYMI parametrami wolno uruchomić" — kontrakty z `config/tool_contracts.yaml`. Model nie dostaje dowolnego shella. |
@@ -127,6 +132,8 @@ Tak sprawdziłem 24.08.2026, że produkcja dodała rodzinę `zbot_*` (patrz comm
 | `kacper_monitor.py` | Czyta wspólny dziennik (`state_store.events` + `job_scheduler` historię), wykrywa POWTARZALNE awarie (job albo skill) → JEDNO zadanie naprawcze/dzień (dedup) → `publish_status("kacper-monitor", ...)`. Domyślnie WYŁĄCZONY w schedulerze. | na żądanie / job |
 | `knowledge_digest_publisher.py` | Cogodzinny digest "ostatnia aktywność" per konto AI → baza wiedzy Projectly (`zbot_create_knowledge`/`zbot_update_knowledge`, upsert po id z `runs/knowledge_entry_ids.json`). | co godzinę |
 | `job_scheduler.py` | Centralny scheduler WSZYSTKICH cyklicznych skryptów — `config/schedule.yaml`. `--status`, `run_job_by_name()`, historia w `runs/run_history.jsonl` (pełne stdout+stderr+return). |
+| `agent_supervisor.py` | **Nadzorca — jedyny proces startowany automatycznie przy zalogowaniu** (`start-nadzorca.bat`). Co 30s czyta status zadania sterującego każdej roli i odpala TYLKO te boty, które mają być włączone. Sam nie wykonuje zadań i nie woła modelu. `--status` = jednorazowy podgląd. |
+| `agent_launcher.py` | Mapa rola → `start-agent-*.bat` + samo odpalenie procesu. Jedno miejsce dla `agent_supervisor.py` i `dashboard.py`. |
 | `scheduler_lock.py` | Blokada: tylko jedna żywa instancja `job_scheduler.py` naraz. |
 | `dashboard.py` (+ `dashboard.html`) | Panel w przeglądarce `http://127.0.0.1:8787/` — historia przebiegów, edycja harmonogramu na żywo, "uruchom teraz", szczegół przebiegu. Tylko localhost. |
 | `usage_monitor.py` | Zużycie Claude + "ile zadań jeszcze" — widoczne w statuslinii terminala. |

@@ -11,6 +11,7 @@ inboxa i pliku stanu. Wpina się automatycznie w self_check.py.
 import tempfile
 from pathlib import Path
 
+import control
 import notebook_intake
 import runner_loop
 
@@ -37,11 +38,18 @@ def test_parse():
 def test_run_once_dedupe():
     calls = []
     original = runner_loop.process_task
+    # control.RUNS_DIR izolowany do katalogu tymczasowego (dodane 01.09.2026):
+    # run_once() pyta control.should_run_new_work(), wiec REALNA flaga
+    # runs/PAUSE.flag tej maszyny (ktos wylaczyl bota z panelu operatora)
+    # wywracala ten test z "processed: 0, reason: paused". Test ma sprawdzac
+    # dedupowanie intake'u, a nie to, czy bot jest akurat wstrzymany.
+    original_runs_dir = control.RUNS_DIR
     runner_loop.process_task = lambda task, policy, routing, client: (
         calls.append(task["task_id"]) or {"task_id": task["task_id"], "status": "done"}
     )
     try:
         tmp = Path(tempfile.mkdtemp())
+        control.RUNS_DIR = tmp
         inbox = tmp / "zadania.txt"
         inbox.write_text("Przejrzyj raport\nSprawdź plik INDEKA !yellow\n", encoding="utf-8")
         processed = tmp / "processed.json"
@@ -56,6 +64,7 @@ def test_run_once_dedupe():
         print("OK  run_once przetwarza nowe zadania i dedupuje przy powtórnym przebiegu")
     finally:
         runner_loop.process_task = original
+        control.RUNS_DIR = original_runs_dir
 
 
 if __name__ == "__main__":
