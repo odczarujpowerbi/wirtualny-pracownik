@@ -123,7 +123,11 @@ default_admin_project_by_role:
 control_task_by_role:
   dev: "cmtghfuun000gh1592g7qrxo2"        # AI - Dev
   checker: "cmtepuld6000eb0yz0bv2dysq"    # AI-Checker
-  marketing: "cmtilfwa40002vr0l92onxb18"  # AI - Marketing
+  # Marketing PRZEPIĘTY 01.09.2026 z "cmtilfwa40002vr0l92onxb18" na to ID
+  # (decyzja właściciela) — w Projectly istnieją DWA zadania o identycznym
+  # tytule "🎛️ Kontrola bota: marketing" i właściciel używa tego, starszego.
+  # Przełączanie tego drugiego nie dawało żadnego efektu, bo nikt go nie czytał.
+  marketing: "cmtfnpedw00029mgpez5g22fg"  # AI - Marketing
   zarzad: "cmti83mbi002lh159n66tnt3j"     # AI - Zarząd
 
 # --- Mapowanie schematu Projectly -> kontrakt wewnętrzny (get_new_tasks) ---
