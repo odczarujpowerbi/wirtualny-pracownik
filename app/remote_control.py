@@ -40,6 +40,7 @@ from pathlib import Path
 
 import control
 import env_bootstrap
+import projectly_client
 from projectly_client import get_client
 
 POLL_SECONDS = 15
@@ -151,18 +152,94 @@ def sync(client=None, role=None, force=False):
         print(f"[remote_control] Sprawdzenie zadania kontrolnego nie powiodło się ({role}): {exc}")
         return None
 
-    # role= przekazywane jawnie do control.* (01.09.2026). Wcześniej te wywołania
-    # szły bez roli, czyli na rolę BIEŻĄCEGO PROCESU — poprawnie, dopóki jedynym
-    # wywołującym był job_scheduler.py (sync(role=CURRENT_ROLE), zawsze własna
-    # rola). agent_supervisor.py pyta o cudze role z jednego procesu i bez tego
-    # sync(role="marketing") wstrzymywałby bota z rolą procesu nadzorcy.
+    _apply_local_pause(role, status)
+    return status
+
+
+def _apply_local_pause(role, status):
+    """Tłumaczy status zadania sterującego na lokalną pauzę TEJ roli. Jedyne
+    miejsce, które to robi — wołane i przez sync() (odczyt z Projectly), i przez
+    set_enabled() (zapis do Projectly), żeby oba kierunki dawały ten sam stan.
+
+    role= przekazywane jawnie do control.* (01.09.2026). Wcześniej te wywołania
+    szły bez roli, czyli na rolę BIEŻĄCEGO PROCESU — poprawnie, dopóki jedynym
+    wywołującym był job_scheduler.py (sync(role=CURRENT_ROLE), zawsze własna
+    rola). agent_supervisor.py i dashboard.py działają na CUDZYCH rolach z
+    jednego procesu i bez tego wstrzymywałyby nie tego bota, co trzeba."""
     reason = _pause_reason(role)
     if status == "done":
         if not control.is_paused(role=role):
             control.pause(reason=reason, role=role)
     elif status is not None and control.is_paused(role=role) and control.pause_reason(role=role) == reason:
         control.resume(role=role)
-    return status
+
+
+def _wymus_lokalnie(role, enabled):
+    """Lokalna pauza wg JAWNEJ decyzji operatora — inaczej niż _apply_local_pause,
+    które tylko odzwierciedla odczytany status i celowo nie rusza cudzej pauzy.
+
+    Tu nadpisujemy stan bez pytania o powód: "włącz" zdejmuje KAŻDĄ pauzę tej
+    roli, "wyłącz" ustawia powód na marker tego modułu. Bez tego pauza założona
+    poza tym mechanizmem (np. flaga z panelu sprzed 01.09.2026, z innym tekstem
+    powodu) byłaby nie do zdjęcia: sync() wznawia tylko własny marker, więc bot
+    zostawałby wstrzymany na zawsze, mimo włączonego zadania sterującego."""
+    if enabled:
+        control.resume(role=role)
+    else:
+        control.pause(reason=_pause_reason(role), role=role)
+
+
+def set_enabled(role, enabled, client=None):
+    """Włącza/wyłącza bota TEJ roli — zapisuje status zadania sterującego w
+    Projectly i od razu domyka lokalną pauzę tym samym kodem, co odczyt.
+    Zwraca {"ok", "status", "message"}, nigdy nie rzuca.
+
+    To jest jedyna droga wyłączania bota z panelu operatora (dashboard.py).
+    Do 01.09.2026 panel pisał WYŁĄCZNIE lokalną flagę pauzy z własnym tekstem
+    powodu, a Projectly o niczym nie wiedziało — dwa niezależne przełączniki
+    tego samego bota, rozjeżdżające się po pierwszym kliknięciu (realny stan tej
+    maszyny: panel mówił "wyłączony", zadanie sterujące "todo"/włączony).
+
+    Zachowanie przy błędzie Projectly jest świadomie ASYMETRYCZNE, w stronę
+    bezpiecznego kierunku:
+      - wyłączanie -> pauza zakładana lokalnie MIMO błędu (użytkownik prosił o
+        stop; ostrzegamy, że nadzorca może bota wznowić, bo źródło prawdy wciąż
+        mówi "włączony"),
+      - włączanie  -> lokalnie NIC nie ruszamy (fail-closed: nie uruchamiamy
+        bota, kiedy nie wiemy, co mówi zadanie sterujące)."""
+    status = "todo" if enabled else "done"
+    czynnosc = "włączony" if enabled else "wyłączony"
+    try:
+        client = client or projectly_client.client_for_role(role)
+        admin_project_id = client.default_admin_project_id()
+        if not admin_project_id:
+            return {"ok": False, "status": None, "message": (
+                f"Rola '{role}' nie widzi projektu administracyjnego w Projectly — "
+                "nie mam gdzie trzymać zadania sterującego (sprawdź default_admin_project_by_role)."
+            )}
+        state_path = _state_path_for_role(role)
+        state = _load_state(state_path)
+        task_id = _find_or_create_control_task(client, role, state, admin_project_id)
+        client.update_status(task_id, status)
+        _save_state(state, state_path)
+    except Exception as exc:  # noqa: BLE001 — panel operatora ma pokazać błąd, nie wywalić się
+        if enabled:
+            return {"ok": False, "status": None, "message": (
+                f"Nie udało się włączyć bota '{role}' — zapis do Projectly nie powiódł się ({exc}). "
+                "Lokalnie nic nie zmieniam, żeby bot nie wstał wbrew zadaniu sterującemu."
+            )}
+        _wymus_lokalnie(role, enabled=False)
+        return {"ok": False, "status": "done", "message": (
+            f"Bot '{role}' wyłączony LOKALNIE, ale zapis do Projectly nie powiódł się ({exc}). "
+            "Zadanie sterujące nadal mówi 'włączony', więc nadzorca może go wznowić — powtórz, gdy Projectly wróci."
+        )}
+
+    _wymus_lokalnie(role, enabled)
+    # Zdejmujemy throttling TEJ roli: najbliższy sync ma przeczytać świeżo
+    # zapisany status, a nie wrócić z None przez okno POLL_SECONDS.
+    _last_checked_at.pop(role, None)
+    return {"ok": True, "status": status,
+            "message": f"Bot '{role}' {czynnosc} — zadanie sterujące w Projectly ustawione na '{status}'."}
 
 
 if __name__ == "__main__":

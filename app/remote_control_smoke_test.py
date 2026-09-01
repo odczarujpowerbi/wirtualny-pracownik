@@ -39,6 +39,14 @@ class _FakeClient:
             if t["task_id"] == task_id:
                 t["status"] = status
 
+    def update_status(self, task_id, status):
+        """Nazwa jak w prawdziwym ProjectlyClient — set_status wyzej to skrot
+        uzywany przez sam test do ustawiania stanu wejsciowego. set_enabled()
+        wola te metode, wiec atrapa musi ja miec (bez tego leciał AttributeError
+        i sciezka bledu udawala poprawne dzialanie)."""
+        self.set_status(task_id, status)
+        return True
+
 
 def _isolate(tmp):
     control.RUNS_DIR = tmp
@@ -171,6 +179,73 @@ def run():
         wynik_odtworzone = rc.sync(client=client7, role="dev", force=True)
         checks.append(("sync: NASTĘPNY przebieg odtwarza zadanie kontrolne (samo-naprawa)",
                        len(client7.utworzone) == 2 and wynik_odtworzone == "todo"))
+
+        # --- 10-13. set_enabled: DRUGI kierunek (zapis do Projectly). Panel
+        # operatora wyłącza bota tą drogą, żeby lokalna pauza i zadanie sterujące
+        # nie mogły pokazywać czegoś innego (stan tej maszyny 01.09.2026: panel
+        # mówił "wyłączony", zadanie sterujące "todo"). ---
+        tmp8 = Path(tempfile.mkdtemp())
+        _isolate(tmp8)
+        rc._state_path_for_role = _temp_state_path_factory(tmp8)
+        client8 = _FakeClient()
+        wynik_off = rc.set_enabled("checker", enabled=False, client=client8)
+        status_w_projectly = client8._tasks[0]["status"]
+        checks.append(("set_enabled(False): status w Projectly = 'done' ORAZ lokalna pauza tej roli",
+                       wynik_off["ok"] is True and status_w_projectly == "done"
+                       and control.is_paused(role="checker") is True))
+        checks.append(("set_enabled(False): powód pauzy to marker remote_control (sync umie ją zdjąć)",
+                       control.pause_reason(role="checker") == rc._pause_reason("checker")))
+        checks.append(("set_enabled(False): NIE rusza innej roli",
+                       control.is_paused(role="dev") is False))
+
+        wynik_on = rc.set_enabled("checker", enabled=True, client=client8)
+        checks.append(("set_enabled(True): status w Projectly = 'todo' ORAZ zdjęta lokalna pauza",
+                       wynik_on["ok"] is True and client8._tasks[0]["status"] == "todo"
+                       and control.is_paused(role="checker") is False))
+
+        # --- 13a. Jawne "włącz" zdejmuje pauzę zalozona POZA tym mechanizmem
+        # (stara flaga panelu z innym tekstem powodu). Bez tego bot zostawalby
+        # wstrzymany na zawsze: sync() wznawia wylacznie wlasny marker. ---
+        tmp8b = Path(tempfile.mkdtemp())
+        _isolate(tmp8b)
+        rc._state_path_for_role = _temp_state_path_factory(tmp8b)
+        control.pause(reason="Wyłączony z dashboardu (panel Agenci).", role="checker")  # stara flaga
+        wynik_on_stara_flaga = rc.set_enabled("checker", enabled=True, client=_FakeClient())
+        checks.append(("set_enabled(True): zdejmuje TAKŻE obcą pauzę (stara flaga panelu)",
+                       wynik_on_stara_flaga["ok"] is True and control.is_paused(role="checker") is False))
+
+        # --- 14-15. Error case: Projectly nie przyjmuje zapisu. Kierunki są
+        # świadomie asymetryczne — wyłączenie ma zadziałać lokalnie mimo błędu,
+        # włączenie NIE (fail-closed: nie uruchamiamy bota w niepewności). ---
+        tmp9 = Path(tempfile.mkdtemp())
+        _isolate(tmp9)
+        rc._state_path_for_role = _temp_state_path_factory(tmp9)
+
+        class _KlientBezZapisu(_FakeClient):
+            def update_status(self, task_id, status):
+                raise ConnectionError("Projectly nie przyjmuje zapisu")
+
+        wynik_off_blad = rc.set_enabled("marketing", enabled=False, client=_KlientBezZapisu())
+        checks.append(("set_enabled(False) + błąd zapisu -> ok=False, ale bot LOKALNIE wstrzymany",
+                       wynik_off_blad["ok"] is False and control.is_paused(role="marketing") is True
+                       and "Projectly" in wynik_off_blad["message"]))
+
+        tmp10 = Path(tempfile.mkdtemp())
+        _isolate(tmp10)
+        rc._state_path_for_role = _temp_state_path_factory(tmp10)
+        control.pause(reason="stan sprzed próby włączenia", role="zarzad")
+        wynik_on_blad = rc.set_enabled("zarzad", enabled=True, client=_KlientBezZapisu())
+        checks.append(("set_enabled(True) + błąd zapisu -> ok=False i stan pauzy NIETKNIĘTY (fail-closed)",
+                       wynik_on_blad["ok"] is False and control.is_paused(role="zarzad") is True
+                       and control.pause_reason(role="zarzad") == "stan sprzed próby włączenia"))
+
+        # --- 16. Brak projektu administracyjnego -> czytelny błąd, zero zmian. ---
+        tmp11 = Path(tempfile.mkdtemp())
+        _isolate(tmp11)
+        rc._state_path_for_role = _temp_state_path_factory(tmp11)
+        wynik_bez_projektu = rc.set_enabled("dev", enabled=False, client=_FakeClient(admin_project_id=None))
+        checks.append(("set_enabled: brak projektu administracyjnego -> ok=False, bez pauzy",
+                       wynik_bez_projektu["ok"] is False and control.is_paused(role="dev") is False))
     finally:
         rc._state_path_for_role = original_state_path_for_role
         control.RUNS_DIR = original_runs_dir

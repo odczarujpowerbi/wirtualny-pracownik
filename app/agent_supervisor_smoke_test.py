@@ -109,13 +109,16 @@ def _run_checks(tmp, uruchomione):
     checks.append(("kill switch aktywny -> żadnego startu",
                    wpisy[0]["action"] == "stop" and uruchomione == []))
 
-    # 7. Pauza lokalna (panel operatora, inny powód niż remote_control) -> mimo
-    #    włączonego zadania sterującego nadzorca NIE startuje bota.
+    # 7. Obca pauza lokalna (powód INNY niż marker remote_control, np. ręczne
+    #    control.pause z terminala) -> mimo włączonego zadania sterującego
+    #    nadzorca NIE startuje bota. Panel operatora od 01.09.2026 pauzuje już
+    #    przez remote_control.set_enabled, więc jego pauzy tu nie ma — zostaje
+    #    zabezpieczenie przed pauzą spoza tego mechanizmu.
     swiezy_start()
-    control.pause(reason="Wyłączony z dashboardu (panel Agenci).", role="dev")
+    control.pause(reason="Ręczne control.pause z terminala.", role="dev")
     wpisy = sup.check_once(roles=["dev"], client_factory=lambda r: _FakeClient(status="todo"), launcher=launcher)
     control.resume(role="dev")
-    checks.append(("pauza z panelu operatora -> nadzorca nie startuje bota",
+    checks.append(("obca pauza lokalna -> nadzorca nie startuje bota",
                    wpisy[0]["action"] == "wstrzymany" and uruchomione == []))
 
     # 8. Tryb --status (start_enabled=False) -> pokazuje, kogo by odpalił, ale
@@ -134,7 +137,14 @@ def _run_checks(tmp, uruchomione):
     checks.append(("brak projektu administracyjnego -> status None, bez startu",
                    wpisy[0]["status"] is None and uruchomione == []))
 
-    # 10. print_status nie wywraca się na wpisie bez statusu (None).
+    # 10. Przelacznik z terminala (--wlacz/--wylacz) idzie ta sama droga co
+    #     panel operatora: nieznana rola -> czytelny blad, bez wyjatku.
+    swiezy_start()
+    wynik_zla_rola = sup._przelacz("nieistniejaca-rola", True)
+    checks.append(("--wlacz/--wylacz: nieznana rola -> ok=False, komunikat, bez wyjątku",
+                   wynik_zla_rola["ok"] is False and "Nieznana rola" in wynik_zla_rola["message"]))
+
+    # 11. print_status nie wywraca się na wpisie bez statusu (None).
     sup.print_status(wpisy)
     checks.append(("print_status radzi sobie ze statusem None", True))
     return checks

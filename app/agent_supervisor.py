@@ -145,14 +145,32 @@ def main():
                                                  "których zadanie sterujące w Projectly jest włączone.")
     parser.add_argument("--status", action="store_true",
                         help="Tylko sprawdź i wypisz stan zadań sterujących, nie odpalaj pętli")
+    parser.add_argument("--wlacz", metavar="ROLA",
+                        help="Włącz bota tej roli (ustawia status zadania sterującego w Projectly)")
+    parser.add_argument("--wylacz", metavar="ROLA",
+                        help="Wyłącz bota tej roli (ustawia status zadania sterującego na 'done')")
     parser.add_argument("--poll", type=int, default=POLL_SECONDS,
                         help=f"Co ile sekund sprawdzać (domyślnie {POLL_SECONDS})")
     args = parser.parse_args()
 
+    # --wlacz/--wylacz idą DOKŁADNIE tą samą drogą co przyciski w panelu
+    # operatora (remote_control.set_enabled) — terminal i panel nie mogą być
+    # dwoma osobnymi przełącznikami tego samego bota.
+    for rola, wlaczony in ((args.wlacz, True), (args.wylacz, False)):
+        if rola:
+            print(_przelacz(rola, wlaczony)["message"])
+            return
     if args.status:
         print_status(check_once(start_enabled=False))
         return
     run(poll_seconds=args.poll)
+
+
+def _przelacz(role, enabled):
+    if role not in agent_launcher.AGENT_BAT_FILES:
+        return {"ok": False, "message": f"Nieznana rola '{role}' "
+                                        f"(znane: {', '.join(agent_launcher.AGENT_BAT_FILES)})."}
+    return remote_control.set_enabled(role, enabled=enabled)
 
 
 if __name__ == "__main__":

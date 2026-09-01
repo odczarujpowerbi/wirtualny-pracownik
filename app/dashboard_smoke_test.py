@@ -18,6 +18,34 @@ import dashboard
 import job_scheduler
 
 
+class _AtrapaProjectly:
+    """Atrapa klienta Projectly dla testu przelacznika Wlacz/Wylacz w panelu.
+    Zapamietuje kazdy ustawiony status, zeby dalo sie sprawdzic, ze panel
+    naprawde zapisuje do zrodla prawdy, a nie tylko do lokalnej flagi."""
+
+    def __init__(self):
+        self.statusy = []
+        self._tasks = []
+
+    def default_admin_project_id(self):
+        return "ADMIN-PROJ"
+
+    def list_tasks(self, project_id=None):
+        return list(self._tasks)
+
+    def create_task(self, title, description, assigned_to=None, project_id=None, **kwargs):
+        task_id = f"CTRL-{len(self._tasks) + 1:03d}"
+        self._tasks.append({"task_id": task_id, "title": title, "status": "todo"})
+        return task_id
+
+    def update_status(self, task_id, status):
+        self.statusy.append(status)
+        for t in self._tasks:
+            if t["task_id"] == task_id:
+                t["status"] = status
+        return True
+
+
 def _install_fake_jobs_module():
     """Moduł z bezargumentowymi funkcjami do odpalenia przez scheduler:
     jedna wypisuje coś i zwraca wartość, druga celowo rzuca błąd."""
@@ -275,15 +303,31 @@ def run():
                            wynik_wszystkie["results"]["dev"]["started"] is False
                            and wynik_wszystkie["results"]["marketing"]["started"] is False))
 
-            # 24-26. Wyłącz/włącz JEDNEGO agenta (29.08.2026) — pauza per rola,
-            # BEZ wpływu na inne role (control.py, control_smoke_test.py testuje
-            # sam mechanizm; tu sprawdzamy WIRING dashboard.py <-> control.py).
+            # 24-27. Wyłącz/włącz JEDNEGO agenta (29.08.2026) — pauza per rola,
+            # BEZ wpływu na inne role. Od 01.09.2026 panel NIE pisze już samej
+            # flagi lokalnej: ustawia status zadania sterującego w Projectly
+            # (remote_control.set_enabled), a pauza jest tego konsekwencją. Stąd
+            # atrapa klienta Projectly — bez niej ten test pisałby do PRAWDZIWEGO
+            # Projectly kontem tej maszyny (ta sama pułapka co z email_client).
             import control
+            import projectly_client
+            import remote_control
             original_runs_dir = control.RUNS_DIR
+            original_client_for_role = projectly_client.client_for_role
+            original_state_path = remote_control._state_path_for_role
             control.RUNS_DIR = tmp4
+            klienci = {}
+
+            def _atrapa_klienta(role):
+                return klienci.setdefault(role, _AtrapaProjectly())
+
+            projectly_client.client_for_role = _atrapa_klienta
+            remote_control._state_path_for_role = lambda role: tmp4 / f"rc_state_{role}.json"
             try:
                 wynik_pauza = dashboard.pause_or_resume_agent("checker", "pause")
                 checks.append(("pause_or_resume_agent: pause -> ok=True", wynik_pauza["ok"] is True))
+                checks.append(("pause_or_resume_agent: pause USTAWIA status 'done' w Projectly (jedno źródło prawdy)",
+                               klienci["checker"].statusy[-1] == "done"))
                 checks.append(("pause_or_resume_agent: build_agents widzi checkera jako wstrzymanego",
                                {a["role"]: a["paused"] for a in dashboard.build_agents()["agents"]}["checker"] is True))
                 checks.append(("pause_or_resume_agent: pauza checkera NIE wpływa na dev",
@@ -293,11 +337,15 @@ def run():
                 checks.append(("pause_or_resume_agent: resume -> ok=True, checker znów aktywny",
                                wynik_wznow["ok"] is True
                                and {a["role"]: a["paused"] for a in dashboard.build_agents()["agents"]}["checker"] is False))
+                checks.append(("pause_or_resume_agent: resume USTAWIA status 'todo' w Projectly",
+                               klienci["checker"].statusy[-1] == "todo"))
 
                 wynik_zla_rola = dashboard.pause_or_resume_agent("nieistniejąca-rola", "pause")
                 checks.append(("pause_or_resume_agent: nieznana rola -> ok=False, komunikat, bez wyjątku",
                                wynik_zla_rola["ok"] is False and "Nieznana rola" in wynik_zla_rola["message"]))
             finally:
+                projectly_client.client_for_role = original_client_for_role
+                remote_control._state_path_for_role = original_state_path
                 control.RUNS_DIR = original_runs_dir
         finally:
             scheduler_lock.is_running = original_is_running

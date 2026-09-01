@@ -18,7 +18,9 @@ job_scheduler.py; ten plik to tylko cienka warstwa HTTP nad nim:
     GET  /api/agents          -> status (działa/nie, wstrzymany/nie) każdego bota (dev/checker/marketing/zarząd)
     POST /api/agents/start    -> odpala PROCES joba wskazanej roli (jeśli nie działa)
     POST /api/agents/start-all -> to samo dla wszystkich ról naraz
-    POST /api/agents/pause    -> wyłącz/włącz JEDNEGO agenta (miękka pauza per rola, control.py)
+    POST /api/agents/pause    -> wyłącz/włącz JEDNEGO agenta — ustawia status jego
+                                 zadania sterującego w Projectly (remote_control.set_enabled),
+                                 lokalna pauza jest tego konsekwencją, nie osobnym przełącznikiem
 
 Serwer słucha TYLKO na 127.0.0.1 (localhost) — nie jest wystawiony na sieć.
 'Uruchom teraz' odpala wyłącznie zadania zadeklarowane w schedule.yaml,
@@ -40,6 +42,7 @@ import job_scheduler
 import kill_switch
 import live_status_publisher
 import notebook_intake
+import remote_control
 import scheduler_lock
 import state_store
 import usage_monitor
@@ -82,17 +85,23 @@ def start_all_agents():
 
 def pause_or_resume_agent(role, action):
     """'Wyłącz'/'Włącz' per agent (29.08.2026, decyzja właściciela) — miękka
-    pauza (control.pause/resume, TEJ roli), nie kill switch: agent kończy
-    zadanie, które już ma w toku, i przestaje przyjmować nowe. Zwraca
-    {"ok": bool, "message": str} — nigdy nie rzuca (wzorzec _run_safely)."""
+    pauza, nie kill switch: agent kończy zadanie, które już ma w toku, i
+    przestaje przyjmować nowe. Zwraca {"ok": bool, "message": str} — nigdy nie
+    rzuca (wzorzec _run_safely).
+
+    Od 01.09.2026 idzie przez remote_control.set_enabled(), czyli USTAWIA STATUS
+    ZADANIA STERUJĄCEGO W PROJECTLY, a lokalną pauzę dokłada dopiero jako
+    konsekwencję. Wcześniej panel pisał tylko lokalną flagę i Projectly o
+    wyłączeniu nie wiedziało — dwa przełączniki tego samego bota, które po
+    pierwszym kliknięciu pokazywały co innego. Jedno źródło prawdy: zadanie
+    sterujące. Skutek uboczny (świadomy): wyłączenie z panelu widać teraz też w
+    Projectly, a nadzorca (agent_supervisor.py) sam z siebie takiego bota nie
+    wystartuje."""
     if role not in agent_launcher.AGENT_BAT_FILES:
         return {"ok": False, "message": f"Nieznana rola '{role}'."}
-    if action == "pause":
-        control.pause(reason="Wyłączony z dashboardu (panel Agenci).", role=role)
-        return {"ok": True, "message": f"Agent '{role}' wyłączony — dokończy bieżące zadanie, nowych nie przyjmie."}
-    if action == "resume":
-        control.resume(role=role)
-        return {"ok": True, "message": f"Agent '{role}' włączony."}
+    if action in ("pause", "resume"):
+        wynik = remote_control.set_enabled(role, enabled=(action == "resume"))
+        return {"ok": wynik["ok"], "message": wynik["message"]}
     return {"ok": False, "message": f"Nieznana akcja '{action}' (dozwolone: pause/resume)."}
 
 
