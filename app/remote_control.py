@@ -19,13 +19,22 @@ oznaczało pauzę, bot zatrzymywałby się sam automatycznie zaraz po utworzeniu
 własnego zadania kontrolnego. "done" jako pauza unika tego, i jest intuicyjne
 ("zamykam = wyłączam").
 
-Współdzielenie z panelem operatora (dashboard.py): resume() jest wołane TYLKO
-gdy aktualny powód pauzy to marker TEGO modułu (patrz `_pause_reason`) — więc
-ręczna pauza z dashboardu (inny tekst powodu) NIE zostanie cicho cofnięta
-przez ten mechanizm, dopóki ktoś nie ustawi z powrotem statusu zadania na
-"done" i potem z powrotem na coś innego. Odwrotnie: jeśli bot jest już
-wstrzymany (z dowolnego powodu) i status w Projectly to "done", nic nie
-robimy — nie nadpisujemy istniejącego powodu pauzy.
+DWA KIERUNKI, jeden stan (01.09.2026):
+    sync()        — czyta status z Projectly i odzwierciedla go w lokalnej pauzie,
+    set_enabled() — zapisuje status w Projectly (panel operatora, terminal) i
+                    domyka lokalną pauzę.
+Oba tłumaczą status na pauzę jednym kodem (_apply_local_pause), więc panel,
+terminal i Projectly nie mogą pokazywać różnych rzeczy.
+
+sync() jest zachowawczy: resume() woła TYLKO gdy aktualny powód pauzy to marker
+TEGO modułu (patrz `_pause_reason`), więc pauza założona spoza mechanizmu (ręczne
+control.pause) nie zostanie cicho cofnięta. Jawna decyzja operatora przez
+set_enabled() jest silniejsza i nadpisuje każdą pauzę (patrz `_wymus_lokalnie`).
+
+Zadania sterujące są ODSIANE z kolejki pracy — filtr siedzi w projectly_client
+(is_control_task / CONTROL_TASK_TITLE_PREFIX), a ten moduł jest jedynym, który
+prosi o nie jawnie (list_tasks(include_control=True)). Bez tego bot brał własny
+przełącznik jako zadanie do wykonania.
 
 Fail-soft: błąd sieci/Projectly NIE zmienia bieżącego stanu pauzy (ani nie
 wstrzymuje, ani nie wznawia) — chwilowa niedostępność Projectly nie może
@@ -62,7 +71,10 @@ _last_checked_at = {}
 
 
 def _control_task_title(role):
-    return f"🎛️ Kontrola bota: {role}"
+    """Prefiks bierzemy z projectly_client (CONTROL_TASK_TITLE_PREFIX) — tam
+    siedzi filtr odsiewający te zadania z kolejki pracy, więc tytuł i filtr nie
+    mogą się rozjechać po zmianie w jednym miejscu."""
+    return f"{projectly_client.CONTROL_TASK_TITLE_PREFIX} {role}"
 
 
 def _pause_reason(role):
@@ -101,7 +113,7 @@ def _find_or_create_control_task(client, role, state, admin_project_id):
     if task_id:
         return task_id
     title = _control_task_title(role)
-    for t in client.list_tasks(project_id=admin_project_id):
+    for t in client.list_tasks(project_id=admin_project_id, include_control=True):
         if t.get("title") == title:
             state["task_id"] = t["task_id"]
             return t["task_id"]
@@ -111,7 +123,7 @@ def _find_or_create_control_task(client, role, state, admin_project_id):
 
 
 def _task_status(client, task_id, admin_project_id):
-    for t in client.list_tasks(project_id=admin_project_id):
+    for t in client.list_tasks(project_id=admin_project_id, include_control=True):
         if t.get("task_id") == task_id:
             return t.get("status")
     return None  # zniknęło (usunięte ręcznie) — traktuj jak "nie znaleziono", nie zgaduj

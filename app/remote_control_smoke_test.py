@@ -25,7 +25,7 @@ class _FakeClient:
     def default_admin_project_id(self):
         return self._admin_project_id
 
-    def list_tasks(self, project_id=None):
+    def list_tasks(self, project_id=None, include_control=False):
         return list(self._tasks)
 
     def create_task(self, title, description, assigned_to=None, project_id=None, **kwargs):

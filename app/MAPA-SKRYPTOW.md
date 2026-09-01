@@ -74,7 +74,7 @@ niżej, potem sekcję kategorii. Jeśli i tam nie ma odpowiedzi, dopiero wtedy p
 | `cost_estimator.py` | Szacunek kosztu POJEDYNCZEGO wywołania modelu (naprawia dziurę: Claude Code dawał 0.0, kill switch nie widział kosztu). |
 | `kill_switch.py` | Globalny plik-flaga STOP, sprawdzany na starcie pętli i przez workery. Ostatnia linia obrony, nie zamiennik walidacji. |
 | `control.py` | Prymityw pauzy: pliki-flagi running / paused / stopped, PER ROLA (mniej brutalne niż kill switch). NIE wołaj go wprost do włączania/wyłączania bota — od tego jest `remote_control.set_enabled`, inaczej Projectly nie dowie się o zmianie. |
-| `remote_control.py` | Tłumaczy status zadania `🎛️ Kontrola bota: <rola>` w Projectly na lokalną pauzę tej roli. Jedyne źródło prawdy o pauzie zdalnej — `job_scheduler.py` woła to priorytetowo co tick, `agent_supervisor.py` przy każdym przebiegu nadzoru. |
+| `remote_control.py` | Tłumaczy status zadania `🎛️ Kontrola bota: <rola>` w Projectly na lokalną pauzę tej roli. Te zadania są ODSIANE z kolejki pracy (`projectly_client.is_control_task`) — ten moduł jest jedynym, który prosi o nie jawnie (`list_tasks(include_control=True)`). Jedyne źródło prawdy o pauzie zdalnej — `job_scheduler.py` woła to priorytetowo co tick, `agent_supervisor.py` przy każdym przebiegu nadzoru. |
 | `heartbeat.py` / `watchdog.py` | `heartbeat.py` zapisuje `runs/heartbeat.json` co cykl; `watchdog.py` wykrywa jego nieaktualność → `ALERT.flag`. |
 | `poprawka_materialu.py` | Pętla poprawek wg zastrzeżeń bramki jakości — bez tego każda drobna wada kończyła zadanie eskalacją. |
 | `tool_registry.py` | "Czy TO narzędzie z TYMI parametrami wolno uruchomić" — kontrakty z `config/tool_contracts.yaml`. Model nie dostaje dowolnego shella. |

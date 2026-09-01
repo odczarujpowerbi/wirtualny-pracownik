@@ -75,6 +75,24 @@ _STATUS_TO_PROJECTLY = {
 }
 
 
+# Zadania STERUJĄCE botem (remote_control.py) mieszkają w tym samym projekcie
+# administracyjnym co zwykłe zadania i są przypisane do konta AI tej roli — więc
+# get_new_tasks() zaciągało je do KOLEJKI PRACY i bot próbował "wykonać" własny
+# przełącznik ("[runner_loop] Start — kolejka zadań: 1: 🎛️ Kontrola bota:
+# marketing", 01.09.2026). Gorzej: po ustawieniu ich na "done" łapał je też
+# task_feedback_requester.py i wysyłał maila z prośbą o feedback do wyłącznika.
+#
+# Prefiks trzymamy TU, a nie w remote_control.py, bo remote_control importuje ten
+# moduł (odwrotny kierunek byłby zależnością kołową). remote_control.py bierze go
+# stąd, żeby tytuł i filtr nie mogły się rozjechać.
+CONTROL_TASK_TITLE_PREFIX = "🎛️ Kontrola bota:"
+
+
+def is_control_task(task):
+    """Czy to zadanie STERUJĄCE botem (przełącznik), a nie praca do wykonania."""
+    return str(task.get("title") or "").startswith(CONTROL_TASK_TITLE_PREFIX)
+
+
 def _load_config():
     if not CONFIG_PATH.exists():
         return {}
@@ -442,6 +460,11 @@ class ProjectlyClient:
                         continue
                     widziane.add(raw.get("id"))
                     zadanie = self._map_task(raw, project["id"])
+                    # Zadanie sterujące to przełącznik bota, nie praca — nigdy
+                    # nie trafia do kolejki. Bez wyjątku i bez opcji: get_new_tasks
+                    # to WYŁĄCZNIE kolejka pracy (patrz is_control_task).
+                    if is_control_task(zadanie):
+                        continue
                     zadanie["ai_account"] = nazwa_konta
                     tasks.append(zadanie)
         return tasks
@@ -650,9 +673,15 @@ class ProjectlyClient:
             lines.append(f"- **{key}**: {value}")
         return "\n".join(lines)
 
-    def list_tasks(self, project_id=None, status=None):
+    def list_tasks(self, project_id=None, status=None, include_control=False):
         """MCP: get_project_tasks. Lista zadań (mapowana do kontraktu
-        wewnętrznego) — dla jednego projektu lub wszystkich pollowanych."""
+        wewnętrznego) — dla jednego projektu lub wszystkich pollowanych.
+
+        Zadania STERUJĄCE botem są domyślnie odsiane (is_control_task): każdy
+        dotychczasowy wywołujący (raporty, digesty, prośby o feedback, licznik
+        kolejki, eskalacje) traktuje wynik jako pracę i nie ma pojęcia o
+        przełącznikach. include_control=True używa WYŁĄCZNIE remote_control.py,
+        który tych zadań właśnie szuka."""
         projects = [{"id": project_id}] if project_id else self._pollable_projects()
         args_status = {"status": status} if status else {}
         tasks = []
@@ -661,7 +690,9 @@ class ProjectlyClient:
                 "get_project_tasks", {"projectId": project["id"], **args_status}
             )
             for raw in self._as_task_list(result):
-                tasks.append(self._map_task(raw, project["id"]))
+                zadanie = self._map_task(raw, project["id"])
+                if include_control or not is_control_task(zadanie):
+                    tasks.append(zadanie)
         return tasks
 
     def get_week_report(self, week_offset=0):
@@ -713,7 +744,10 @@ class MockProjectlyClient:
 
     def get_new_tasks(self):
         with open(self.tasks_path, encoding="utf-8") as f:
-            return json.load(f)
+            tasks = json.load(f)
+        # Ten sam filtr co w realnym kliencie — kolejka pracy nigdy nie zawiera
+        # przełączników bota (patrz is_control_task).
+        return [t for t in tasks if not is_control_task(t)]
 
     def post_comment(self, task_id, text):
         print(f"[MOCK Projectly] komentarz na {task_id}:\n{text}\n")
@@ -801,12 +835,14 @@ class MockProjectlyClient:
         print(f"[MOCK Projectly] status na żywo ({role}): {statuses[role]}")
         return True
 
-    def list_tasks(self, project_id=None, status=None):
+    def list_tasks(self, project_id=None, status=None, include_control=False):
         tasks = self._load(self.project_tasks_path, default=[])
         if project_id:
             tasks = [t for t in tasks if t.get("project_id") == project_id]
         if status:
             tasks = [t for t in tasks if t.get("status") == status]
+        if not include_control:
+            tasks = [t for t in tasks if not is_control_task(t)]
         return tasks
 
     def get_week_report(self, week_offset=0):

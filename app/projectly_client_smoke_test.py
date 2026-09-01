@@ -238,6 +238,72 @@ def test_load_role_bot_role_env_var_overrides_role_json(tmp_path=None):
     print("OK  _load_role(): BOT_ROLE w środowisku ma pierwszeństwo nad role.json")
 
 
+class _FakeMCPZadania:
+    """Atrapa MCP zwracajaca staly zestaw zadan z get_project_tasks - do testu
+    odsiewania zadan STERUJACYCH botem z kolejki pracy."""
+
+    def __init__(self, zadania):
+        self._zadania = zadania
+
+    def call_tool(self, name, arguments=None):
+        if name == "get_project_tasks":
+            return {"tasks": self._zadania}
+        return {}
+
+
+def _klient_z_zadaniami(zadania):
+    client = ProjectlyClient(api_key="fake-token", base_url="http://fake.local/mcp")
+    client._mcp = _FakeMCPZadania(zadania)
+    client._projects = [{"id": "PROJ-1", "name": "Administracyjne"}]
+    client._people_by_id, client._people_by_name = {}, {}
+    return client
+
+
+ZADANIA_Z_STERUJACYM = [
+    {"id": "T-1", "title": "Zrób raport sprzedaży", "status": "todo"},
+    {"id": "CTRL-1", "title": "🎛️ Kontrola bota: marketing", "status": "todo"},
+]
+
+
+def test_list_tasks_odsiewa_zadania_sterujace():
+    # Żywy bug 01.09.2026: "[runner_loop] Start — kolejka zadań: 1: 🎛️ Kontrola
+    # bota: marketing" — bot brał własny przełącznik jako pracę do wykonania.
+    client = _klient_z_zadaniami(ZADANIA_Z_STERUJACYM)
+    tytuly = [t["title"] for t in client.list_tasks(project_id="PROJ-1")]
+    assert tytuly == ["Zrób raport sprzedaży"], tytuly
+    print("OK  list_tasks() domyślnie odsiewa zadania sterujące botem")
+
+
+def test_list_tasks_include_control_zwraca_sterujace():
+    # remote_control.py MUSI móc je znaleźć - to jedyny wywołujący z opt-inem.
+    client = _klient_z_zadaniami(ZADANIA_Z_STERUJACYM)
+    tytuly = [t["title"] for t in client.list_tasks(project_id="PROJ-1", include_control=True)]
+    assert "🎛️ Kontrola bota: marketing" in tytuly, tytuly
+    print("OK  list_tasks(include_control=True) zwraca zadania sterujące (dla remote_control)")
+
+
+def test_get_new_tasks_nigdy_nie_zwraca_zadan_sterujacych():
+    client = _klient_z_zadaniami(ZADANIA_Z_STERUJACYM)
+    client._polled_account_ids = lambda: [("AI - Marketing", "ACC-1")]
+    client._pollable_projects = lambda: [{"id": "PROJ-1"}]
+    tytuly = [t["title"] for t in client.get_new_tasks()]
+    assert tytuly == ["Zrób raport sprzedaży"], tytuly
+    print("OK  get_new_tasks() nigdy nie zwraca zadań sterujących (kolejka pracy)")
+
+
+def test_mock_client_tez_odsiewa_zadania_sterujace():
+    # Tryb mock musi zachowywać się tak samo, inaczej testy lokalne nie łapią bugu.
+    tmp = Path(tempfile.mkdtemp())
+    sciezka = tmp / "project_tasks.json"
+    sciezka.write_text(json.dumps(ZADANIA_Z_STERUJACYM), encoding="utf-8")
+    client = MockProjectlyClient()
+    client.project_tasks_path = sciezka
+    tytuly = [t["title"] for t in client.list_tasks()]
+    assert tytuly == ["Zrób raport sprzedaży"], tytuly
+    assert len(client.list_tasks(include_control=True)) == 2
+    print("OK  MockProjectlyClient.list_tasks() odsiewa zadania sterujące tak samo jak realny")
+
+
 if __name__ == "__main__":
     test_self_heal_from_corrupt_json()
     test_atomic_save_no_leftover_tmp()
@@ -252,4 +318,8 @@ if __name__ == "__main__":
     test_set_task_feedback_sends_cost_usd_to_update_task()
     test_set_task_feedback_omits_cost_usd_when_not_given()
     test_load_role_bot_role_env_var_overrides_role_json()
+    test_list_tasks_odsiewa_zadania_sterujace()
+    test_list_tasks_include_control_zwraca_sterujace()
+    test_get_new_tasks_nigdy_nie_zwraca_zadan_sterujacych()
+    test_mock_client_tez_odsiewa_zadania_sterujace()
     print("\nWszystkie testy MockProjectlyClient przeszły.")
