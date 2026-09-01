@@ -93,6 +93,16 @@ def is_control_task(task):
     return str(task.get("title") or "").startswith(CONTROL_TASK_TITLE_PREFIX)
 
 
+def control_task_id_for_role(role):
+    """ID zadania sterującego tą rolą, PRZYPIĘTE w config/projectly.yaml
+    (control_task_by_role). None = brak wpisu dla tej roli.
+
+    Przypięte ID zamiast szukania po tytule, bo zadanie zakładane od zera
+    dostaje status "todo", a "todo" znaczy WŁĄCZONY — każde odtworzenie
+    przełącznika cicho włączało bota (żywy incydent 01.09.2026)."""
+    return _load_config().get("control_task_by_role", {}).get(role)
+
+
 def _load_config():
     if not CONFIG_PATH.exists():
         return {}

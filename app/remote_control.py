@@ -101,14 +101,27 @@ def _save_state(state, path):
 
 
 def _find_or_create_control_task(client, role, state, admin_project_id):
-    """Cache po task_id w stanie lokalnym (jedno zapytanie mniej na sync po
-    pierwszym udanym uruchomieniu) — ale sam STATUS i tak zawsze czytamy na
-    żywo (_task_status), cache dotyczy tylko ID, nie stanu.
+    """ID zadania sterującego tą rolą. Kolejność: PRZYPIĘTE w configu →
+    zapamiętane lokalnie → szukanie po tytule → utworzenie nowego.
+
+    Przypięte ID (config/projectly.yaml → control_task_by_role, 01.09.2026) ma
+    bezwarunkowe pierwszeństwo i wyłącza trzy dalsze kroki: żadnego zgadywania
+    po tytule, żadnego tworzenia, żadnych duplikatów. Powód jest twardy —
+    zadanie tworzone od zera dostaje w Projectly status "todo", czyli WŁĄCZONY,
+    więc gubienie i odtwarzanie przełącznika cicho włączało boty (trzy z czterech
+    wróciły na "włączony" po wyłączeniu, 01.09.2026).
+
+    Ścieżka bez configu została dla roli bez wpisu, ale nowe zadanie zakłada się
+    teraz jako WYŁĄCZONE (fail-closed) — nie chcemy, żeby samo pojawienie się
+    przełącznika uruchamiało bota.
 
     list_tasks(project_id=...) świadomie bez filtra po assignee (WS1,
     29.08.2026) — szuka WYŁĄCZNIE PO TYTULE dokładnego zadania kontrolnego tej
     roli (_control_task_title), nie działa na żadnym innym znalezionym
     zadaniu. Nie zgłaszać jako tego samego bugа co task_feedback_requester.py."""
+    przypiete = projectly_client.control_task_id_for_role(role)
+    if przypiete:
+        return przypiete
     task_id = state.get("task_id")
     if task_id:
         return task_id
@@ -118,15 +131,28 @@ def _find_or_create_control_task(client, role, state, admin_project_id):
             state["task_id"] = t["task_id"]
             return t["task_id"]
     new_id = client.create_task(title, CONTROL_DESCRIPTION, assigned_to="self", project_id=admin_project_id)
+    client.update_status(new_id, "done")  # fail-closed: nowy przełącznik = WYŁĄCZONY
+    print(f"[remote_control] Utworzyłem zadanie sterujące '{title}' jako WYŁĄCZONE "
+          f"({new_id}) — przypnij to ID w config/projectly.yaml → control_task_by_role.")
     state["task_id"] = new_id
     return new_id
 
 
 def _task_status(client, task_id, admin_project_id):
+    """Status zadania sterującego. Najpierw projekt administracyjny (jedno
+    zapytanie), a gdy tam go nie ma — szerzej, po wszystkich pollowanych
+    projektach. Ten drugi krok dodany 01.09.2026: przypięte ID przestaje wtedy
+    zależeć od tego, w którym projekcie właściciel trzyma przełącznik
+    (przeniesienie zadania w Projectly nie może zepsuć sterowania).
+
+    Zwraca None, gdy zadania nie ma NIGDZIE — wtedy nie zgadujemy."""
     for t in client.list_tasks(project_id=admin_project_id, include_control=True):
         if t.get("task_id") == task_id:
             return t.get("status")
-    return None  # zniknęło (usunięte ręcznie) — traktuj jak "nie znaleziono", nie zgaduj
+    for t in client.list_tasks(include_control=True):
+        if t.get("task_id") == task_id:
+            return t.get("status")
+    return None
 
 
 def sync(client=None, role=None, force=False):
@@ -149,7 +175,14 @@ def sync(client=None, role=None, force=False):
         state = _load_state(state_path)
         task_id = _find_or_create_control_task(client, role, state, admin_project_id)
         status = _task_status(client, task_id, admin_project_id)
-        if status is None and state.get("task_id") == task_id:
+        if status is None and projectly_client.control_task_id_for_role(role):
+            # ID przypięte w configu, a Projectly go nie zna (usunięte, literówka,
+            # inny tenant). NIE zakładamy nowego — nowe byłoby "todo", czyli
+            # WŁĄCZONY, i cicho uruchomiłoby bota. Zwracamy None: nadzorca zostawia
+            # wszystko jak jest i widać to w logu.
+            print(f"[remote_control] Przypięte zadanie sterujące '{task_id}' ({role}) nie istnieje w Projectly — "
+                  "popraw config/projectly.yaml → control_task_by_role. Nie zmieniam stanu bota.")
+        elif status is None and state.get("task_id") == task_id:
             # Żywy bug znaleziony 29.08.2026: zadanie kontrolne zniknęło (usunięte
             # ręcznie/gdzie indziej) — _find_or_create_control_task ufał cache'owi
             # BEZ WERYFIKACJI, więc mechanizm milczał na zawsze zamiast odtworzyć
@@ -234,6 +267,18 @@ def set_enabled(role, enabled, client=None):
         task_id = _find_or_create_control_task(client, role, state, admin_project_id)
         client.update_status(task_id, status)
         _save_state(state, state_path)
+        # WERYFIKACJA ODCZYTEM (01.09.2026). update_task w Projectly zwraca sukces
+        # także dla ID, którego nie ma — więc bez tego set_enabled meldował
+        # "bot wyłączony", a w Projectly nie zmieniało się nic. Realnie zmyliło to
+        # i mnie, i właściciela: cztery przełączniki "wyłączone", z czego dwa
+        # nieistniejące, a dwa dalej na "todo".
+        po_zapisie = _task_status(client, task_id, admin_project_id)
+        if po_zapisie != status:
+            return {"ok": False, "status": po_zapisie, "message": (
+                f"Zapis statusu dla '{role}' NIE zadziałał: po zapisie zadanie '{task_id}' "
+                f"ma status {po_zapisie or 'BRAK (zadanie nie istnieje)'}, a miało mieć '{status}'. "
+                "Sprawdź config/projectly.yaml → control_task_by_role. Stanu bota nie zmieniam."
+            )}
     except Exception as exc:  # noqa: BLE001 — panel operatora ma pokazać błąd, nie wywalić się
         if enabled:
             return {"ok": False, "status": None, "message": (

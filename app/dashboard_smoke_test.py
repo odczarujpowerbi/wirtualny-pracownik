@@ -315,6 +315,7 @@ def run():
             original_runs_dir = control.RUNS_DIR
             original_client_for_role = projectly_client.client_for_role
             original_state_path = remote_control._state_path_for_role
+            original_control_id = projectly_client.control_task_id_for_role
             control.RUNS_DIR = tmp4
             klienci = {}
 
@@ -323,6 +324,7 @@ def run():
 
             projectly_client.client_for_role = _atrapa_klienta
             remote_control._state_path_for_role = lambda role: tmp4 / f"rc_state_{role}.json"
+            projectly_client.control_task_id_for_role = lambda role: None
             try:
                 wynik_pauza = dashboard.pause_or_resume_agent("checker", "pause")
                 checks.append(("pause_or_resume_agent: pause -> ok=True", wynik_pauza["ok"] is True))
@@ -346,6 +348,7 @@ def run():
             finally:
                 projectly_client.client_for_role = original_client_for_role
                 remote_control._state_path_for_role = original_state_path
+                projectly_client.control_task_id_for_role = original_control_id
                 control.RUNS_DIR = original_runs_dir
         finally:
             scheduler_lock.is_running = original_is_running

@@ -106,6 +106,26 @@ default_admin_project: "Administracyjne"
 default_admin_project_by_role:
   checker: "Usprawnienia"
 
+# --- Zadania STERUJĄCE botem (remote_control.py) ---
+# ID przypięte na stałe (decyzja właściciela 01.09.2026) zamiast szukania po
+# tytule i tworzenia brakującego zadania. Powód jest konkretny: zadanie tworzone
+# od zera dostaje w Projectly status "todo", a "todo" znaczy WŁĄCZONY — więc
+# każde zgubienie/odtworzenie przełącznika cicho WŁĄCZAŁO bota. Realnie zdarzyło
+# się 01.09.2026: trzy z czterech botów wróciły na "włączony" po tym, jak
+# zostały wyłączone, bo mechanizm założył nowe zadania obok istniejących.
+#
+# Przypięte ID = zero tworzenia, zero zgadywania po tytule, zero duplikatów.
+# Zmiana nazwy zadania w Projectly niczego nie psuje. Gdy ID nie istnieje,
+# mechanizm mówi to wprost w logu i NIE startuje bota (fail-closed), zamiast
+# zakładać nowe zadanie z domyślnie włączonym statusem.
+#
+# Klucz = rola (BOT_ROLE), komentarz = konto AI w Projectly (role_to_account).
+control_task_by_role:
+  dev: "cmtghfuun000gh1592g7qrxo2"        # AI - Dev
+  checker: "cmtepuld6000eb0yz0bv2dysq"    # AI-Checker
+  marketing: "cmtilfwa40002vr0l92onxb18"  # AI - Marketing
+  zarzad: "cmti83mbi002lh159n66tnt3j"     # AI - Zarząd
+
 # --- Mapowanie schematu Projectly -> kontrakt wewnętrzny (get_new_tasks) ---
 # risk_level_hint NIE istnieje w Projectly; brak -> runner klasyfikuje jako
 # żółte (fail-closed). goal -> expected_result, effect -> acceptance_criteria.

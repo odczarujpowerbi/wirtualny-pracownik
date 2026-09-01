@@ -13,6 +13,7 @@ import tempfile
 from pathlib import Path
 
 import control
+import projectly_client
 import remote_control as rc
 
 
@@ -51,6 +52,10 @@ class _FakeClient:
 def _isolate(tmp):
     control.RUNS_DIR = tmp
     rc._last_checked_at = {}
+    # Bez tego testy czytalyby PRZYPIETE ID z prawdziwego config/projectly.yaml
+    # (control_task_by_role) i szukaly ich w atrapie klienta, ktora ich nie ma.
+    # Tu testujemy sciezke BEZ przypiecia; przypiecie ma wlasny test nizej.
+    projectly_client.control_task_id_for_role = lambda role: None
 
 
 def _temp_state_path_factory(tmp):
@@ -68,16 +73,18 @@ def run():
     original_runs_dir = control.RUNS_DIR
 
     try:
-        # --- 1. Zadanie kontrolne NIE istnieje -> tworzy je RAZ, status
-        # domyślny "todo" -> bot NIE jest wstrzymywany (todo != "done"). ---
+        # --- 1. Zadanie kontrolne NIE istnieje -> tworzy je RAZ i od razu jako
+        # WYŁĄCZONE. Do 01.09.2026 powstawało ze statusem "todo", czyli WŁĄCZONY,
+        # więc samo odtworzenie przełącznika cicho uruchamiało bota (realnie: trzy
+        # z czterech botów wróciły na "włączony" po tym, jak je wyłączono). ---
         tmp1 = Path(tempfile.mkdtemp())
         _isolate(tmp1)
         rc._state_path_for_role = _temp_state_path_factory(tmp1)
         client1 = _FakeClient()
         status1 = rc.sync(client=client1, role="dev", force=True)
         checks.append(("sync: brak zadania kontrolnego -> tworzy RAZ", len(client1.utworzone) == 1))
-        checks.append(("sync: nowo utworzone zadanie ma status 'todo' -> bot NIE wstrzymany",
-                       status1 == "todo" and control.is_paused() is False))
+        checks.append(("sync: nowo utworzone zadanie jest WYŁĄCZONE (fail-closed, 01.09.2026)",
+                       status1 == "done" and control.is_paused(role="dev") is True))
         checks.append(("sync: tytuł zadania kontrolnego zawiera nazwę roli",
                        "dev" in client1.utworzone[0]["title"]))
 
@@ -177,8 +184,34 @@ def run():
         checks.append(("sync: zadanie zniknęło -> status None (nie zgadujemy), BRAK nowego zadania w TYM przebiegu",
                        wynik_po_zniknieciu is None and len(client7.utworzone) == 1))
         wynik_odtworzone = rc.sync(client=client7, role="dev", force=True)
-        checks.append(("sync: NASTĘPNY przebieg odtwarza zadanie kontrolne (samo-naprawa)",
-                       len(client7.utworzone) == 2 and wynik_odtworzone == "todo"))
+        checks.append(("sync: NASTĘPNY przebieg odtwarza zadanie kontrolne (samo-naprawa), też WYŁĄCZONE",
+                       len(client7.utworzone) == 2 and wynik_odtworzone == "done"))
+
+        # --- 9a-9c. PRZYPIĘTE ID (config/projectly.yaml -> control_task_by_role).
+        # Ma wygrywać ze wszystkim: zero szukania po tytule, zero tworzenia. ---
+        tmp7b = Path(tempfile.mkdtemp())
+        _isolate(tmp7b)
+        rc._state_path_for_role = _temp_state_path_factory(tmp7b)
+        client7b = _FakeClient(existing_tasks=[
+            {"task_id": "PINNED-1", "title": "🎛️ Kontrola bota: dev", "status": "done"},
+            {"task_id": "DUPLIKAT-1", "title": "🎛️ Kontrola bota: dev", "status": "todo"},
+        ])
+        projectly_client.control_task_id_for_role = lambda role: "PINNED-1"
+        status_przypiete = rc.sync(client=client7b, role="dev", force=True)
+        checks.append(("sync: przypięte ID wygrywa nad duplikatem o tym samym tytule",
+                       status_przypiete == "done" and len(client7b.utworzone) == 0))
+
+        tmp7c = Path(tempfile.mkdtemp())
+        _isolate(tmp7c)
+        rc._state_path_for_role = _temp_state_path_factory(tmp7c)
+        projectly_client.control_task_id_for_role = lambda role: "NIE-MA-TAKIEGO"
+        client7c = _FakeClient()
+        status_brak = rc.sync(client=client7c, role="dev", force=True)
+        checks.append(("sync: przypięte ID nie istnieje -> None i ZERO utworzonych zadań (fail-closed)",
+                       status_brak is None and len(client7c.utworzone) == 0))
+        checks.append(("sync: przypięte ID nie istnieje -> stan pauzy NIETKNIĘTY",
+                       control.is_paused(role="dev") is False))
+        projectly_client.control_task_id_for_role = lambda role: None
 
         # --- 10-13. set_enabled: DRUGI kierunek (zapis do Projectly). Panel
         # operatora wyłącza bota tą drogą, żeby lokalna pauza i zadanie sterujące
@@ -238,6 +271,24 @@ def run():
         checks.append(("set_enabled(True) + błąd zapisu -> ok=False i stan pauzy NIETKNIĘTY (fail-closed)",
                        wynik_on_blad["ok"] is False and control.is_paused(role="zarzad") is True
                        and control.pause_reason(role="zarzad") == "stan sprzed próby włączenia"))
+
+        # --- 15a. Zapis "przeszedl", ale status sie NIE zmienil (Projectly zwraca
+        # sukces takze dla nieistniejacego ID). set_enabled musi to wykryc
+        # odczytem, a nie meldowac sukcesu. ---
+        tmp10b = Path(tempfile.mkdtemp())
+        _isolate(tmp10b)
+        rc._state_path_for_role = _temp_state_path_factory(tmp10b)
+
+        class _KlientUdajacyZapis(_FakeClient):
+            """update_status zwraca True, ale niczego nie zmienia - dokladnie tak
+            zachowuje sie Projectly dla ID, ktorego nie ma."""
+
+            def update_status(self, task_id, status):
+                return True
+
+        wynik_klamstwo = rc.set_enabled("dev", enabled=False, client=_KlientUdajacyZapis())
+        checks.append(("set_enabled: zapis bez efektu -> ok=False (weryfikacja odczytem, nie wiara w API)",
+                       wynik_klamstwo["ok"] is False and "NIE zadziałał" in wynik_klamstwo["message"]))
 
         # --- 16. Brak projektu administracyjnego -> czytelny błąd, zero zmian. ---
         tmp11 = Path(tempfile.mkdtemp())

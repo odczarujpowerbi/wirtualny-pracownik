@@ -47,6 +47,28 @@ import scheduler_lock
 
 POLL_SECONDS = 30
 
+# Po próbie odpalenia bota nie próbujemy ponownie przez ten czas (01.09.2026,
+# obawa właściciela o "trzy okienka jednego bota"). Dwa realne problemy, które
+# to zamyka:
+#   1. Wyścig startu — proces potrzebuje kilkudziesięciu sekund na import
+#      wszystkich modułów, zanim zajmie blokadę (scheduler_lock). Bez odczekania
+#      nadzorca widziałby "nie działa" i odpalał drugi proces; jeden z nich i tak
+#      by padł na blokadzie, ale po co go wołać.
+#   2. Pętla odpalania — bot, który wywala się na starcie (zła konfiguracja, brak
+#      biblioteki), byłby odpalany co POLL_SECONDS bez końca. To właśnie tak
+#      zjada maszynę.
+LAUNCH_COOLDOWN_SECONDS = 180
+
+# Po tylu nieudanych próbach z rzędu nadzorca PRZESTAJE próbować dla tej roli i
+# mówi to w logu. Fail-closed: lepiej niech bot nie wstanie i będzie o tym
+# wiadomo, niż niech maszyna orze w kółko. Licznik zeruje się, gdy bot wstanie.
+MAX_LAUNCH_ATTEMPTS = 3
+
+# Rola -> {"ostatnia_proba": monotonic, "proby": int}. W pamięci procesu, nie w
+# pliku — nadzorca jest jednym, długo żyjącym procesem, a po jego restarcie
+# ponowna próba jest wręcz pożądana.
+_proby_startu = {}
+
 
 def _decide(role, status, is_running, is_paused, stop_active):
     """Czysta decyzja (bez efektów ubocznych, dlatego testowalna wprost):
@@ -99,26 +121,76 @@ def check_once(roles=None, client_factory=None, launcher=None, start_enabled=Tru
     for role in roles:
         status = _status_for_role(role, client_factory)
         is_running = scheduler_lock.is_running(role)
+        if is_running:
+            _proby_startu.pop(role, None)  # wstał — licznik nieudanych prób do zera
         action, detail = _decide(role, status, is_running, control.is_paused(role=role), stop_active)
         if action == "start" and not start_enabled:
             action, detail = "do-startu", "włączony w Projectly — wystartuje przy najbliższym przebiegu nadzorcy"
         elif action == "start":
-            wynik = launcher(role)
-            detail = wynik["message"]
-            if not wynik["started"]:
-                action = "start-nieudany"
-        wpisy.append({"role": role, "status": status, "running": is_running,
+            action, detail = _sprobuj_start(role, launcher)
+        wpisy.append({"role": role, "status": status, "running": is_running, "pid": scheduler_lock.running_pid(role),
                       "action": action, "detail": detail})
     return wpisy
 
 
+def _sprobuj_start(role, launcher, teraz=None):
+    """Odpala bota, ale z odczekaniem i limitem prób — patrz
+    LAUNCH_COOLDOWN_SECONDS i MAX_LAUNCH_ATTEMPTS. Zwraca (akcja, opis).
+
+    Sam launcher (agent_launcher.start_agent) i tak pyta scheduler_lock, czy bot
+    nie działa, a job_scheduler.py zajmuje blokadę na starcie i wychodzi, gdy
+    zastanie żywą instancję — to są dwa zabezpieczenia przed DWOMA procesami tej
+    samej roli. To tutaj jest trzecie i pilnuje czegoś innego: żeby nadzorca nie
+    WOŁAŁ startu w kółko, kiedy bot nie wstaje."""
+    teraz = teraz if teraz is not None else time.monotonic()
+    wpis = _proby_startu.setdefault(role, {"ostatnia_proba": None, "proby": 0})
+
+    if wpis["proby"] >= MAX_LAUNCH_ATTEMPTS:
+        return "start-poddaje-sie", (
+            f"bot '{role}' nie wstał po {MAX_LAUNCH_ATTEMPTS} próbach — przestaję próbować. "
+            "Odpal ręcznie (start-agent-<rola>.bat) i zobacz, na czym się wywala."
+        )
+    if wpis["ostatnia_proba"] is not None and teraz - wpis["ostatnia_proba"] < LAUNCH_COOLDOWN_SECONDS:
+        czekam = int(LAUNCH_COOLDOWN_SECONDS - (teraz - wpis["ostatnia_proba"]))
+        return "start-czekam", f"start '{role}' już zlecony, daję mu jeszcze {czekam}s na podniesienie się"
+
+    wpis["ostatnia_proba"] = teraz
+    wpis["proby"] += 1
+    wynik = launcher(role)
+    if not wynik["started"]:
+        return "start-nieudany", wynik["message"]
+    return "start", f"{wynik['message']} (próba {wpis['proby']}/{MAX_LAUNCH_ATTEMPTS})"
+
+
 def print_status(wpisy):
-    print(f"{'Rola':<12}{'Zadanie sterujące':<24}{'Proces':<12}{'Akcja':<18}Szczegóły")
+    print(f"{'Rola':<12}{'Zadanie sterujące':<24}{'Proces':<20}{'Akcja':<18}Szczegóły")
     for w in wpisy:
         status = w["status"] or "—"
         wlaczony = "wyłączony" if status == "done" else ("—" if status == "—" else "włączony")
+        proces = f"działa (PID {w['pid']})" if w["running"] else "nie działa"
         print(f"{w['role']:<12}{wlaczony + ' (' + status + ')':<24}"
-              f"{('działa' if w['running'] else 'nie działa'):<12}{w['action']:<18}{w['detail']}")
+              f"{proces:<20}{w['action']:<18}{w['detail']}")
+    print()
+    print(f"Procesów job_scheduler.py na maszynie: {_ile_procesow_schedulera()} "
+          f"(powinno być tyle, ile ról z 'działa' wyżej — inaczej ktoś odpalił bota ręcznie obok nadzorcy)")
+
+
+def _ile_procesow_schedulera():
+    """Liczba żywych procesów job_scheduler.py, LICZONA NIEZALEŻNIE od plików
+    blokady — właśnie po to, żeby wykryć proces, który blokady nie trzyma.
+    Bez psutil zwraca None (nie zgadujemy)."""
+    try:
+        import psutil
+    except ImportError:
+        return None
+    ile = 0
+    for proc in psutil.process_iter(["cmdline"]):
+        try:
+            if "job_scheduler" in " ".join(proc.info["cmdline"] or []).lower():
+                ile += 1
+        except psutil.Error:
+            continue
+    return ile
 
 
 def run(poll_seconds=POLL_SECONDS):

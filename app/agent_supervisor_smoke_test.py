@@ -16,6 +16,7 @@ from pathlib import Path
 import agent_supervisor as sup
 import control
 import kill_switch
+import projectly_client
 import remote_control as rc
 import scheduler_lock
 
@@ -39,6 +40,13 @@ class _FakeClient:
         task_id = f"CTRL-{len(self._tasks) + 1:03d}"
         self._tasks.append({"task_id": task_id, "title": title, "status": self._status})
         return task_id
+
+    def update_status(self, task_id, status):
+        """remote_control zaklada nowe zadanie sterujace jako WYLACZONE, wiec po
+        create_task wola te metode. Atrapa celowo NIE nadpisuje tu statusu
+        zadanego w konstruktorze - test steruje wlaczeniem/wylaczeniem przez
+        _FakeClient(status=...), a nie przez sciezke tworzenia."""
+        return True
 
 
 class _BrokenClient(_FakeClient):
@@ -137,6 +145,40 @@ def _run_checks(tmp, uruchomione):
     checks.append(("brak projektu administracyjnego -> status None, bez startu",
                    wpisy[0]["status"] is None and uruchomione == []))
 
+    # 9a-9d. Odczekanie i limit prob startu (obawa wlasciciela 01.09.2026 o
+    #        "trzy okienka jednego bota" i o petle odpalania, ktora zjada maszyne).
+    swiezy_start()
+    sup._proby_startu.clear()
+    scheduler_lock.is_running = lambda role: False
+    # JEDNA instancja atrapy na cale te blok - kolejne przebiegi musza widziec
+    # to samo zadanie sterujace, ktore utworzyl przebieg pierwszy (swieza atrapa
+    # per wywolanie dawalaby status None i badalibysmy nie to, co chcemy).
+    klient_trwaly = _FakeClient(status="todo")
+    klient_wlaczony = lambda r: klient_trwaly
+
+    sup.check_once(roles=["dev"], client_factory=klient_wlaczony, launcher=launcher)
+    checks.append(("start: pierwsza proba odpala bota", uruchomione == ["dev"]))
+
+    # Drugi przebieg OD RAZU po pierwszym: bot jeszcze nie wstal, ale nadzorca
+    # NIE wola startu ponownie - czeka LAUNCH_COOLDOWN_SECONDS.
+    wpisy = sup.check_once(roles=["dev"], client_factory=klient_wlaczony, launcher=launcher)
+    checks.append(("start: drugi przebieg w oknie odczekania NIE odpala drugiego procesu",
+                   wpisy[0]["action"] == "start-czekam" and uruchomione == ["dev"]))
+
+    # Po uplywie odczekania probuje znowu, ale najwyzej MAX_LAUNCH_ATTEMPTS razy.
+    for _ in range(sup.MAX_LAUNCH_ATTEMPTS + 2):
+        sup._proby_startu["dev"]["ostatnia_proba"] = None  # symuluje uplyw odczekania
+        wpisy = sup.check_once(roles=["dev"], client_factory=klient_wlaczony, launcher=launcher)
+    checks.append((f"start: po {sup.MAX_LAUNCH_ATTEMPTS} nieudanych probach nadzorca sie poddaje (bez petli)",
+                   wpisy[0]["action"] == "start-poddaje-sie"
+                   and len(uruchomione) == sup.MAX_LAUNCH_ATTEMPTS))
+
+    # Bot w koncu wstal -> licznik prob zerowany, nadzorca znow gotowy dzialac.
+    scheduler_lock.is_running = lambda role: True
+    sup.check_once(roles=["dev"], client_factory=klient_wlaczony, launcher=launcher)
+    checks.append(("start: gdy bot wstanie, licznik nieudanych prob jest zerowany",
+                   "dev" not in sup._proby_startu))
+
     # 10. Przelacznik z terminala (--wlacz/--wylacz) idzie ta sama droga co
     #     panel operatora: nieznana rola -> czytelny blad, bez wyjatku.
     swiezy_start()
@@ -165,12 +207,17 @@ def run():
         kill_switch.STOP_FLAG_PATH = tmp / "STOP.flag"
         rc._state_path_for_role = lambda role: tmp / f"remote_control_state_{role}.json"
         rc._last_checked_at = {}
+        # Przypiete ID z prawdziwego configu nie moga wyciekac do testu (atrapa
+        # klienta ich nie zna) — testujemy sciezke bez przypiecia.
+        original_control_id = projectly_client.control_task_id_for_role
+        projectly_client.control_task_id_for_role = lambda role: None
         try:
             checks = _run_checks(tmp, [])
         finally:
             control.RUNS_DIR = original_runs_dir
             kill_switch.STOP_FLAG_PATH = original_stop_flag
             rc._state_path_for_role = original_state_path
+            projectly_client.control_task_id_for_role = original_control_id
             scheduler_lock.is_running = original_is_running
             rc._last_checked_at = {}
 

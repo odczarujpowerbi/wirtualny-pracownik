@@ -90,6 +90,16 @@ def is_running(role):
     return record is not None and _is_alive(record)
 
 
+def running_pid(role):
+    """PID żywego procesu job_scheduler.py TEJ roli albo None. Do pokazania w
+    `agent_supervisor.py --status` — właściciel ma móc zobaczyć na oczy, że
+    danego bota jest DOKŁADNIE jeden, a nie trzy okna (pytanie 01.09.2026)."""
+    record = _read_path(_lock_path_for_role(role))
+    if record is None or not _is_alive(record):
+        return None
+    return record.get("pid")
+
+
 def acquire(pid=None):
     """Próbuje zająć blokadę jedynej żywej instancji. Zwraca {ok, detail}.
     Blokadę martwego procesu (crash bez czyszczenia) przejmuje automatycznie."""
