@@ -134,7 +134,8 @@ Tak sprawdziłem 24.08.2026, że produkcja dodała rodzinę `zbot_*` (patrz comm
 | `job_scheduler.py` | Centralny scheduler WSZYSTKICH cyklicznych skryptów — `config/schedule.yaml`. `--status`, `run_job_by_name()`, historia w `runs/run_history.jsonl` (pełne stdout+stderr+return). |
 | `agent_supervisor.py` | **Nadzorca — jedyny proces startowany automatycznie przy zalogowaniu** (`start-nadzorca.bat`). Co 30s czyta status zadania sterującego każdej roli i odpala TYLKO te boty, które mają być włączone. Sam nie wykonuje zadań i nie woła modelu. `--status` = jednorazowy podgląd. |
 | `agent_launcher.py` | Mapa rola → `start-agent-*.bat` + samo odpalenie procesu. Jedno miejsce dla `agent_supervisor.py` i `dashboard.py`. |
-| `scheduler_lock.py` | Blokada: tylko jedna żywa instancja `job_scheduler.py` naraz. |
+| `scheduler_lock.py` | Blokada: tylko jedna żywa instancja `job_scheduler.py` naraz. `running_pid(rola)` = PID żywego procesu (widoczny w `agent_supervisor.py --status`). |
+| samo-zamykanie bota | Bot wyłączony w Projectly dokańcza bieżące zadanie i SAM zamyka proces (`job_scheduler.run_scheduler` + `prace_w_toku`). Bez limitu czasowego — kryterium to "czy jakiś job jeszcze pracuje". Dlatego nie zostają wiszące procesy, a `--wlacz` odpala świeży proces przez nadzorcę. |
 | `dashboard.py` (+ `dashboard.html`) | Panel w przeglądarce `http://127.0.0.1:8787/` — historia przebiegów, edycja harmonogramu na żywo, "uruchom teraz", szczegół przebiegu. Tylko localhost. |
 | `usage_monitor.py` | Zużycie Claude + "ile zadań jeszcze" — widoczne w statuslinii terminala. |
 

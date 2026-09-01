@@ -11,6 +11,11 @@ deterministycznie "wyjść" z `while True` bez modyfikowania run_scheduler()).
 scheduler_lock.acquire/release podmienione, żeby test nie dotykał
 prawdziwego pliku blokady tej maszyny.
 
+prace_w_toku() podmienione tak, żeby udawać ZADANIE W TOKU (01.09.2026): od tej
+daty bot wyłączony i z pustym biurkiem SAM ZAMYKA proces, więc bez tego pętla
+kończyłaby się po pierwszym ticku i nie dałoby się sprawdzić kolejności wywołań
+na kolejnych. Samo zamykanie ma własny test: job_scheduler_self_exit_smoke_test.py.
+
 Użycie:
     python job_scheduler_remote_control_priority_smoke_test.py
 """
@@ -36,12 +41,15 @@ def run():
     original_is_paused = job_scheduler.control.is_paused
     original_kill_active = job_scheduler.kill_switch.is_active
     original_sleep = job_scheduler.time.sleep
+    original_prace_w_toku = job_scheduler.prace_w_toku
 
     kolejnosc = []
 
     job_scheduler.scheduler_lock.acquire = lambda: {"ok": True, "detail": "test"}
     job_scheduler.scheduler_lock.release = lambda: None
     job_scheduler.kill_switch.is_active = lambda: False
+    # "Coś jest w toku" -> wstrzymany bot NIE zamyka jeszcze procesu, pętla tyka dalej.
+    job_scheduler.prace_w_toku = lambda *args, **kwargs: ["runner_loop"]
 
     def _fake_sync(role=None, **kwargs):
         kolejnosc.append("sync")
@@ -80,6 +88,7 @@ def run():
         job_scheduler.control.is_paused = original_is_paused
         job_scheduler.kill_switch.is_active = original_kill_active
         job_scheduler.time.sleep = original_sleep
+        job_scheduler.prace_w_toku = original_prace_w_toku
 
     print("\n--- Wynik testu dymnego: priorytet remote_control.sync() w job_scheduler ---")
     all_passed = True

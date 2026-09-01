@@ -5,6 +5,13 @@ kosztuje: co POLL_SECONDS czyta status zadania sterującego każdej roli w
 Projectly ("🎛️ Kontrola bota: <rola>") i na tej podstawie ODPALA proces bota,
 który ma być włączony. Boty wyłączone po prostu nie istnieją jako procesy.
 
+Wyłączenie jest pełne, nie połowiczne: bot wyłączony w Projectly dokańcza to, co
+ma w toku, i SAM ZAMYKA PROCES (job_scheduler.run_scheduler, patrz prace_w_toku).
+Świadomie bez limitu czasowego — zadanie może trwać godzinami, więc kryterium
+jest sprawdzalne ("czy jakiś job jeszcze pracuje"), a nie odliczane. Dlatego
+"wyłączony" znaczy tu "nie ma go w pamięci", a nadzorca odpala go z powrotem
+dopiero, gdy przełącznik wróci na włączony.
+
 Odwrócenie dotychczasowego układu. Wcześniej cała czwórka (dev/checker/
 marketing/zarzad) startowała z Harmonogramu zadań Windows przy logowaniu, a
 zadanie sterujące potrafiło je tylko WSTRZYMAĆ — bo remote_control.sync()
@@ -79,7 +86,7 @@ def _decide(role, status, is_running, is_paused, stop_active):
     if status is None:
         return "nieznany", "brak statusu z Projectly — zostawiam jak jest"
     if status == "done":
-        return ("wylaczony-dziala", "wyłączony w Projectly — działający proces wstrzyma się sam") \
+        return ("wylaczony-dziala", "wyłączony w Projectly — dokończy bieżące zadanie i sam zamknie proces") \
             if is_running else ("wylaczony", "wyłączony w Projectly")
     if is_running:
         return "dziala", "włączony i działa"

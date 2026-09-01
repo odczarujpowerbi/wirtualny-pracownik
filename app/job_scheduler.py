@@ -71,6 +71,24 @@ def _watchdog_timeout_exceeded(started_at, now, limit_seconds):
     return started_at is not None and (now - started_at).total_seconds() > limit_seconds
 
 
+def prace_w_toku(threads, thread_started_at, thread_limits, now):
+    """Nazwy jobów, które REALNIE jeszcze pracują. Wątek uznany przez watchdoga
+    za zawieszony NIE liczy się jako praca w toku — scheduler już go osierocił i
+    odpalił przebieg obok, więc czekanie na niego nie skończyłoby się nigdy.
+
+    Wyodrębnione (01.09.2026) dla `wylaczony_i_bez_pracy()`: bot wyłączony ma się
+    sam zamknąć, ale dopiero gdy dokończy to, co ma na biurku."""
+    aktywne = []
+    for name, watek in threads.items():
+        if not watek.is_alive():
+            continue
+        limit = thread_limits.get(name, DEFAULT_MAX_DURATION_SECONDS)
+        if _watchdog_timeout_exceeded(thread_started_at.get(name), now, limit):
+            continue  # zawieszony/osierocony — nie blokuje zamknięcia
+        aktywne.append(name)
+    return aktywne
+
+
 def _job_runs_under_role(job, role):
     """Wyodrębnione z run_scheduler() dla testowalności. Job bez pola "role"
     jest "dev" domyślnie (wsteczna zgodność, stan sprzed 29.08.2026) — patrz
@@ -394,6 +412,7 @@ def run_scheduler(tick_seconds=5, schedule_path=SCHEDULE_PATH):
     state = _load_state()
     threads = {}
     thread_started_at = {}
+    thread_limits = {}  # nazwa joba -> jego max_duration_seconds (dla prace_w_toku)
 
     print(f"job_scheduler.py wystartował jako rola '{CURRENT_ROLE}' — sprawdzanie harmonogramu "
           f"co {tick_seconds}s (config: {schedule_path})")
@@ -411,7 +430,23 @@ def run_scheduler(tick_seconds=5, schedule_path=SCHEDULE_PATH):
             # samo w sobie chroni Projectly przed zapytaniem co tick).
             remote_control.sync(role=CURRENT_ROLE)
             if control.is_paused():
-                print(f"PAUSE ({control.pause_reason()}) — nie odpalam nowych zadań.")
+                # WYŁĄCZONY + PUSTE BIURKO = KONIEC PROCESU (decyzja właściciela
+                # 01.09.2026). Świadomie BEZ limitu czasowego: zadanie może trwać
+                # godziny i ubijanie po sztywnym odliczaniu byłoby zgadywaniem.
+                # Kryterium jest sprawdzalne — czy jakiś job jeszcze pracuje.
+                # Dzięki temu "wyłączony" znaczy "nie ma go w pamięci", a nie
+                # "stoi i nic nie robi", i nie zostają wiszące procesy botów.
+                # Nadzorca (agent_supervisor.py) nie podniesie go z powrotem,
+                # dopóki zadanie sterujące jest na "done".
+                aktywne = prace_w_toku(threads, thread_started_at, thread_limits,
+                                       datetime.now(timezone.utc))
+                if not aktywne:
+                    print(f"WYŁĄCZONY ({control.pause_reason()}) i nic nie jest w toku — "
+                          f"zamykam proces bota '{CURRENT_ROLE}'. Włącz go zadaniem sterującym "
+                          "w Projectly (albo w panelu operatora), nadzorca odpali go z powrotem.")
+                    return
+                print(f"WYŁĄCZONY ({control.pause_reason()}) — nowych zadań nie biorę, "
+                      f"czekam na dokończenie: {', '.join(aktywne)}. Potem zamykam proces.")
                 time.sleep(tick_seconds)
                 continue
 
@@ -448,6 +483,7 @@ def run_scheduler(tick_seconds=5, schedule_path=SCHEDULE_PATH):
                     t = threading.Thread(target=_run_job, args=(job, state), daemon=True)
                     threads[name] = t
                     thread_started_at[name] = now
+                    thread_limits[name] = job.get("max_duration_seconds", DEFAULT_MAX_DURATION_SECONDS)
                     t.start()
 
             time.sleep(tick_seconds)
