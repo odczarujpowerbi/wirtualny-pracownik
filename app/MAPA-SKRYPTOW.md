@@ -30,6 +30,9 @@ niżej, potem sekcję kategorii. Jeśli i tam nie ma odpowiedzi, dopiero wtedy p
 | Zarejestrować rolę maszyny (dev/marketing/...) | `python bootstrap_register.py <rola>` |
 | Uruchomić PEŁNY test dymny repo (bramka jakości commitu) | `python self_check.py` |
 | Zaktualizować kod na maszynie z GitHub (git pull) | `repo_updater.py` (job w schedulerze: `repo_update`) |
+| Kazać agentowi pracować w repozytorium (poprawić kod, zbudować projekt) | nic ręcznie: wystarczy, że zadanie w Projectly niesie URL repo / ścieżkę z `.git` / prośbę o nowy projekt. `agentic_worker.py` sam zrobi klon przez `repo_workspace.py`, a `repo_publish.py` zacommituje wg konwencji i otworzy PR |
+| Sprawdzić, co agent zrobił w repozytorium zadania | `app/runs/repos/<task_id>_<tytuł>/` (klon per zadanie, poza gitem) plus branch `agent/<task_id>-<slug>` na origin |
+| Zmienić zakres pracy agenta z repo (push/PR, gdzie nowe projekty, tożsamość commitów) | `config/repos.yaml` |
 | Sprawdzić czy sekrety Microsoft Graph (mail) w ogóle łapią token | `python graph_verify.py` (NIE wysyła maila) |
 | Sprawdzić czy dostęp do SharePoint działa | `python sharepoint_verify.py` |
 | Sprawdzić, dlaczego bot NIE WIDZI dodanego zadania | `python queue_verify.py` — kolejka każdej roli + po jakich projektach szuka + LUKI UPRAWNIEŃ kont AI do projektów |
@@ -78,6 +81,11 @@ niżej, potem sekcję kategorii. Jeśli i tam nie ma odpowiedzi, dopiero wtedy p
 | `remote_control.py` | Tłumaczy status zadania `🎛️ Kontrola bota: <rola>` w Projectly na lokalną pauzę tej roli. Te zadania są ODSIANE z kolejki pracy (`projectly_client.is_control_task`) — ten moduł jest jedynym, który prosi o nie jawnie (`list_tasks(include_control=True)`). Jedyne źródło prawdy o pauzie zdalnej — `job_scheduler.py` woła to priorytetowo co tick, `agent_supervisor.py` przy każdym przebiegu nadzoru. |
 | `heartbeat.py` / `watchdog.py` | `heartbeat.py` zapisuje `runs/heartbeat.json` co cykl; `watchdog.py` wykrywa jego nieaktualność → `ALERT.flag`. |
 | `poprawka_materialu.py` | Pętla poprawek wg zastrzeżeń bramki jakości — bez tego każda drobna wada kończyła zadanie eskalacją. |
+| `agentic_worker.py` | Prawdziwy subagent Claude Code (Read/Write/Edit/**Bash**/Skill/WebFetch/WebSearch) dla zadań bez wąskiego workera. Pracuje w folderze zadania, a dla zadań o repozytorium w piaskownicy z `repo_workspace.py`. |
+| `agentic_prompt.py` | Co subagent WIE: kontekst firmy, projekt/etap, rodzeństwo podzadań, STANDARDY z `.claude/rules` (przez `zasady_pracy.py`) i instrukcja wykonania (repo albo folder zadania). |
+| `zasady_pracy.py` | Wstrzykuje standardy organizacyjne z `.claude/rules/*.md` do promptu: konwencja commitów, standardy kodu, standard Power BI. Dobór po treści zadania, pliki regul są jedynym źródłem prawdy (zero parafrazy). |
+| `repo_workspace.py` | Piaskownica repo dla zadania: wykrywa repozytorium w treści zadania, robi KLON PER ZADANIE do `runs/repos/`, zakłada branch `agent/<task_id>-<slug>`, ustawia tożsamość commitów. Nowy projekt = `git init` + commit `00 - pusty`. |
+| `repo_publish.py` | Publikacja pracy: commit wg konwencji `NN - opis po polsku` (numer liczony z `git log`, nie zgadywany przez model), push brancha, PR przez `gh`. Commit z plikiem wyglądającym na sekret jest ODRZUCANY. |
 | `tool_registry.py` | "Czy TO narzędzie z TYMI parametrami wolno uruchomić" — kontrakty z `config/tool_contracts.yaml`. Model nie dostaje dowolnego shella. |
 | `skill_registry.py` / `skill_usage_logger.py` | Rejestr skilli z wersją/ryzykiem (`config/skills_manifest.yaml`) + log użycia (sukces/porażka/koszt/czas). |
 | `model_registry.py` | Jedno miejsce: jakiego modelu użyć i ile kosztuje (`config/models.yaml` czy podobne — wzorzec jak `tool_registry`). |
@@ -239,6 +247,7 @@ Tak sprawdziłem 24.08.2026, że produkcja dodała rodzinę `zbot_*` (patrz comm
 | `config/email_safety.yaml` | Kto realnie dostaje maile (przekierowanie bezpieczeństwa) |
 | `config/sharepoint.yaml` / `sharepoint_sites.yaml` | Docelowa witryna/biblioteka SharePoint |
 | `config/data_contracts/*.yaml` | Oczekiwana struktura plików źródłowych per klient/proces |
+| `config/repos.yaml` | Praca agenta z repozytoriami: korzeń piaskownic, prefiks brancha, push/PR, tożsamość commitów |
 | `config/health_thresholds.yaml` | Progi `system_health_monitor.py` (RAM, oczekiwane skrypty) |
 | `config/kacper_thresholds.yaml` | Progi `kacper_monitor.py` (ile awarii = zadanie naprawcze) |
 

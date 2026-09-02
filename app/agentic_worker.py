@@ -4,10 +4,11 @@ zadania (i task_decomposer.py zdecydował NIE dzielić go dalej), tu zadanie
 faktycznie się WYKONUJE: Claude Code z realnym Read/Write/Edit + Skill.
 
 Zapis plików ZOSTAJE ograniczony do WŁASNEGO folderu zadania
-(runs/agentic_tasks/<task_id>_<tytuł>/) ORAZ (29.08.2026, decyzja właściciela)
-folderu TEGO SAMEGO zadania na SharePoint/OneDrive (Zadania-Agenta/<task_id>_...,
-gdy ONEDRIVE_TASKS_ROOT skonfigurowany — patrz _onedrive_task_folder) — nigdy
-do reszty repo/maszyny. Od
+(runs/agentic_tasks/<task_id>_<tytuł>/), folderu TEGO SAMEGO zadania na
+SharePoint/OneDrive (Zadania-Agenta/<task_id>_..., gdy ONEDRIVE_TASKS_ROOT
+skonfigurowany — patrz _onedrive_task_folder) oraz, dla zadań o repozytorium,
+WŁASNEJ piaskownicy repo (runs/repos/<task_id>_..., patrz repo_workspace.py) —
+nigdy do katalogu roboczego człowieka ani do reszty maszyny. Od
 25.08.2026 (decyzja właściciela) subagent ma NATOMIAST swobodny dostęp do
 internetu (WebFetch/WebSearch, bez allowlisty domen) — to jest INNA oś
 ograniczeń niż zapis plików (potwierdzone: tool_registry.check_call dla
@@ -23,12 +24,19 @@ wynik". Plan jest sprawdzany przez bot_content_check.judge() PRZED
 wykonaniem: subagent dostaje zielone światło tylko dla podejścia, które
 faktycznie adresuje zadanie — zero zmarnowanego czasu/kosztu na złe podejście.
 
-Kontekst promptu (od 25.08.2026): kontekst firmy (kontekst_firmy.zbuduj —
-ta sama funkcja co w task_brief_builder.py, wcześniej NIE podłączona tutaj),
-nazwa projektu (client.project_name, gdy client podany) i — dla podzadań —
-tytuły/statusy innych podzadań tego samego zadania głównego
-(task["sibling_tasks"], ustawiane przez runner_loop.py). Każdy blok jest
-fail-soft: błąd/brak danych pomija TEN blok, nie blokuje wykonania.
+Kontekst promptu buduje agentic_prompt.py (wydzielone 02.09.2026, limit 300
+linii na plik): kontekst firmy, projekt/etap, rodzeństwo podzadań i STANDARDY
+z .claude/rules. Każdy blok jest fail-soft: błąd/brak danych pomija TEN blok,
+nie blokuje wykonania.
+
+PRACA W REPOZYTORIUM (decyzja właściciela 02.09.2026). Gdy zadanie wskazuje
+repozytorium (URL/ścieżka w treści, pole repo_url/project_path) albo prosi o
+projekt od zera, repo_workspace.py daje zadaniu WŁASNY KLON w runs/repos/ i
+branch zadania, subagent dostaje `Bash` (pełny, żeby móc budować i uruchamiać
+testy), a repo_publish.py po jego pracy commituje wg konwencji firmowej
+("NN - opis po polsku"), pushuje branch i próbuje otworzyć PR. Gita nie woła
+model: numeracja commitów liczona jest z historii repo, nie zgadywana.
+Zadania bez repozytorium działają dokładnie jak dotąd, w folderze zadania.
 
 Fail-closed: brak planu / plan niedopasowany / brak Claude Code / błąd
 wykonania / brak pliku wyniku -> executed=False (albo "NIE WYKONANO"),
@@ -42,18 +50,36 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+import agentic_prompt
 import bot_content_check
-import context_cache
 import cost_estimator
-import kontekst_firmy
 import model_registry
+import repo_publish
+import repo_workspace
 import task_thinker
 import tool_registry
 
 APP_DIR = Path(__file__).parent
 WORKSPACE_DIR = APP_DIR / "runs" / "agentic_tasks"
-RESULT_FILENAME = "wynik.md"
+RESULT_FILENAME = agentic_prompt.RESULT_FILENAME
+OPIS_COMMITA_FILENAME = agentic_prompt.OPIS_COMMITA_FILENAME
 AGENTIC_TIMEOUT_SECONDS = 600  # realna praca (pliki, komendy), nie krótki prompt
+
+# "Skill" dopisane 25.08.2026 — bez niego subagent MIAŁ dostępne skille (Power
+# BI/PBIP/DAX itd., globalne u właściciela), ale nie wolno mu było ich wywołać.
+# "WebFetch WebSearch" dopisane 25.08.2026 (decyzja właściciela: swobodne
+# czytanie/szukanie w internecie, bez allowlisty domen). "Bash" dopisane
+# 02.09.2026 (decyzja właściciela): bez niego subagent nie mógł uruchomić
+# NICZEGO — ani gita, ani testów, ani budowania projektu — mimo że prompt
+# obiecywał mu "uruchamiaj co potrzebne do realizacji planu". Klikanie po UI
+# (computer use) zostaje wyłącznie dla browser_worker.py, z jego własną
+# allowlistą.
+NARZEDZIA_SUBAGENTA = "Read Write Edit Bash Skill WebFetch WebSearch"
+
+# Publikacja, po której praca NIE jest dostarczona — fail-closed, runner_loop
+# eskaluje do człowieka (patrz repo_publish.zamknij). "brak_zmian" tu NIE jest:
+# zadanie analityczne w repo może legalnie nie zmienić ani jednego pliku.
+NIEUDANE_PUBLIKACJE = ("commit_odrzucony", "commit_nieudany")
 
 
 def _slug(text, limit=60):
@@ -79,38 +105,6 @@ def _nie_wykonano(powod, cost_usd=0.0, output=None):
     prawdziwe awarie subagenta mogły cicho zamykać się jako "done"."""
     return {"cost_usd": cost_usd, "tool": "agentic_task", "executed": False,
             "acceptance_notes": "NIE WYKONANO — " + powod, "output": output or {}}
-
-
-def _kontekst_firmy_blok(task):
-    """Fail-soft: błąd/brak dopasowania -> pusty string, nie blokuje promptu."""
-    tekst_zadania = " ".join(str(task.get(k) or "") for k in ("title", "description"))
-    try:
-        return kontekst_firmy.zbuduj(tekst_zadania)
-    except Exception:  # noqa: BLE001 — kontekst jest dodatkiem, nie warunkiem wykonania
-        return ""
-
-
-def _kontekst_kesza_blok(task, context):
-    """Projekt+etap (bogatsze niż _kontekst_projektu_blok — niesie też nazwę
-    ETAPU) i digest bazy wiedzy, z context_cache.py (decyzja właściciela
-    30.08.2026: subagent ma zawsze znać projekt/etap zadania i wiedzę agenta
-    wrzuconą w Projectly). DODATKOWY blok obok _kontekst_projektu_blok, nie
-    zastępuje go — context=None (kesz jeszcze nieodświeżony/brak klienta w
-    tym wywołaniu) daje po prostu pusty string, fail-soft."""
-    if not context:
-        return ""
-    return context_cache.context_block(context, task)
-
-
-def _kontekst_projektu_blok(task, client):
-    """Fail-soft: brak client/project_id albo błąd -> pusty string."""
-    if client is None or not task.get("project_id"):
-        return ""
-    try:
-        nazwa = client.project_name(task["project_id"])
-    except Exception:  # noqa: BLE001
-        return ""
-    return f"Projekt: {nazwa}" if nazwa else ""
 
 
 def _onedrive_task_folder(task):
@@ -146,53 +140,52 @@ def _onedrive_task_folder(task):
     return nowy_folder
 
 
-def _kontekst_rodzenstwa_blok(task):
-    """Inne podzadania tego samego zadania głównego — ustawiane przez
-    runner_loop.py w task["sibling_tasks"]. Fail-soft: brak/puste -> ''."""
-    rodzenstwo = task.get("sibling_tasks") or []
-    if not rodzenstwo:
-        return ""
-    linie = "\n".join(
-        f"- {s.get('title') or '?'} (status: {s.get('status') or '?'})" for s in rodzenstwo
-    )
-    return f"Inne podzadania tego samego zadania głównego:\n{linie}"
+def _opis_commita(folder, task):
+    """Opis commitu napisany przez subagenta (plik opis-commita.txt, jedna
+    linia). Brak pliku -> tytuł zadania: numer i tak dokłada repo_publish,
+    więc commit zawsze spełnia konwencję, nawet gdy subagent opisu nie zostawi."""
+    sciezka = folder / OPIS_COMMITA_FILENAME
+    if sciezka.is_file():
+        pierwsza_linia = sciezka.read_text(encoding="utf-8").strip().split("\n")[0].strip()
+        if pierwsza_linia:
+            return pierwsza_linia
+    return task.get("title") or "zmiany agenta"
 
 
-def _build_prompt(task, plan_text, folder, client=None, sharepoint_folder=None, context=None):
-    bloki_kontekstu = [
-        blok for blok in (
-            _kontekst_firmy_blok(task),
-            _kontekst_projektu_blok(task, client),
-            _kontekst_kesza_blok(task, context),
-            _kontekst_rodzenstwa_blok(task),
+def _publikuj_zmiany(sandbox, task, folder):
+    """Commit wg konwencji + push + PR. Nigdy nie rzuca: awaria publikacji jest
+    zwracana jako akcja, o której decyduje wołający (fail-closed dla
+    NIEUDANE_PUBLIKACJE)."""
+    try:
+        return repo_publish.zamknij(sandbox, _opis_commita(folder, task))
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {"akcja": "commit_nieudany", "powod": f"publikacja zmian nie powiodła się: {exc}",
+                "branch": sandbox.get("branch")}
+
+
+def _uruchom_subagenta(claude_exe, model, prompt, katalog_pracy, dodatkowe_foldery, env):
+    """Jedno wywołanie Claude Code headless. Zwraca (result, błąd_lub_None).
+
+    Prompt zaraz po --model: --allowedTools i --add-dir są WARIADYCZNE
+    (konsumują każdy kolejny token bez "-" na początku), więc prompt PO nich
+    zostałby połknięty jako kolejny "katalog"/"tool" zamiast trafić do CLI jako
+    właściwy prompt (znaleziony 24.08.2026 na żywym teście — CLI kończył się
+    "Input must be provided...")."""
+    try:
+        result = subprocess.run(
+            [claude_exe, "-p", "--model", model, prompt, "--permission-mode", "acceptEdits",
+             "--allowedTools", NARZEDZIA_SUBAGENTA,
+             "--add-dir", *dodatkowe_foldery],
+            cwd=str(katalog_pracy),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=AGENTIC_TIMEOUT_SECONDS,
+            env=env,
         )
-        if blok
-    ]
-    kontekst = ("\n\n".join(bloki_kontekstu) + "\n\n") if bloki_kontekstu else ""
-    sharepoint_akapit = (
-        f"\n\nMasz TAKŻE zapis do folderu '{sharepoint_folder}' (ten sam folder zadania na "
-        "SharePoint/OneDrive, do którego trafi finalny wynik) — jeśli zadanie wymaga "
-        "dostarczenia realnego pliku (np. arkusz, dokument, zestawienie), zapisz go TAM "
-        "wprost, oprócz opisu w wyniku.md w bieżącym katalogu."
-        if sharepoint_folder else ""
-    )
-    return (
-        kontekst +
-        f"Zadanie: {task.get('title', '')}\n"
-        f"Cel: {task.get('expected_result', '')}\n"
-        f"Kryteria akceptacji: {task.get('acceptance_criteria', '')}\n"
-        f"Opis: {(task.get('description') or '')[:2000]}\n\n"
-        f"Zatwierdzony plan podejścia:\n{plan_text}\n\n"
-        "Wykonaj to zadanie NAPRAWDĘ w bieżącym katalogu — czytaj/pisz pliki, "
-        "szukaj i czytaj strony w internecie gdy to pomaga (masz do tego "
-        "narzędzia), uruchamiaj co potrzebne do realizacji planu. Finalną, "
-        f"czytelną dla człowieka odpowiedź zapisz w pliku '{RESULT_FILENAME}' "
-        "(Markdown) w bieżącym katalogu — to ma być PEŁNE ROZWIĄZANIE zadania, "
-        "nie opis planu ani streszczenie tego, co zamierzasz zrobić. WOLNO Ci "
-        "wyłącznie MODYFIKOWAĆ/EDYTOWAĆ istniejące pliki i DODAWAĆ nowe — "
-        "NIGDY nie usuwaj żadnego pliku (decyzja właściciela repozytorium)."
-        + sharepoint_akapit
-    )
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        return None, f"Wykonanie przez subagenta nie powiodło się: {exc}"
+    return result, None
 
 
 def run(task, thinking, client=None, context=None):
@@ -230,8 +223,16 @@ def run(task, thinking, client=None, context=None):
     if not kontrakt["allowed"]:
         return _odmowa(kontrakt["reason"], cost_usd=ocena_planu["cost_usd"])
 
+    sandbox = repo_workspace.przygotuj(task)
+    if sandbox and not sandbox.get("ok"):
+        return _nie_wykonano("nie udało się przygotować repozytorium zadania: "
+                             + str(sandbox.get("powod") or "nieznany powód"),
+                             cost_usd=ocena_planu["cost_usd"])
+
     sharepoint_folder = _onedrive_task_folder(task)
-    prompt = _build_prompt(task, plan_text, folder, client, sharepoint_folder=sharepoint_folder, context=context)
+    prompt = agentic_prompt.build(task, plan_text, folder, client,
+                                  sharepoint_folder=sharepoint_folder, context=context,
+                                  sandbox=sandbox)
     if prompt.startswith("-"):
         # Żywy incydent 25.08.2026: kontekst firmy (kontekst_firmy.zbuduj) zaczyna
         # się od "--- KONTEKST FIRMY ---", a CLI Claude Code parsuje pierwszy
@@ -249,35 +250,17 @@ def run(task, thinking, client=None, context=None):
     # do TEJ SAMEJ grupy argumentów, nie osobna flaga. Folder OneDrive/SharePoint
     # (decyzja właściciela 29.08.2026) dopisany TYLKO gdy faktycznie się rozwiązał
     # (fail-soft — patrz _onedrive_task_folder).
-    dodatkowe_foldery = [str(folder)] + ([str(sharepoint_folder)] if sharepoint_folder else [])
-    try:
-        result = subprocess.run(
-            # Prompt zaraz po --model: --allowedTools i --add-dir są WARIADYCZNE
-            # (konsumują każdy kolejny token bez "-" na początku), więc prompt
-            # PO nich zostałby połknięty jako kolejny "katalog"/"tool" zamiast
-            # trafić do CLI jako właściwy prompt (znaleziony 24.08.2026 na
-            # żywym teście — CLI kończył się "Input must be provided...").
-            # "Skill" dopisane 25.08.2026 — bez niego subagent MIAŁ dostępne
-            # skille (Power BI/PBIP/DAX itd., globalne u właściciela), ale nie
-            # wolno mu było ich wywołać (poza allowlistą), więc faktycznie
-            # pracował bez nich mimo że istniały.
-            # "WebFetch WebSearch" dopisane 25.08.2026 — decyzja właściciela:
-            # subagent ma swobodny dostęp do internetu (czytanie/szukanie),
-            # bez allowlisty domen. Klikanie po UI zostaje wyłącznie dla
-            # browser_worker.py, który ma odrębną, ograniczoną allowlistę.
-            [claude_exe, "-p", "--model", model, prompt, "--permission-mode", "acceptEdits",
-             "--allowedTools", "Read Write Edit Skill WebFetch WebSearch",
-             "--add-dir", *dodatkowe_foldery],
-            cwd=str(folder),
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            timeout=AGENTIC_TIMEOUT_SECONDS,
-            env=env,
-        )
-    except (subprocess.TimeoutExpired, OSError) as exc:
-        return _odmowa(f"Wykonanie przez subagenta nie powiodło się: {exc}",
-                       cost_usd=ocena_planu["cost_usd"])
+    # Katalog pracy: piaskownica repo, gdy zadanie dotyczy repozytorium, inaczej
+    # folder zadania (jak dotąd). Folder zadania jest w --add-dir ZAWSZE, bo tam
+    # i tak ląduje wynik.md czytany przez runner_loop/bramkę jakości.
+    katalog_pracy = Path(sandbox["path"]) if sandbox else folder
+    dodatkowe_foldery = ([str(folder)]
+                         + ([sandbox["path"]] if sandbox else [])
+                         + ([str(sharepoint_folder)] if sharepoint_folder else []))
+    result, blad = _uruchom_subagenta(claude_exe, model, prompt, katalog_pracy,
+                                      dodatkowe_foldery, env)
+    if blad:
+        return _odmowa(blad, cost_usd=ocena_planu["cost_usd"])
 
     cost_wykonania = cost_estimator.estimate_call("claude_code") + ocena_planu["cost_usd"]
 
@@ -296,14 +279,24 @@ def run(task, thinking, client=None, context=None):
                              "z odpowiedzią.", cost_usd=cost_wykonania, output={"folder": str(folder)})
 
     tresc = wynik_path.read_text(encoding="utf-8").strip()
+    publikacja = _publikuj_zmiany(sandbox, task, folder) if sandbox else None
+    if publikacja and publikacja["akcja"] in NIEUDANE_PUBLIKACJE:
+        return _nie_wykonano(repo_publish.opis_dla_czlowieka(publikacja),
+                             cost_usd=cost_wykonania,
+                             output={"folder": str(folder), "repo": publikacja})
+
+    opis_repo = f"\n\nRepozytorium: {repo_publish.opis_dla_czlowieka(publikacja)}" if publikacja else ""
     return {
         "cost_usd": cost_wykonania,
         "tool": "agentic_task",
         "executed": True,
-        "acceptance_notes": tresc,
+        "acceptance_notes": tresc + opis_repo,
         "source_note": f"Subagent Claude Code, Read/Write/Edit ograniczone do {folder.name}/"
+                       + (f", piaskownica repo {sandbox['branch']}" if sandbox else "")
                        + (f" i folderu SharePoint/OneDrive {sharepoint_folder.name}/." if sharepoint_folder else "."),
-        "output": {"folder": str(folder), "sharepoint_folder": str(sharepoint_folder) if sharepoint_folder else None},
+        "output": {"folder": str(folder),
+                   "sharepoint_folder": str(sharepoint_folder) if sharepoint_folder else None,
+                   "repo": publikacja},
         "functional_checks": [{"name": f"Plik {RESULT_FILENAME} zapisany i niepusty",
                                "type": "nonempty_file", "target": str(wynik_path)}],
     }

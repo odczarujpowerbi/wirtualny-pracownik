@@ -199,10 +199,16 @@ tools:
   agentic_task:
     risk: yellow
     description: >
-      Prawdziwy subagent Claude Code (Read/Write/Edit/Skill/WebFetch/WebSearch)
+      Prawdziwy subagent Claude Code (Read/Write/Edit/Bash/Skill/WebFetch/WebSearch)
       dla zadań bez wąskiego workera, uruchamiany dopiero gdy plan przeszedł
       ocenę bot_content_check.py. Zapis plików ograniczony do WŁASNEGO folderu
-      zadania (runs/agentic_tasks/<task_id>_.../), nigdy do reszty repo/maszyny
+      zadania (runs/agentic_tasks/<task_id>_.../) oraz, dla zadań o
+      repozytorium, do WŁASNEJ piaskownicy repo (runs/repos/<task_id>_...,
+      klon per zadanie, repo_workspace.py) — nigdy do katalogu roboczego
+      człowieka. `Bash` dopisany 02.09.2026 (decyzja właściciela): bez niego
+      subagent nie mógł uruchomić ani gita, ani testów, ani budowania projektu.
+      Commit/push/PR nie należą do modelu: robi je repo_publish.py wg konwencji
+      "NN - opis po polsku", z odrzuceniem commitu zawierającego sekrety
       (agentic_worker.py, --add-dir + --allowedTools, BEZ
       --dangerously-skip-permissions). Dostęp do internetu (czytanie/szukanie,
       NIE klikanie UI) jest od 25.08.2026 SWOBODNY, bez allowlisty domen —
@@ -215,6 +221,7 @@ tools:
       ograniczoną allowlistą.
     allowed_roots:
       - runs/agentic_tasks
+      - runs/repos
     params:
       task_id:
         required: true

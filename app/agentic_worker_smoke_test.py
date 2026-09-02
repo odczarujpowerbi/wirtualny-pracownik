@@ -14,6 +14,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+import agentic_prompt
 import agentic_worker
 import bot_content_check
 import task_thinker
@@ -136,8 +137,8 @@ def run():
                        wynik_ok["functional_checks"][0]["target"].endswith("wynik.md")))
         checks.append(("Happy path: komenda ma --permission-mode acceptEdits",
                        "acceptEdits" in captured["cmd"]))
-        checks.append(("Happy path: komenda ma --allowedTools z Read/Write/Edit/Skill/WebFetch/WebSearch",
-                       "Read Write Edit Skill WebFetch WebSearch" in captured["cmd"]))
+        checks.append(("Happy path: komenda ma --allowedTools z Read/Write/Edit/Bash/Skill/WebFetch/WebSearch",
+                       "Read Write Edit Bash Skill WebFetch WebSearch" in captured["cmd"]))
         checks.append(("Happy path: komenda ma --add-dir na folder zadania",
                        "--add-dir" in captured["cmd"] and captured["cwd"] in captured["cmd"]))
         checks.append(("Happy path: BRAK --dangerously-skip-permissions",
@@ -149,8 +150,8 @@ def run():
 
         # 7. Kontekst firmy/projektu/rodzeństwa trafia do promptu (dokładany
         # PRZED "Zadanie: ..."), gdy dostępny.
-        original_zbuduj = agentic_worker.kontekst_firmy.zbuduj
-        agentic_worker.kontekst_firmy.zbuduj = lambda tekst: "--- KONTEKST FIRMY ---\nFikcyjna treść firmowa."
+        original_zbuduj = agentic_prompt.kontekst_firmy.zbuduj
+        agentic_prompt.kontekst_firmy.zbuduj = lambda tekst: "--- KONTEKST FIRMY ---\nFikcyjna treść firmowa."
 
         class _FakeClient:
             def project_name(self, project_id):
@@ -163,7 +164,7 @@ def run():
             agentic_worker.run(task_z_kontekstem, THINKING_OK, _FakeClient())
             prompt_z_kontekstem = captured["cmd"][4]
         finally:
-            agentic_worker.kontekst_firmy.zbuduj = original_zbuduj
+            agentic_prompt.kontekst_firmy.zbuduj = original_zbuduj
 
         checks.append(("Kontekst firmy trafia do promptu PRZED treścią zadania",
                        "Fikcyjna treść firmowa" in prompt_z_kontekstem
@@ -174,13 +175,13 @@ def run():
                        "Inne podzadanie" in prompt_z_kontekstem))
 
         # 8. Brak client / błąd project_name -> fail-soft, wykonanie się nie wywala.
-        agentic_worker.kontekst_firmy.zbuduj = lambda tekst: (_ for _ in ()).throw(RuntimeError("błąd kontekstu"))
+        agentic_prompt.kontekst_firmy.zbuduj = lambda tekst: (_ for _ in ()).throw(RuntimeError("błąd kontekstu"))
         try:
             wynik_bez_klienta = agentic_worker.run(TASK, THINKING_OK, None)
             checks.append(("Brak client / błąd kontekstu -> fail-soft, executed=True",
                            wynik_bez_klienta["executed"] is True))
         finally:
-            agentic_worker.kontekst_firmy.zbuduj = original_zbuduj
+            agentic_prompt.kontekst_firmy.zbuduj = original_zbuduj
 
         # 9. ONEDRIVE_TASKS_ROOT skonfigurowany (żądanie właściciela 29.08.2026:
         # subagent ma TAKŻE zapis do folderu zadania na SharePoint/OneDrive,
@@ -222,6 +223,87 @@ def run():
                        "SharePoint" not in wynik_bez_onedrive["source_note"]))
         checks.append(("Brak ONEDRIVE_TASKS_ROOT: output.sharepoint_folder = None",
                        wynik_bez_onedrive["output"]["sharepoint_folder"] is None))
+        # 11. Zadanie o repozytorium (decyzja właściciela 02.09.2026): subagent
+        # pracuje w piaskownicy repo, a nie w folderze zadania, prompt niesie
+        # branch i konwencję commitów, po pracy publikacja trafia do wyniku.
+        # repo_workspace/repo_publish są podmienione: ten test nie klonuje
+        # niczego z sieci i nie woła prawdziwego gita (mają własne testy dymne).
+        piaskownica = Path(tempfile.mkdtemp()) / "klon"
+        piaskownica.mkdir(parents=True)
+        original_przygotuj = agentic_worker.repo_workspace.przygotuj
+        original_zamknij = agentic_worker.repo_publish.zamknij
+
+        def _atrapa_przygotuj(task, **kwargs):
+            return {"ok": True, "tryb": "clone", "zrodlo": "https://github.com/przyklad/repo.git",
+                    "path": str(piaskownica), "branch": "agent/t-repo-popraw-walidacje",
+                    "base_branch": "main", "config": {"push": True, "pull_request": True}}
+
+        def _atrapa_zamknij(sandbox, opis, **kwargs):
+            return {"akcja": "pr_utworzony", "branch": sandbox["branch"], "commit": f"07 - {opis}",
+                    "pr_url": "https://github.com/przyklad/repo/pull/7"}
+
+        def _fake_run_repo(cmd, **kwargs):
+            captured["cmd"] = cmd
+            captured["cwd"] = kwargs.get("cwd")
+            folder_zadania = Path(cmd[cmd.index("--add-dir") + 1])
+            (folder_zadania / "wynik.md").write_text("Naprawiono walidację, testy zielone.",
+                                                     encoding="utf-8")
+            (folder_zadania / "opis-commita.txt").write_text("naprawiono walidacje formularza\n",
+                                                             encoding="utf-8")
+
+            class _Wynik:
+                returncode = 0
+                stdout = ""
+                stderr = ""
+            return _Wynik()
+
+        task_repo = {**TASK, "task_id": "T-REPO", "title": "Popraw walidacje w repo",
+                     "repo_url": "https://github.com/przyklad/repo.git"}
+        try:
+            agentic_worker.repo_workspace.przygotuj = _atrapa_przygotuj
+            agentic_worker.repo_publish.zamknij = _atrapa_zamknij
+            agentic_worker.subprocess.run = _fake_run_repo
+            wynik_repo = agentic_worker.run(task_repo, THINKING_OK)
+            prompt_repo = captured["cmd"][4]
+
+            checks.append(("Repo: cwd subagenta = piaskownica repo, nie folder zadania",
+                           captured["cwd"] == str(piaskownica)))
+            checks.append(("Repo: --add-dir niesie folder zadania I piaskownicę",
+                           captured["cmd"].count(str(piaskownica)) == 1
+                           and any("T-REPO" in str(arg) for arg in captured["cmd"])))
+            checks.append(("Repo: prompt niesie nazwę brancha zadania",
+                           "agent/t-repo-popraw-walidacje" in prompt_repo))
+            checks.append(("Repo: prompt niesie konwencję commitów z .claude/rules",
+                           "numer dwucyfrowy" in prompt_repo))
+            checks.append(("Repo: prompt zabrania samodzielnego commitowania",
+                           "NIE wołaj `git commit`" in prompt_repo))
+            checks.append(("Repo: executed=True, wynik niesie link do PR",
+                           wynik_repo["executed"] is True
+                           and "pull/7" in wynik_repo["acceptance_notes"]))
+            checks.append(("Repo: commit powstał z opisu subagenta, nie z tytułu zadania",
+                           wynik_repo["output"]["repo"]["commit"] == "07 - naprawiono walidacje formularza"))
+
+            # 12. Publikacja odrzucona (np. sekret w zmianach) -> fail-closed.
+            agentic_worker.repo_publish.zamknij = lambda sandbox, opis, **kw: {
+                "akcja": "commit_odrzucony", "branch": sandbox["branch"],
+                "powod": "zmiany zawieraja pliki wygladajace na sekrety: .env"}
+            wynik_odrzucony = agentic_worker.run(task_repo, THINKING_OK)
+            checks.append(("Repo: odrzucony commit (sekrety) -> executed=False, NIE WYKONANO",
+                           wynik_odrzucony["executed"] is False
+                           and "NIE WYKONANO" in wynik_odrzucony["acceptance_notes"]))
+
+            # 13. Nieudane przygotowanie piaskownicy -> subagent NIE jest odpalany.
+            agentic_worker.repo_workspace.przygotuj = lambda task, **kw: {
+                "ok": False, "powod": "git clone nie powiodl sie: repository not found"}
+            agentic_worker.subprocess.run = lambda *a, **k: (_ for _ in ()).throw(
+                AssertionError("subagent nie powinien wystartować bez piaskownicy"))
+            wynik_bez_repo = agentic_worker.run(task_repo, THINKING_OK)
+            checks.append(("Repo: nieudany klon -> executed=False, powód w notatce",
+                           wynik_bez_repo["executed"] is False
+                           and "repository not found" in wynik_bez_repo["acceptance_notes"]))
+        finally:
+            agentic_worker.repo_workspace.przygotuj = original_przygotuj
+            agentic_worker.repo_publish.zamknij = original_zamknij
     finally:
         bot_content_check.judge = original_judge
         task_thinker._find_claude = original_find_claude

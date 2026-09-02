@@ -1,0 +1,37 @@
+# Praca agenta z repozytoriami Git: jedno zrodlo prawdy o tym, GDZIE agent
+# pracuje z kodem i JAK DALEKO moze posunac zmiany.
+#
+# Decyzje wlasciciela (02.09.2026):
+#  - kazde zadanie dostaje WLASNY klon w sandbox_root (nigdy katalog roboczy
+#    czlowieka, nigdy worktree zywego repo),
+#  - branch + commit + push + PR automatycznie (PR wymaga `gh auth login`;
+#    brak gh -> fail-soft, zostaje wypchniety branch),
+#  - repozytorium moze przyjsc WPROST z tresci zadania (URL albo lokalna
+#    sciezka z .git), moze byc tez zalozone od zera (git init).
+repo_work:
+  # Katalog piaskownic, wzgledem app/ (runs/ jest w .gitignore).
+  sandbox_root: runs/repos
+
+  # Galaz bazowa PR, gdy klon nie powie inaczej (odczytujemy realne HEAD klonu).
+  base_branch: main
+
+  # Nazwa brancha zadania: <branch_prefix>/<task_id>-<slug tytulu>
+  branch_prefix: agent
+
+  # Czy wypchnac branch na origin po commicie.
+  push: true
+
+  # Czy probowac otworzyc PR (`gh pr create`). Brak gh / brak logowania ->
+  # fail-soft: branch zostaje wypchniety, PR do otwarcia recznie.
+  pull_request: true
+
+  # Katalog na NOWE projekty zakladane od zera. null -> ida do sandbox_root.
+  new_projects_root: null
+
+  # Tozsamosc commitow agenta. Maszyna NIE ma globalnego git user.name,
+  # wiec bez tego `git commit` w swiezym klonie failuje.
+  commit_author_name: "Wirtualny pracownik (agent)"
+  commit_author_email: "kontakt@clickless.pl"
+
+  clone_timeout_seconds: 300
+  push_timeout_seconds: 180
