@@ -88,7 +88,9 @@ def _fake_run_factory(git_status_stdout="", gh_dostepne=True):
             return _Wynik(0)
         if cmd[:1] == ["git"] and "status" in cmd:
             return _Wynik(0, stdout=git_status_stdout)
-        if cmd[:1] == ["gh"]:
+        # gh rozpoznawany po NAZWIE pliku, nie po dokladnym "gh": od 02.09.2026
+        # sciezke podaje repo_publish.znajdz_gh (moze byc pelna, np. /usr/bin/gh).
+        if Path(str(cmd[0])).name.startswith("gh"):
             if not gh_dostepne:
                 return _Wynik(1, stderr="gh: command not found")
             return _Wynik(0, stdout="https://github.com/example/repo/pull/1\n")
@@ -105,7 +107,7 @@ def run():
     original_db_path = state_store.DB_PATH
     original_state_path = rai.STATE_PATH
     original_run = rai._run
-    original_which = rai.shutil.which
+    original_znajdz_gh = rai.repo_publish.znajdz_gh
     original_find_claude = task_thinker._find_claude
     original_uruchom = rai._uruchom_subagenta
     now = "2026-08-25T10:00:00+00:00"
@@ -147,7 +149,7 @@ def run():
                        rai.sygnal_problemu("T-DUP-ALE-DONE")[0] is None))
 
         # --- 2. napraw_zadanie: pełna ścieżka szczęśliwa (zmiany + gh dostępne) ---
-        rai.shutil.which = lambda name: "/usr/bin/gh"  # host testu może NIE mieć gh — nie polegamy na środowisku
+        rai.repo_publish.znajdz_gh = lambda: "/usr/bin/gh"  # host testu może NIE mieć gh — nie polegamy na środowisku
         rai._run = _fake_run_factory(git_status_stdout=" M app/foo.py\n", gh_dostepne=True)
         rai._uruchom_subagenta = _z_podsumowaniem
         wynik = rai.napraw_zadanie("T-GATE", "bramka_odrzucila", "historia")
@@ -170,14 +172,14 @@ def run():
         task_thinker._find_claude = lambda: "claude"
 
         # --- 5. napraw_zadanie: są zmiany, ale brak `gh` -> branch_bez_pr ---
-        rai.shutil.which = lambda name: None
+        rai.repo_publish.znajdz_gh = lambda: None
         rai._run = _fake_run_factory(git_status_stdout=" M app/foo.py\n", gh_dostepne=False)
         rai._uruchom_subagenta = _z_podsumowaniem
         wynik_bez_gh = rai.napraw_zadanie("T-GATE", "bramka_odrzucila", "historia")
         checks.append(("napraw_zadanie: brak `gh` -> akcja='branch_bez_pr'", wynik_bez_gh["akcja"] == "branch_bez_pr"))
 
         # --- 6. napraw_zadanie: worktree faktycznie sprzątnięty w każdym przypadku ---
-        rai.shutil.which = lambda name: "/usr/bin/gh"
+        rai.repo_publish.znajdz_gh = lambda: "/usr/bin/gh"
         rai._run = _fake_run_factory(git_status_stdout=" M app/foo.py\n", gh_dostepne=True)
         utworzone_katalogi = []
         oryginalny_run = rai._run
@@ -270,8 +272,9 @@ def run():
                        "--model" in captured_cmd["cmd"] and "claude-opus-5" in captured_cmd["cmd"]))
         checks.append(("_uruchom_subagenta: prompt zaraz po --model, PRZED --allowedTools",
                        captured_cmd["cmd"].index("prompt testowy") < captured_cmd["cmd"].index("--allowedTools")))
-        checks.append(("_uruchom_subagenta: --allowedTools zawiera Skill",
-                       "Read Write Edit Skill" in captured_cmd["cmd"]))
+        checks.append(("_uruchom_subagenta: --allowedTools zawiera Bash i Skill (Bash od 02.09.2026: "
+                       "subagent musi móc uruchomić testy przed commitem)",
+                       "Read Write Edit Bash Skill" in captured_cmd["cmd"]))
         checks.append(("_uruchom_subagenta: ANTHROPIC_API_KEY usunięty ze środowiska subprocesu "
                        "(żywy bug 25-26.08.2026: bez tego KAŻDE uruchomienie kończyło się błędem "
                        "'claude.ai connectors are disabled')",
@@ -354,7 +357,7 @@ def run():
                        wynik_budzet["w_kolejce"] == 1))
     finally:
         rai._run = original_run
-        rai.shutil.which = original_which
+        rai.repo_publish.znajdz_gh = original_znajdz_gh
         rai._uruchom_subagenta = original_uruchom
         task_thinker._find_claude = original_find_claude
         state_store.DB_PATH = original_db_path

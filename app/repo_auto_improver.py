@@ -38,7 +38,6 @@ Zasady bezpieczeństwa:
 import json
 import os
 import re
-import shutil
 import subprocess
 import tempfile
 from datetime import datetime, timezone
@@ -48,6 +47,7 @@ import cost_estimator
 import cost_tracker
 import model_registry
 import projectly_client
+import repo_publish
 import state_store
 import task_thinker
 
@@ -250,7 +250,10 @@ def _uruchom_subagenta(worktree, prompt, task_id=None):
             # wariadyczne — konsumują każdy kolejny token bez "-" na początku,
             # patrz agentic_worker.py dla tego samego wzorca/incydentu).
             [claude_exe, "-p", "--model", model, prompt, "--permission-mode", "acceptEdits",
-             "--allowedTools", "Read Write Edit Skill", "--add-dir", str(worktree)],
+             # "Bash" dopisane 02.09.2026 (decyzja właściciela): bez niego subagent
+             # naprawiający repo nie mógł uruchomić testów, czyli nie mógł
+             # spełnić własnej bramki jakości ("po zmianach uruchom self_check").
+             "--allowedTools", "Read Write Edit Bash Skill", "--add-dir", str(worktree)],
             cwd=worktree, timeout=SUBAGENT_TIMEOUT_SECONDS, env=env,
         )
     except (subprocess.TimeoutExpired, OSError) as exc:
@@ -277,16 +280,22 @@ def _ma_zmiany(worktree):
 
 
 def _commituj_i_wypchnij(worktree, branch, opis):
+    """Komunikat commitu wg konwencji organizacyjnej ("NN - opis po polsku",
+    .claude/rules/git-workflow.md), numer policzony z historii repo przez
+    repo_publish.komunikat. Do 02.09.2026 leciało tu "auto-fix: <tytuł>", czyli
+    format spoza standardu, którego nie da się umiejscowić w historii."""
+    komunikat = repo_publish.komunikat(worktree, opis)
     _run(["git", "-C", str(worktree), "add", "-A"], timeout=60, check=True)
-    _run(["git", "-C", str(worktree), "commit", "-m", opis], timeout=60, check=True)
+    _run(["git", "-C", str(worktree), "commit", "-m", komunikat], timeout=60, check=True)
     push = _run(["git", "-C", str(worktree), "push", "-u", "origin", branch], timeout=120)
     return push.returncode == 0, (push.stderr or "").strip()[:400]
 
 
 def _otworz_pr(branch, tytul, opis):
-    if not shutil.which("gh"):
+    gh = repo_publish.znajdz_gh()
+    if not gh:
         return {"utworzono": False, "powod": "Brak `gh` CLI na tej maszynie — otwórz PR ręcznie z brancha."}
-    result = _run(["gh", "pr", "create", "--base", BASE_BRANCH, "--head", branch,
+    result = _run([gh, "pr", "create", "--base", BASE_BRANCH, "--head", branch,
                    "--title", tytul, "--body", opis], cwd=REPO_DIR, timeout=60)
     if result.returncode != 0:
         return {"utworzono": False, "powod": (result.stderr or "").strip()[:400]}
@@ -352,7 +361,8 @@ def napraw_zadanie(task_id, powod, historia):
         podsumowanie = (podsumowanie_path.read_text(encoding="utf-8").strip()
                         if podsumowanie_path.exists() else "(subagent nie zostawił podsumowania)")
 
-        ok, blad = _commituj_i_wypchnij(worktree, branch, f"auto-fix: {task.get('title', '')[:60]} ({powod})")
+        ok, blad = _commituj_i_wypchnij(
+            worktree, branch, f"auto-naprawa po zadaniu {task.get('title', '')[:40]} ({powod})")
         if not ok:
             return {"task_id": task_id, "akcja": "commit_nieudany", "powod": blad}
 
