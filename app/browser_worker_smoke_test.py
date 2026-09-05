@@ -169,9 +169,15 @@ def run():
     checks.append(("Kontrakt: domena z allowlisty (MailerLite) przechodzi",
                    dozwolony["allowed"] is True and dozwolony["risk"] == "yellow"))
 
-    spoza_listy = tool_registry.check_call("browser_task", {"url": "https://cokolwiek.example/x"})
-    checks.append(("Kontrakt: host spoza allowed_domains -> odmowa (fail-closed)",
-                   spoza_listy["allowed"] is False and "allowed_domains" in spoza_listy["reason"]))
+    # Jak przy fetch_url: od 05.09.2026 kazda normalna witryna jest zatwierdzona,
+    # a twarde granice to darknet i adresy wewnetrzne (host_policy.py).
+    zwykla = tool_registry.check_call("browser_task", {"url": "https://cokolwiek.example/x"})
+    checks.append(("Kontrakt: dowolna normalna witryna przechodzi (allowlista '*')",
+                   zwykla["allowed"] is True))
+
+    darknet = tool_registry.check_call("browser_task", {"url": "https://cokolwiek.onion/x"})
+    checks.append(("Kontrakt: darknet -> odmowa mimo allowlisty '*'",
+                   darknet["allowed"] is False and "darknet" in darknet["reason"]))
 
     brak_url = tool_registry.check_call("browser_task", {})
     checks.append(("Kontrakt: brak adresu -> odmowa", brak_url["allowed"] is False))

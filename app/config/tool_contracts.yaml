@@ -13,7 +13,10 @@
 #                   nie dotyka plików.
 #   allowed_domains — hosty, do których narzędziu wolno sięgnąć przez sieć (dokładnie
 #                   albo jako subdomena). Odpowiednik allowed_roots dla internetu;
-#                   brak wpisu = narzędzie nie może pobrać niczego.
+#                   brak wpisu = narzędzie nie może pobrać niczego. Wpis "*" =
+#                   każda normalna witryna (decyzja właściciela 05.09.2026 dla
+#                   fetch_url i browser_task). Nawet przy "*" host_policy.py
+#                   blokuje darknet i adresy wewnętrzne, a adres musi być https.
 #   params        — schemat parametrów: required (bool) + type (path/url/string/bool/number)
 #                   Parametr type=path jest sprawdzany wobec allowed_roots,
 #                   type=url wobec allowed_domains (i musi być https).
@@ -44,19 +47,14 @@ tools:
     risk: green
     description: >
       Pobranie informacji ze strony/API przez HTTPS GET (read-only, bez wysyłania
-      danych). Allowlista hostów jest jedynym źródłem prawdy — dopisanie nowego
-      źródła to świadoma decyzja właściciela, nie decyzja modelu.
+      danych). Decyzja wlasciciela 05.09.2026: KAZDA normalna witryna jest
+      zatwierdzona ("*"), bo prowadzenie listy wyjatkow blokowalo realna prace
+      (zadanie o stronie klienta ldit.pl skonczylo sie odmowa i eskalacja).
+      Twarde granice zostaja dwie i tylko dwie, obie w host_policy.py: adres musi
+      byc https, a darknet (.onion/.i2p) i adresy wewnetrzne tej maszyny/sieci
+      (localhost, 10.x, 192.168.x) sa zablokowane zawsze.
     allowed_domains:
-      - api.nbp.pl                # kursy walut NBP (dane publiczne, stabilne API)
-      - pl.wikipedia.org          # kontekst merytoryczny (REST API i strony)
-      - en.wikipedia.org
-      - api.open-meteo.com        # pogoda (bez klucza API)
-      - learn.microsoft.com       # dokumentacja Power BI / Microsoft 365
-      - powerbi.microsoft.com     # blog i ogloszenia produktowe Power BI
-      # Wlasne strony firmy — zrodlo prawdy o ofercie, cenach i terminach.
-      - odczarujpowerbi.pl        # marka szkoleniowa (kursy, szkolenia, spolecznosc)
-      - powerbiday.com.pl         # konferencja Power BI Day
-      - clickless.pl              # marka wdrozeniowa (automatyzacje, raporty)
+      - "*"
     # Czytelne nazwy źródeł do stopki materiału dla odbiorcy — surowy adres API
     # jest dla człowieka nieczytelny (uwaga z odbioru biznesowego).
     source_names:
@@ -114,11 +112,12 @@ tools:
       Zadania z profilem logowania (browser_profile) muszą TYLKO PRZEGLĄDAĆ —
       żadnego klikania "wyślij/zapisz/opublikuj/usuń" na cudzym koncie (Meta Ads,
       MailerLite) — rola workera to odczyt i zestawienie, nie edycja.
+    # Jak fetch_url: kazda normalna witryna (decyzja wlasciciela 05.09.2026).
+    # Profile logowania NIE sa przez to szersze: profil jest dobierany po domenie
+    # (executor._profil_dla_url wg browser_profiles nizej), wiec ciasteczka
+    # MailerLite/Meta ida wylacznie na ich wlasne domeny, nigdy na obca strone.
     allowed_domains:
-      - dashboard.mailerlite.com   # panel MailerLite (rzeczy niedostepne przez API/MCP) — profil: mailerlite
-      - business.facebook.com      # Meta Ads Manager — WYLACZNIE przegladanie kampanii, bez edycji — profil: meta_ads
-      - adsmanager.facebook.com    # alternatywny adres Meta Ads Manager — profil: meta_ads
-      - podatki.gov.pl             # publiczna strona rzadowa (obejmuje www.podatki.gov.pl), bez logowania — test bezpiecznej nawigacji
+      - "*"
     # Nazwy profili logowania dozwolone dla browser_profile (executor.py
     # odmawia nieznanej nazwy — nie tworzy cicho nowego, pustego profilu).
     # Profil trzeba zalogowac RECZNIE: python browser_worker.py --login <profil> <adres>.

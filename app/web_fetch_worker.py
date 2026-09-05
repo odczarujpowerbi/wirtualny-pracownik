@@ -41,6 +41,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import env_bootstrap  # noqa: F401 — UTF-8 na stdout (Windows)
+import host_policy
 
 APP_DIR = Path(__file__).parent
 OUT_DIR = APP_DIR / "runs" / "web"
@@ -61,12 +62,10 @@ def _ssl_context():
 
 
 def host_allowed(url, allowed_hosts):
-    """Czy host adresu mieści się w allowliście (dokładnie albo jako subdomena).
-    Pusta allowlista = odmowa (fail-closed)."""
-    host = (urlparse(url).hostname or "").lower()
-    if not host or not allowed_hosts:
-        return False
-    return any(host == d.lower() or host.endswith("." + d.lower()) for d in allowed_hosts)
+    """Czy wolno pobrac ten adres. Cala regula siedzi w host_policy.py (wspolna
+    z warstwa kontraktow, tool_registry.py) — tu zostaje sama nazwa, bo wolaja
+    ja executor.py i browser_worker.py."""
+    return host_policy.host_dozwolony(url, allowed_hosts)
 
 
 class _GuardedRedirectHandler(urllib.request.HTTPRedirectHandler):

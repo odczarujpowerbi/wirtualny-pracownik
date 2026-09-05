@@ -146,16 +146,33 @@ def run():
     ok = tool_registry.check_call("fetch_url", {"url": "https://api.nbp.pl/api/exchangerates/rates/a/eur/"})
     checks.append(("Kontrakt: dozwolony host przechodzi", ok["allowed"] is True and ok["risk"] == "green"))
 
-    zly = tool_registry.check_call("fetch_url", {"url": "https://przypadkowa-strona.example/dane"})
-    checks.append(("Kontrakt: host spoza allowed_domains -> odmowa",
-                   zly["allowed"] is False and "allowed_domains" in zly["reason"]))
+    # Decyzja wlasciciela 05.09.2026: KAZDA normalna witryna jest zatwierdzona.
+    # Wczesniej ten sam adres byl tu odmawiany — polityka sie zmienila, wiec
+    # test pilnuje NOWEJ granicy, nie starej.
+    zwykla = tool_registry.check_call("fetch_url", {"url": "https://przypadkowa-strona.example/dane"})
+    checks.append(("Kontrakt: dowolna normalna witryna przechodzi (allowlista '*')",
+                   zwykla["allowed"] is True))
+
+    darknet = tool_registry.check_call("fetch_url", {"url": "https://cokolwiek.onion/dane"})
+    checks.append(("Kontrakt: darknet -> odmowa mimo allowlisty '*'",
+                   darknet["allowed"] is False and "darknet" in darknet["reason"]))
+
+    wewnetrzny = tool_registry.check_call("fetch_url", {"url": "https://192.168.0.5/panel"})
+    checks.append(("Kontrakt: adres wewnetrzny sieci -> odmowa mimo allowlisty '*'",
+                   wewnetrzny["allowed"] is False and "wewn" in wewnetrzny["reason"]))
+
+    po_http = tool_registry.check_call("fetch_url", {"url": "http://przypadkowa-strona.example/dane"})
+    checks.append(("Kontrakt: http (nie https) -> odmowa mimo allowlisty '*'",
+                   po_http["allowed"] is False and "https" in po_http["reason"]))
 
     brak = tool_registry.check_call("fetch_url", {})
     checks.append(("Kontrakt: brak adresu -> odmowa", brak["allowed"] is False))
 
     # --- odmowa na poziomie executora (bez sieci: zły host nigdy nie dochodzi do pobrania) ---
-    odmowa = executor.execute({"action": "fetch_url", "url": "https://przypadkowa-strona.example/dane"})
-    checks.append(("Executor: zadanie ze złym hostem -> executed=False (fail-closed)",
+    # Zly host = taki, ktorego nie wolno odwiedzic NIGDY (darknet/adres wewnetrzny).
+    # Odmowa zapada w kontrakcie, wiec test nadal nie dotyka sieci.
+    odmowa = executor.execute({"action": "fetch_url", "url": "https://cokolwiek.onion/dane"})
+    checks.append(("Executor: zadanie z zablokowanym hostem -> executed=False (fail-closed)",
                    odmowa is not None and odmowa["executed"] is False and odmowa["tool"] == "fetch_url"))
 
     nieznane = executor.execute({"action": "cos_czego_nie_ma"})

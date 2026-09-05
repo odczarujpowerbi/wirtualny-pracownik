@@ -40,7 +40,7 @@
 
   <h2><span class="n">1</span> Jak agent wyłuskuje adres/projekt/personę z treści zadania</h2>
   <div class="card">
-    <p>Zadania z Projectly nie mają dedykowanego pola "url" — adres źródła siedzi w tytule albo opisie. <code>executor._urls_from_task</code> wyłuskuje go regexem, ale bierze <b>tylko</b> adresy z allowlisty (<code>tool_contracts.yaml</code>) — zwykły link w opisie (np. do SharePointa) nie uruchamia pobierania. Zadanie może wskazać kilka źródeł naraz ("porównaj kurs EUR i USD") — worker pobiera każde.</p>
+    <p>Zadania z Projectly nie mają dedykowanego pola "url" — adres źródła siedzi w tytule albo opisie. <code>executor._urls_from_task</code> wyłuskuje go regexem, i bierze adres z <b>każdej normalnej witryny</b> (allowlista <code>"*"</code> od 05.09.2026); pomijane są tylko linki do samego narzędzia pracy (Projectly) oraz adresy zablokowane na stałe (darknet, adresy wewnętrzne). Link do SharePointa ma osobną, wcześniejszą ścieżkę (<code>sharepoint_read</code>). Zadanie może wskazać kilka źródeł naraz ("porównaj kurs EUR i USD") — worker pobiera każde.</p>
     <p>Projekt klienta i marka są dobierane analogicznie: <code>kontekst_firmy.dopasuj_projekt</code> szuka nazwy projektu w treści zadania, <code>wybierz_pliki</code> szuka jednoznacznej frazy marki. Zawsze fail-closed — brak jednoznacznego sygnału = brak dopasowania, nigdy zgadywanie.</p>
   </div>
 
@@ -48,7 +48,7 @@
   <table>
     <thead><tr><th style="width:30%">Sytuacja</th><th>Reakcja</th></tr></thead>
     <tbody>
-      <tr><td>Adres spoza allowlisty</td><td>Odmowa z konkretnym powodem — eskalacja z pytaniem, czy dopisać domenę, NIE ciche „done".</td></tr>
+      <tr><td>Adres zablokowany na stałe (darknet, adres wewnętrzny)</td><td>Odmowa z konkretnym powodem — eskalacja, NIE ciche „done".</td></tr>
       <tr><td>Źródło nie zawiera odpowiedzi (np. zła waluta)</td><td><code>web_source_fixer.py</code> próbuje RAZ poprawić adres wg reguły ze skilla (np. inna waluta w tej samej tabeli NBP).</td></tr>
       <tr><td>Źródło zwraca błąd (404 w dzień wolny)</td><td>Fallback na zakres dat kończący się zamówionym dniem — nigdy "najnowsze dostępne", bo to dałoby dane z innego dnia niż zamówiony.</td></tr>
       <tr><td>Błąd nie da się naprawić samą redakcją</td><td>Zadanie zamykane z konkretnym feedbackiem, czego zabrakło — bez tworzenia zadania dla człowieka.</td></tr>

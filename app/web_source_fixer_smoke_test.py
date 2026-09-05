@@ -46,14 +46,15 @@ def run():
         checks.append(("Brak pliku skilla -> None, bez wyjątku",
                        web_source_fixer.popraw_adres(NBP_EUR, "kurs JPY", path=brak) is None))
 
-    # --- odmowa dla źródła spoza allowlisty (regresja: kończyło się cichym "done") ---
+    # --- odmowa dla źródła, którego nie wolno odwiedzić NIGDY (regresja: kończyło
+    # się cichym "done"). Do 05.09.2026 była nim "strona spoza allowlisty"; po
+    # otwarciu allowlisty na wszystkie witryny zostały darknet i adresy wewnętrzne.
     odmowa = executor.execute({"title": "Zbierz cennik",
-                               "description": "Sprawdź ceny: https://przypadkowa-strona.example/cennik"})
-    checks.append(("Źródło spoza allowlisty -> odmowa, nie ciche 'brak workera'",
+                               "description": "Sprawdź ceny: https://sklep.onion/cennik"})
+    checks.append(("Zablokowane źródło -> odmowa, nie ciche 'brak workera'",
                    odmowa is not None and odmowa["executed"] is False))
-    checks.append(("Odmowa mówi, czego brakuje i czyja to decyzja",
-                   "allowed_domains" in odmowa["acceptance_notes"]
-                   and "właściciel" in odmowa["acceptance_notes"].lower()))
+    checks.append(("Odmowa mówi WPROST, dlaczego tego adresu nie wolno pobrać",
+                   "darknet" in odmowa["acceptance_notes"].lower()))
     checks.append(("Zadanie bez adresu nadal idzie dotychczasową ścieżką (None)",
                    executor.execute({"title": "Przygotuj podsumowanie tygodnia"}) is None))
 

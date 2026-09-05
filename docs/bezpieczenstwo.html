@@ -43,9 +43,9 @@
     </tbody>
   </table>
 
-  <h2><span class="n">2</span> Pobieranie z internetu — allowlista domen</h2>
+  <h2><span class="n">2</span> Pobieranie z internetu — wszystkie normalne witryny</h2>
   <div class="card">
-    <p><code>web_fetch_worker.py</code>: tylko HTTPS, tylko GET, tylko hosty z <code>config/tool_contracts.yaml</code> → <code>fetch_url.allowed_domains</code>. Każde przekierowanie (302) sprawdzane PONOWNIE wobec allowlisty — serwer nie może przez przekierowanie ominąć kontroli. Pobrana treść jest z definicji niezaufana: trafia do promptu oznaczona jako DANE, nie polecenia, i przechodzi kontrolę wstrzyknięcia instrukcji ZANIM dojdzie do modelu piszącego odpowiedź.</p>
+    <p><code>web_fetch_worker.py</code>: tylko HTTPS, tylko GET. Od 05.09.2026 (decyzja właściciela) <b>każda normalna witryna jest zatwierdzona</b> — <code>fetch_url.allowed_domains</code> to <code>"*"</code>, bo prowadzenie listy wyjątków blokowało realną pracę. Zostają dwie twarde granice, obie w <code>host_policy.py</code>: adres musi być https, a darknet (.onion, .i2p) i adresy wewnętrzne maszyny/sieci (localhost, 10.x, 192.168.x) są zablokowane zawsze. Każde przekierowanie (302) sprawdzane PONOWNIE wobec tej samej reguły — serwer nie może przez przekierowanie ominąć kontroli. Pobrana treść jest z definicji niezaufana: trafia do promptu oznaczona jako DANE, nie polecenia, i przechodzi kontrolę wstrzyknięcia instrukcji ZANIM dojdzie do modelu piszącego odpowiedź.</p>
   </div>
 
   <h2><span class="n">3</span> Fail-closed — wzorzec powtarzający się w całym systemie</h2>

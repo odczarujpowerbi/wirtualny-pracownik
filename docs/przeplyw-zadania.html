@@ -61,7 +61,7 @@
 
   <h2><span class="n">2</span> Realny worker: pobranie i napisanie treści z internetu</h2>
   <div class="card">
-    <p><code>web_fetch_worker.py</code> — HTTPS GET, tylko hosty z allowlisty (<code>config/tool_contracts.yaml</code>), każde przekierowanie sprawdzane ponownie wobec allowlisty. <code>web_answer.py</code> domyka pętlę: samo pobranie danych to nie wykonanie zadania — model odpowiada na pytanie z tytułu zadania na podstawie treści (oznaczonej jako DANE, nie polecenia — obrona przed wstrzyknięciem instrukcji).</p>
+    <p><code>web_fetch_worker.py</code> — HTTPS GET z każdej normalnej witryny (<code>host_policy.py</code>: blokada dotyczy tylko darknetu i adresów wewnętrznych), każde przekierowanie sprawdzane ponownie wobec tej samej reguły. <code>web_answer.py</code> domyka pętlę: samo pobranie danych to nie wykonanie zadania — model odpowiada na pytanie z tytułu zadania na podstawie treści (oznaczonej jako DANE, nie polecenia — obrona przed wstrzyknięciem instrukcji).</p>
     <p><code>web_source_fixer.py</code> — samodzielna korekta adresu, gdy wskazane źródło nie zawiera odpowiedzi (np. inna waluta w tej samej tabeli NBP, albo dzień wolny → zakres dni kończący się zamówioną datą, nigdy "najnowsze notowanie").</p>
   </div>
 
@@ -81,7 +81,7 @@
   <table>
     <thead><tr><th style="width:16%">Klasa</th><th style="width:40%">Przykłady</th><th>Zasada</th></tr></thead>
     <tbody>
-      <tr><td><b>Zielona</b></td><td>Odczyt danych, zrzut, test, raport, draft pliku, pobranie ze allowlisty.</td><td>Automatycznie.</td></tr>
+      <tr><td><b>Zielona</b></td><td>Odczyt danych, zrzut, test, raport, draft pliku, pobranie strony internetowej.</td><td>Automatycznie.</td></tr>
       <tr><td><b>Żółta</b></td><td>Zmiana statusu, commit na gałęzi, wersja robocza, ograniczona korekta.</td><td>Automatycznie w granicach polityki, przez bramkę jakości.</td></tr>
       <tr><td><b>Czerwona</b></td><td>Publikacja, zmiana budżetu, nadanie roli, masowa wiadomość, usunięcie danych.</td><td>Wymaga jawnej akceptacji człowieka.</td></tr>
     </tbody>

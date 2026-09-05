@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 import yaml
 
 import browser_worker
+import host_policy
 import integracje_worker
 import pbi_desktop_bridge
 import pbip_validate
@@ -31,6 +32,14 @@ import web_source_fixer
 import web_fetch_worker
 
 SKILL_PATH = Path(__file__).parent / "skills" / "web_research_operations.yaml"
+
+# Hosty, ktore NIE sa zrodlem tresci, tylko narzedziem pracy: link do samego
+# Projectly w opisie zadania ("szczegoly w zadaniu nadrzednym: <link>") ma zostac
+# kontekstem, nie zleceniem pobrania. Potrzebne od 05.09.2026: dopoki allowlista
+# byla waska, sam fakt bycia poza nia odsiewal takie linki; po otwarciu na
+# wszystkie witryny trzeba to nazwac wprost. SharePoint/OneDrive firmy ma wlasna,
+# wczesniejsza sciezke (sharepoint_read), wiec nie ma go na tej liscie.
+HOSTY_NIE_ZRODLA = ("projectly-production.up.railway.app", "projectly.app")
 
 
 def execute(task):
@@ -62,10 +71,14 @@ def execute(task):
         # None kończyło się "zielone bez efektu -> auto done": zadanie zamykane jako
         # zrobione, choć nikt niczego nie zrobił (realnie napotkane). Odmowa z
         # powodem trafia do eskalacji, a właściciel decyduje o dopisaniu domeny.
+        # Od 05.09.2026 allowlista to "*" (każda normalna witryna), więc tu
+        # trafiają już tylko adresy z twardej blokady host_policy: darknet i
+        # adresy wewnętrzne maszyny/sieci. Powód podajemy wprost, bo "dopisz
+        # domenę do allowlisty" byłoby teraz błędną radą.
+        powod = host_policy.powod_blokady(obcy) or "adres poza allowed_domains narzędzia fetch_url"
         return _refused(
-            f"Zadanie wskazuje źródło '{obcy}', którego nie ma na allowliście narzędzia fetch_url "
-            f"(config/tool_contracts.yaml -> allowed_domains). Nie pobieram niczego spoza listy. "
-            f"Decyzja właściciela: dopisać tę domenę do allowlisty albo wskazać inne źródło.",
+            f"Zadanie wskazuje źródło '{obcy}', którego nie wolno pobrać: {powod}. "
+            f"Wskaż inne źródło albo zmień politykę w config/tool_contracts.yaml -> allowed_domains.",
             tool="fetch_url")
     return None
 
@@ -102,13 +115,25 @@ def rozpoznaj_narzedzie(task):
 
 
 def _browser_url_from_task(task):
-    """Adres wymagający KLIKANIA (nie tylko GET) wyłuskany z treści zadania.
-    Domeny browser_task i fetch_url się NIE POKRYWAJĄ (świadomie), więc sam
-    host jednoznacznie wskazuje właściwe narzędzie — bez zgadywania z treści,
-    które z nich użyć. Zadania z Projectly nie mają pola 'action', więc to
-    JEDYNY sposób, żeby zadanie tekstowe trafiło do browser_task."""
+    """Adres wymagający KLIKANIA albo ZALOGOWANEJ sesji (nie samego GET).
+
+    Do 05.09.2026 rozstrzygał to sam host: domeny browser_task i fetch_url się
+    NIE POKRYWAŁY. Po otwarciu obu allowlist na wszystkie witryny host już
+    niczego nie rozstrzyga, więc kryterium jest jawne i węższe:
+      - zadanie niesie kroki do wykonania (browser_steps/kroki), albo
+      - host wymaga zalogowanego profilu (profile_by_domain, np. panel
+        MailerLite, Meta Ads) — tam zwykły GET zwróciłby stronę logowania.
+    Wszystko inne idzie do tańszego fetch_url, jak dotąd."""
     contract = tool_registry.get_contract("browser_task") or {}
-    domeny = tool_registry.allowed_domains(contract)
+    # Jawne zlecenie przeglądarki (action albo kroki do wykonania) działa na
+    # pełnej allowliście kontraktu. Bez takiego zlecenia bierzemy WYŁĄCZNIE
+    # domeny wymagające zalogowanego profilu — inaczej po otwarciu allowlisty
+    # na "*" każdy link w treści zadania trafiałby do Playwrighta zamiast do
+    # tańszego fetch_url.
+    jawne_zlecenie = ((task.get("action") or "").lower() == "browser_task"
+                      or bool(task.get("browser_steps") or task.get("kroki")))
+    domeny = (tool_registry.allowed_domains(contract) if jawne_zlecenie
+              else list(contract.get("profile_by_domain") or {}))
     wskazany = task.get("url")
     if wskazany and web_fetch_worker.host_allowed(wskazany, domeny):
         return wskazany
@@ -210,46 +235,54 @@ def _url_spoza_allowlisty(task):
     return None
 
 
-def _urls_from_task(task, limit=3):
-    """Wszystkie adresy źródeł z treści zadania (z allowlisty), do `limit` sztuk.
-    Zadanie potrafi wskazać kilka źródeł naraz ("porównaj kurs EUR i USD")."""
-    wskazany = task.get("url")
-    if isinstance(wskazany, list):
-        return wskazany[:limit]
-    if wskazany:
-        return [wskazany]
+def _jest_zrodlem_tresci(url):
+    """Czy ten adres w treści zadania jest źródłem do pobrania, a nie linkiem do
+    narzędzia pracy (patrz HOSTY_NIE_ZRODLA)."""
+    return not web_fetch_worker.host_allowed(url, list(HOSTY_NIE_ZRODLA))
 
+
+def _kandydaci_url(task, limit=3):
+    """Adresy z treści zadania nadające się do POBRANIA (wspólne dla
+    _url_from_task i _urls_from_task)."""
     tekst = " ".join(str(task.get(p) or "") for p in ("title", "description", "expected_result",
                                                       "acceptance_criteria", "source_file_link"))
     domeny = tool_registry.allowed_domains(tool_registry.get_contract("fetch_url") or {})
     znalezione = []
-    for kandydat in re.findall(r"https://\S+", tekst):
-        kandydat = kandydat.rstrip(".,;:!?)\"']")
-        if web_fetch_worker.host_allowed(kandydat, domeny) and kandydat not in znalezione:
-            znalezione.append(kandydat)
-    return znalezione[:limit]
-
-
-def _url_from_task(task):
-    """Adres źródła wyłuskany z treści zadania. Zadania z Projectly nie mają pola
-    'url' — niosą adres w tytule albo opisie. Bierzemy TYLKO adresy z allowlisty
-    kontraktu: dzięki temu zwykły link w opisie (SharePoint, załącznik) nie
-    uruchamia pobierania, a zadanie bez pasującego źródła idzie dotychczasową
-    ścieżką zamiast produkować odmowę."""
-    if task.get("url"):
-        return task["url"]
-    tekst = " ".join(str(task.get(p) or "") for p in ("title", "description", "expected_result",
-                                                      "acceptance_criteria", "source_file_link"))
-    domeny = tool_registry.allowed_domains(tool_registry.get_contract("fetch_url") or {})
     # Przecinek MUSI być dozwolony w środku adresu — parametry API mają postać
     # "daily=temperature_2m_max,temperature_2m_min,precipitation_sum". Wycinanie
     # go z zakresu znaków ucinało adres w połowie, więc model dostawał inne dane
     # niż zamówione (realnie: brak opadów i minimum w zadaniu o pogodzie).
     for kandydat in re.findall(r"https://\S+", tekst):
         kandydat = kandydat.rstrip(".,;:!?)\"']")
-        if web_fetch_worker.host_allowed(kandydat, domeny):
-            return kandydat
-    return None
+        if not web_fetch_worker.host_allowed(kandydat, domeny):
+            continue
+        if not _jest_zrodlem_tresci(kandydat):
+            continue
+        if kandydat not in znalezione:
+            znalezione.append(kandydat)
+    return znalezione[:limit]
+
+
+def _urls_from_task(task, limit=3):
+    """Wszystkie adresy źródeł z treści zadania, do `limit` sztuk. Zadanie
+    potrafi wskazać kilka źródeł naraz ("porównaj kurs EUR i USD")."""
+    wskazany = task.get("url")
+    if isinstance(wskazany, list):
+        return wskazany[:limit]
+    if wskazany:
+        return [wskazany]
+    return _kandydaci_url(task, limit)
+
+
+def _url_from_task(task):
+    """Adres źródła wyłuskany z treści zadania. Zadania z Projectly nie mają pola
+    'url' — niosą adres w tytule albo opisie. Od 05.09.2026 pobieramy z KAŻDEJ
+    normalnej witryny (allowlista "*"), z wyjątkiem linków do samego narzędzia
+    pracy (HOSTY_NIE_ZRODLA) i adresów zablokowanych przez host_policy."""
+    if task.get("url"):
+        return task["url"]
+    kandydaci = _kandydaci_url(task, limit=1)
+    return kandydaci[0] if kandydaci else None
 
 
 def _is_pbip_validation(task):

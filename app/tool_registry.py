@@ -15,6 +15,7 @@ Każda odmowa niesie czytelny powód (trafia do audytu i eskalacji).
 from pathlib import Path
 from urllib.parse import urlparse
 
+import host_policy
 import yaml
 
 APP_DIR = Path(__file__).parent
@@ -46,12 +47,10 @@ def allowed_domains(contract):
 
 
 def _host_within(url, domains):
-    """Host równy wpisowi albo jego subdomena. Sam sufiks nie wystarcza —
-    'api.nbp.pl.atakujacy.example' nie może przejść jako 'api.nbp.pl'."""
-    host = (urlparse(url).hostname or "").lower()
-    if not host:
-        return False
-    return any(host == d.lower() or host.endswith("." + d.lower()) for d in domains)
+    """Czy adres mieści się w allowed_domains kontraktu. Reguła (w tym wpis "*"
+    = wszystkie normalne witryny oraz stała blokada darknetu i adresów
+    wewnętrznych) siedzi w host_policy.py, wspólnie z workerami sieciowymi."""
+    return host_policy.host_dozwolony(url, domains)
 
 
 def _allow(risk):
@@ -93,6 +92,12 @@ def check_call(tool, params, path=CONTRACTS_PATH):
             if urlparse(str(value)).scheme != "https":
                 return _deny(f"Adres '{value}' (parametr '{name}') nie jest https — odmowa (fail-closed).", risk)
             if not _host_within(str(value), domains):
+                # Przy allowliście "*" (wszystkie normalne witryny) jedyny powód
+                # odmowy to twarda blokada z host_policy — mówimy KTÓRA, bo
+                # "poza allowed_domains" byłoby wtedy myrlące dla człowieka.
+                blokada = host_policy.powod_blokady(str(value))
+                if blokada and host_policy.wszystkie_dozwolone(domains):
+                    return _deny(f"Adres '{value}' (parametr '{name}'): {blokada} — odmowa.", risk)
                 return _deny(
                     f"Host adresu '{value}' (parametr '{name}') jest poza allowed_domains narzędzia '{tool}' "
                     f"— odmowa (fail-closed).", risk)
