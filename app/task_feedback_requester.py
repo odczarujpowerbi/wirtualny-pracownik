@@ -36,6 +36,7 @@ import json
 from pathlib import Path
 
 from email_draft_generator import generate_draft
+from projectly_client import FEEDBACK_TITLE_PREFIX as _FEEDBACK_TITLE_PREFIX
 from projectly_client import (ESCALATION_TITLE_PREFIX, PRIORITY_BACKLOG,
                               get_client, own_account_name)
 
@@ -49,7 +50,10 @@ ASKED_PATH = Path(__file__).parent / "runs" / "feedback_requested.json"
 # doklejał KOLEJNE "Feedback: " ("Feedback: Feedback: ..." narastające w
 # kółko z każdym zamknięciem) — bo find_tasks_needing_feedback nie
 # rozróżniało prawdziwej pracy od własnych zadań meta.
-FEEDBACK_TITLE_PREFIX = "Feedback: "
+# Prefiks mieszka w projectly_client.py (tam stoi filtr kolejki pracy,
+# is_feedback_task), tu re-eksport pod dotychczasową nazwą, żeby tytuł nadawany
+# przez ten skrypt i filtr kolejki nie mogły się rozjechać.
+FEEDBACK_TITLE_PREFIX = _FEEDBACK_TITLE_PREFIX
 
 FEEDBACK_COMMENT = (
     "👋 Krótki feedback do tego zadania: ile realnie zajęło (jeśli różni się "

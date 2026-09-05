@@ -330,6 +330,21 @@ def test_prefiks_eskalacji_ma_jedno_zrodlo():
     print("OK  prefiks eskalacji ma jedno źródło prawdy (projectly_client)")
 
 
+def test_get_new_tasks_nigdy_nie_zwraca_zadan_feedbackowych():
+    # Zadanie "Feedback: ..." prosi CZŁOWIEKA o ocenę zamkniętej pracy, ale
+    # powstaje z assignee zadania źródłowego (konto AI) i wracało do kolejki.
+    # Realnie zastane 05.09.2026: jedyne zadanie w kolejce roli dev.
+    client = _klient_z_zadaniami([
+        {"id": "T-1", "title": "Zrób raport sprzedaży", "status": "todo"},
+        {"id": "FB-1", "title": "Feedback: Zrób zestawienie z MailerLite", "status": "todo"},
+    ])
+    client._polled_account_ids = lambda: [("AI - Dev", "ACC-1")]
+    client._pollable_projects = lambda: [{"id": "PROJ-1"}]
+    tytuly = [t["title"] for t in client.get_new_tasks()]
+    assert tytuly == ["Zrób raport sprzedaży"], tytuly
+    print("OK  get_new_tasks() nigdy nie zwraca zadań feedbackowych (kolejka pracy)")
+
+
 def test_mock_client_tez_odsiewa_zadania_sterujace():
     # Tryb mock musi zachowywać się tak samo, inaczej testy lokalne nie łapią bugu.
     tmp = Path(tempfile.mkdtemp())
@@ -361,6 +376,7 @@ if __name__ == "__main__":
     test_list_tasks_include_control_zwraca_sterujace()
     test_get_new_tasks_nigdy_nie_zwraca_zadan_sterujacych()
     test_get_new_tasks_nigdy_nie_zwraca_zadan_eskalacyjnych()
+    test_get_new_tasks_nigdy_nie_zwraca_zadan_feedbackowych()
     test_list_tasks_nadal_widzi_eskalacje()
     test_prefiks_eskalacji_ma_jedno_zrodlo()
     test_mock_client_tez_odsiewa_zadania_sterujace()

@@ -122,10 +122,24 @@ def is_escalation_task(task):
     return ESCALATION_TITLE_PREFIX in str(task.get("title") or "")
 
 
+# Zadania META tworzone przez task_feedback_requester.py ("Feedback: <oryginał>")
+# proszą CZŁOWIEKA o ocenę zamkniętej pracy, ale powstają z assignee zadania
+# źródłowego, czyli z kontem AI, i wracały do kolejki pracy bota. Bot nie ma
+# czego w nich wykonać, więc kończyły się eskalacją, a eskalacja kolejną warstwą
+# tytułu ("Wymaga decyzji: Feedback: ..."). Realnie zastane 05.09.2026: jedyne
+# zadanie w kolejce roli dev było właśnie takim zadaniem meta.
+FEEDBACK_TITLE_PREFIX = "Feedback: "
+
+
+def is_feedback_task(task):
+    """Czy to zadanie META z prośbą o feedback (dla człowieka), a nie praca."""
+    return FEEDBACK_TITLE_PREFIX in str(task.get("title") or "")
+
+
 def is_praca(task):
     """Czy to realna praca do wykonania przez bota. Jedno miejsce, w którym
-    kolejka pracy odsiewa zadania sterujące i eskalacyjne."""
-    return not is_control_task(task) and not is_escalation_task(task)
+    kolejka pracy odsiewa zadania sterujące, eskalacyjne i feedbackowe."""
+    return not (is_control_task(task) or is_escalation_task(task) or is_feedback_task(task))
 
 
 def control_task_id_for_role(role):
