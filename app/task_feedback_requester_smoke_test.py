@@ -101,6 +101,22 @@ def run():
                        "T-FB-META" not in {t["task_id"] for t in do_zapytania_z_meta}
                        and {t["task_id"] for t in do_zapytania_z_meta} == {"T-1", "T-2"}))
 
+        # Tytuły NARASTAJĄ warstwami (realny przypadek z kolejki 05.09.2026:
+        # "Feedback: Wymaga decyzji: ..."), więc prefiksu szukamy GDZIEKOLWIEK
+        # w tytule, nie tylko na początku — inaczej taka warstwa uruchamiała
+        # kolejną rundę i zadanie wracało do kolejki pracy bota.
+        zadania_warstwowe = [
+            {"task_id": "T-WARSTWA", "title": "Wymaga decyzji: Feedback: Zadanie 1",
+             "status": "done", "assignee": "asia"},
+            {"task_id": "T-ESK", "title": "Wymaga decyzji: Alert stanu maszyny",
+             "status": "done", "assignee": "asia"},
+        ]
+        do_zapytania_warstwowe = tfr.find_tasks_needing_feedback(zadania_warstwowe, already_asked=set())
+        checks.append(("find_tasks_needing_feedback: pomija tytuł z prefiksem W ŚRODKU",
+                       do_zapytania_warstwowe == []))
+        checks.append(("find_tasks_needing_feedback: nie pyta o feedback do eskalacji",
+                       all(t["task_id"] != "T-ESK" for t in do_zapytania_warstwowe)))
+
         # Defense-in-depth: nawet wywołane wprost, request_feedback_for_task
         # NIE dokleja drugiego prefiksu do już-prefiksowanego tytułu.
         client_meta = _FakeClient()

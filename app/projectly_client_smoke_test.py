@@ -12,7 +12,8 @@ import tempfile
 from pathlib import Path
 
 import projectly_client
-from projectly_client import MAX_COMMENTS_PER_TASK, MockProjectlyClient, ProjectlyClient
+from projectly_client import (ESCALATION_TITLE_PREFIX, MAX_COMMENTS_PER_TASK,
+                              MockProjectlyClient, ProjectlyClient, is_escalation_task)
 
 
 def _client_with(path):
@@ -264,6 +265,12 @@ ZADANIA_Z_STERUJACYM = [
     {"id": "CTRL-1", "title": "🎛️ Kontrola bota: marketing", "status": "todo"},
 ]
 
+ZADANIA_Z_ESKALACJA = [
+    {"id": "T-1", "title": "Zrób raport sprzedaży", "status": "todo"},
+    {"id": "ESK-1", "title": "Wymaga decyzji: Alert: stan maszyny wymaga sprawdzenia",
+     "status": "todo"},
+]
+
 
 def test_list_tasks_odsiewa_zadania_sterujace():
     # Żywy bug 01.09.2026: "[runner_loop] Start — kolejka zadań: 1: 🎛️ Kontrola
@@ -289,6 +296,38 @@ def test_get_new_tasks_nigdy_nie_zwraca_zadan_sterujacych():
     tytuly = [t["title"] for t in client.get_new_tasks()]
     assert tytuly == ["Zrób raport sprzedaży"], tytuly
     print("OK  get_new_tasks() nigdy nie zwraca zadań sterujących (kolejka pracy)")
+
+
+def test_get_new_tasks_nigdy_nie_zwraca_zadan_eskalacyjnych():
+    # Żywy incydent 04-05.09.2026: 4 zadania "Wymaga decyzji: ..." wracały do
+    # kolejki pracy przy KAŻDYM przebiegu (co ~30 s przez 20 godzin) i dały
+    # 9098 par zdarzeń skip/close, zajmując wszystkie miejsca w partii przebiegu.
+    # runner_loop je odrzucał, ale dopiero PO pobraniu - filtr musi stać w kolejce.
+    client = _klient_z_zadaniami(ZADANIA_Z_ESKALACJA)
+    client._polled_account_ids = lambda: [("AI - Marketing", "ACC-1")]
+    client._pollable_projects = lambda: [{"id": "PROJ-1"}]
+    tytuly = [t["title"] for t in client.get_new_tasks()]
+    assert tytuly == ["Zrób raport sprzedaży"], tytuly
+    print("OK  get_new_tasks() nigdy nie zwraca zadań eskalacyjnych (kolejka pracy)")
+
+
+def test_list_tasks_nadal_widzi_eskalacje():
+    # escalation_watcher.py przypomina o przeterminowanych decyzjach człowieka -
+    # gdyby filtr stał w list_tasks, przestałby cokolwiek widzieć.
+    client = _klient_z_zadaniami(ZADANIA_Z_ESKALACJA)
+    tytuly = [t["title"] for t in client.list_tasks(project_id="PROJ-1")]
+    assert "Wymaga decyzji: Alert: stan maszyny wymaga sprawdzenia" in tytuly, tytuly
+    print("OK  list_tasks() nadal widzi zadania eskalacyjne (dla escalation_watcher)")
+
+
+def test_prefiks_eskalacji_ma_jedno_zrodlo():
+    # Tytuł nadaje escalate_to_human, filtr kolejki czyta ten sam prefiks -
+    # rozjazd tych dwóch miejsc odtworzyłby pętlę po cichu.
+    import escalation
+    assert escalation.ESCALATION_TITLE_PREFIX == ESCALATION_TITLE_PREFIX
+    assert is_escalation_task({"title": ESCALATION_TITLE_PREFIX + "cokolwiek"})
+    assert not is_escalation_task({"title": "Zwykłe zadanie"})
+    print("OK  prefiks eskalacji ma jedno źródło prawdy (projectly_client)")
 
 
 def test_mock_client_tez_odsiewa_zadania_sterujace():
@@ -321,5 +360,8 @@ if __name__ == "__main__":
     test_list_tasks_odsiewa_zadania_sterujace()
     test_list_tasks_include_control_zwraca_sterujace()
     test_get_new_tasks_nigdy_nie_zwraca_zadan_sterujacych()
+    test_get_new_tasks_nigdy_nie_zwraca_zadan_eskalacyjnych()
+    test_list_tasks_nadal_widzi_eskalacje()
+    test_prefiks_eskalacji_ma_jedno_zrodlo()
     test_mock_client_tez_odsiewa_zadania_sterujace()
     print("\nWszystkie testy MockProjectlyClient przeszły.")

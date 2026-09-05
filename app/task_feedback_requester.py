@@ -36,7 +36,8 @@ import json
 from pathlib import Path
 
 from email_draft_generator import generate_draft
-from projectly_client import PRIORITY_BACKLOG, get_client, own_account_name
+from projectly_client import (ESCALATION_TITLE_PREFIX, PRIORITY_BACKLOG,
+                              get_client, own_account_name)
 
 ASKED_PATH = Path(__file__).parent / "runs" / "feedback_requested.json"
 
@@ -74,6 +75,20 @@ def _save_asked(asked, path=None):
     path.write_text(json.dumps(sorted(asked), ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _tytul_meta(title):
+    """Czy to tytuł zadania META (prośba o feedback albo eskalacja), a nie
+    prawdziwej pracy, o którą wypada pytać o feedback.
+
+    Prefiksy szukane GDZIEKOLWIEK w tytule, nie tylko na początku: tytuły
+    narastają warstwami, więc "Wymaga decyzji: Feedback: X" przechodziło przez
+    sprawdzanie samego początku i uruchamiało kolejną rundę. Eskalacje odsiewamy
+    tu po raz pierwszy (05.09.2026): prośba o feedback do zadania czekającego na
+    decyzję człowieka tworzyła "Feedback: Wymaga decyzji: ...", a takie zadanie
+    wracało do kolejki pracy bota."""
+    tekst = str(title or "")
+    return FEEDBACK_TITLE_PREFIX in tekst or ESCALATION_TITLE_PREFIX in tekst
+
+
 def find_tasks_needing_feedback(tasks, already_asked, own_account=None):
     """Pomija zadania utworzone PRZEZ ten skrypt (tytuł już zaczyna się od
     FEEDBACK_TITLE_PREFIX) — to zadania META o pytaniu o feedback, nie
@@ -90,7 +105,7 @@ def find_tasks_needing_feedback(tasks, already_asked, own_account=None):
     -> filtr po assignee pomijany, zachowanie sprzed poprawki (nie blokuje
     testów/trybu mock bez pełnej konfiguracji ról)."""
     return [t for t in tasks if t.get("status") == "done" and t["task_id"] not in already_asked
-           and not (t.get("title") or "").startswith(FEEDBACK_TITLE_PREFIX)
+           and not _tytul_meta(t.get("title"))
            and (own_account is None or t.get("assignee") == own_account)]
 
 
@@ -102,8 +117,8 @@ def request_feedback_for_task(task, client=None, send_email=False):
     # Zabezpieczenie defense-in-depth (główny filtr jest w
     # find_tasks_needing_feedback) — na wypadek wywołania tej funkcji wprost,
     # z pominięciem tamtego filtra, nie dokładaj prefiksu drugi raz.
-    tytul = original_title if original_title.startswith(FEEDBACK_TITLE_PREFIX) \
-        else f"{FEEDBACK_TITLE_PREFIX}{original_title}"
+    tytul = (original_title if FEEDBACK_TITLE_PREFIX in original_title
+             else f"{FEEDBACK_TITLE_PREFIX}{original_title}")
     feedback_task_id = client.create_task(
         title=tytul,
         description=FEEDBACK_COMMENT,

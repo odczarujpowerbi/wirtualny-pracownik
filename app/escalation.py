@@ -28,6 +28,7 @@ from datetime import datetime, timedelta, timezone
 
 import email_client
 import state_store
+from projectly_client import ESCALATION_TITLE_PREFIX as _ESCALATION_TITLE_PREFIX
 from projectly_client import PRIORITY_BIEZACE, PRIORITY_PRIORYTET, effective_priority
 from projectly_client import _load_config as _load_projectly_config
 
@@ -68,7 +69,10 @@ def _wyslij_powiadomienie_eskalacji(task, reason, new_task_id, assignee):
         print(f"[escalation] Powiadomienie mailowe nie powiodło się (eskalacja i tak zapisana w Projectly): {exc}")
 
 
-ESCALATION_TITLE_PREFIX = "Wymaga decyzji: "
+# Prefiks mieszka w projectly_client.py (tam stoi filtr kolejki pracy,
+# is_escalation_task) — tu re-eksport pod dotychczasową nazwą, żeby tytuł
+# nadawany przez escalate_to_human i filtr kolejki nie mogły się rozjechać.
+ESCALATION_TITLE_PREFIX = _ESCALATION_TITLE_PREFIX
 
 
 def _escalation_default_assignee():
@@ -122,7 +126,10 @@ def escalate_to_human(task, reason, client, options=None, assignee=None, severit
     doklejała prefiks bez sprawdzenia)."""
     assignee = assignee or _escalation_default_assignee()
     original_title = task["title"]
-    if original_title.startswith(ESCALATION_TITLE_PREFIX):
+    # Prefiks szukany GDZIEKOLWIEK w tytule (nie tylko na początku): tytuł
+    # "Feedback: Wymaga decyzji: X" przechodził dotąd przez ten warunek i
+    # dostawał KOLEJNY prefiks, więc tytuł narastał mimo tej ochrony.
+    if ESCALATION_TITLE_PREFIX in original_title:
         title = original_title
     else:
         title = f"{ESCALATION_TITLE_PREFIX}{original_title}"

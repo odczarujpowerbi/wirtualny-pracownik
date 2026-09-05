@@ -52,6 +52,8 @@ niżej, potem sekcję kategorii. Jeśli i tam nie ma odpowiedzi, dopiero wtedy p
 | Tylko pobrać treść strony (GET, bez klikania) | `web_fetch_worker.py` |
 | Odpowiedzieć na pytanie na podstawie pobranej treści strony | `web_answer.py` |
 | Naprawić zły link źródłowy w zadaniu | `web_source_fixer.py` |
+| Zmienić, na jakie strony agent może wchodzić | `config/tool_contracts.yaml` → `fetch_url`/`browser_task` → `allowed_domains` (dziś `"*"`); twarde blokady w `host_policy.py` |
+| Zrozumieć, dlaczego bot w kółko mieli te same zadania | zadania eskalacyjne (`Wymaga decyzji: ...`) i sterujące NIE wchodzą do kolejki pracy (`projectly_client.is_praca`); jeśli mimo to wracają, sprawdź `python queue_verify.py` |
 | Sprawdzić czy tekst zewnętrzny nie zawiera prompt injection | `validator_prompt.py` (dzieje się automatycznie PRZED klasyfikacją w `runner_loop.py`) |
 | Poprosić o feedback po zamkniętym zadaniu | `task_feedback_requester.py` |
 | Eskalować zadanie do człowieka | `escalation.escalate_to_human()` (przez `runner_loop.py`, nie ręcznie) |
@@ -86,6 +88,7 @@ niżej, potem sekcję kategorii. Jeśli i tam nie ma odpowiedzi, dopiero wtedy p
 | `zasady_pracy.py` | Wstrzykuje standardy organizacyjne z `.claude/rules/*.md` do promptu: konwencja commitów, standardy kodu, standard Power BI. Dobór po treści zadania, pliki regul są jedynym źródłem prawdy (zero parafrazy). |
 | `repo_workspace.py` | Piaskownica repo dla zadania: wykrywa repozytorium w treści zadania, robi KLON PER ZADANIE do `runs/repos/`, zakłada branch `agent/<task_id>-<slug>`, ustawia tożsamość commitów. Nowy projekt = `git init` + commit `00 - pusty`. |
 | `repo_publish.py` | Publikacja pracy: commit wg konwencji `NN - opis po polsku` (numer liczony z `git log`, nie zgadywany przez model), push brancha, PR przez `gh`. Commit z plikiem wyglądającym na sekret jest ODRZUCANY. |
+| `host_policy.py` | Jedna reguła "gdzie agentowi wolno wejść w internecie", wspólna dla kontraktów i workerów. Od 05.09.2026: KAŻDA normalna witryna (`allowed_domains: "*"`), zablokowane na stałe tylko darknet (.onion/.i2p) i adresy wewnętrzne (localhost, 10.x, 192.168.x). |
 | `tool_registry.py` | "Czy TO narzędzie z TYMI parametrami wolno uruchomić" — kontrakty z `config/tool_contracts.yaml`. Model nie dostaje dowolnego shella. |
 | `skill_registry.py` / `skill_usage_logger.py` | Rejestr skilli z wersją/ryzykiem (`config/skills_manifest.yaml`) + log użycia (sukces/porażka/koszt/czas). |
 | `model_registry.py` | Jedno miejsce: jakiego modelu użyć i ile kosztuje (`config/models.yaml` czy podobne — wzorzec jak `tool_registry`). |

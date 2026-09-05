@@ -93,6 +93,41 @@ def is_control_task(task):
     return str(task.get("title") or "").startswith(CONTROL_TASK_TITLE_PREFIX)
 
 
+# Zadania ESKALACYJNE (escalate_to_human) czekają na decyzję CZŁOWIEKA, ale
+# zostają przypisane do konta AI, więc get_new_tasks() zaciągało je do kolejki
+# pracy przy KAŻDYM przebiegu. runner_loop je odrzucał (escalation_task_skipped),
+# ale dopiero po pobraniu — efekt: bot mielił w kółko te same zadania.
+# Żywy incydent 04-05.09.2026: 4 zadania "Wymaga decyzji: ..." wygenerowały przez
+# noc 9098 par zdarzeń skip/close (co ~30 s przez 20 godzin), zajmowały wszystkie
+# 3 miejsca w partii przebiegu (MAX_TASKS_PER_RUN) i wypełniły dziennik zdarzeń,
+# nie wykonując ani jednej minuty realnej pracy.
+#
+# Ten sam wzorzec co przy zadaniach sterujących: filtr stoi w KOLEJCE PRACY
+# (get_new_tasks), a nie w list_tasks — escalation_watcher.py musi te zadania
+# widzieć, żeby przypominać o przeterminowanych decyzjach.
+#
+# Prefiks trzymamy TU (escalation.py importuje ten moduł, więc odwrotny kierunek
+# byłby zależnością kołową); escalation.py re-eksportuje go pod dotychczasową
+# nazwą ESCALATION_TITLE_PREFIX, żeby tytuł i filtr nie mogły się rozjechać.
+ESCALATION_TITLE_PREFIX = "Wymaga decyzji: "
+
+
+def is_escalation_task(task):
+    """Czy to zadanie eskalacyjne (decyzja dla człowieka), a nie praca dla bota.
+
+    Prefiks szukany GDZIEKOLWIEK w tytule, nie tylko na początku: tytuły
+    narastają warstwami ("Feedback: Wymaga decyzji: ..." — realny przypadek
+    z kolejki 05.09.2026), a sprawdzanie samego początku przepuszczało taką
+    warstwę z powrotem do kolejki i pętla startowała od nowa."""
+    return ESCALATION_TITLE_PREFIX in str(task.get("title") or "")
+
+
+def is_praca(task):
+    """Czy to realna praca do wykonania przez bota. Jedno miejsce, w którym
+    kolejka pracy odsiewa zadania sterujące i eskalacyjne."""
+    return not is_control_task(task) and not is_escalation_task(task)
+
+
 def control_task_id_for_role(role):
     """ID zadania sterującego tą rolą, PRZYPIĘTE w config/projectly.yaml
     (control_task_by_role). None = brak wpisu dla tej roli.
@@ -477,10 +512,11 @@ class ProjectlyClient:
                         continue
                     widziane.add(raw.get("id"))
                     zadanie = self._map_task(raw, project["id"])
-                    # Zadanie sterujące to przełącznik bota, nie praca — nigdy
-                    # nie trafia do kolejki. Bez wyjątku i bez opcji: get_new_tasks
-                    # to WYŁĄCZNIE kolejka pracy (patrz is_control_task).
-                    if is_control_task(zadanie):
+                    # Zadanie sterujące (przełącznik bota) ani eskalacyjne
+                    # (czeka na decyzję człowieka) to nie jest praca — nigdy nie
+                    # trafiają do kolejki. Bez wyjątku i bez opcji: get_new_tasks
+                    # to WYŁĄCZNIE kolejka pracy (patrz is_praca).
+                    if not is_praca(zadanie):
                         continue
                     zadanie["ai_account"] = nazwa_konta
                     tasks.append(zadanie)
@@ -763,8 +799,8 @@ class MockProjectlyClient:
         with open(self.tasks_path, encoding="utf-8") as f:
             tasks = json.load(f)
         # Ten sam filtr co w realnym kliencie — kolejka pracy nigdy nie zawiera
-        # przełączników bota (patrz is_control_task).
-        return [t for t in tasks if not is_control_task(t)]
+        # przełączników bota ani zadań eskalacyjnych (patrz is_praca).
+        return [t for t in tasks if is_praca(t)]
 
     def post_comment(self, task_id, text):
         print(f"[MOCK Projectly] komentarz na {task_id}:\n{text}\n")
