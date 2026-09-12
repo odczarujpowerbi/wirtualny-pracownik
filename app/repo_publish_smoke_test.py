@@ -41,8 +41,71 @@ def _repo_testowe():
 
 
 def _sandbox(katalog, **config):
+    # merge_to_main domyslnie False: scalanie ma wlasne testy (_checki_scalania),
+    # a te sprawdzaja sciezke commit/push/PR, uzywana gdy scalanie jest wylaczone.
     return {"ok": True, "path": str(katalog), "branch": BRANCH, "base_branch": "main",
-            "config": {"push": False, "pull_request": False, **config}}
+            "config": {"push": False, "pull_request": False, "merge_to_main": False, **config}}
+
+
+def _runner_z_bramka(kod_testow):
+    """Git wykonujemy NAPRAWDE, samo polecenie testow udajemy podanym kodem wyjscia."""
+    def runner(cmd, **kwargs):
+        if cmd[:1] != ["git"]:
+            return _WynikRunnera(kod_testow, stdout="log testow")
+        return subprocess.run(cmd, **kwargs)
+    return runner
+
+
+def _galaz(katalog):
+    return subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=str(katalog),
+                          capture_output=True, text=True).stdout.strip()
+
+
+def _log(katalog, ref="HEAD"):
+    return subprocess.run(["git", "log", "--format=%s", ref], cwd=str(katalog),
+                          capture_output=True, text=True).stdout
+
+
+def _checki_scalania():
+    """Bramka jakosci i automatyczne scalanie do galezi glownej (12.09.2026)."""
+    checks = []
+
+    # 1. Zielona bramka -> praca scalona do galezi glownej.
+    katalog = _repo_testowe()
+    (katalog / "self_check.py").write_text("# udawane testy", encoding="utf-8")
+    (katalog / "nowy.txt").write_text("praca agenta", encoding="utf-8")
+    wynik = repo_publish.zamknij(_sandbox(katalog, merge_to_main=True), "dodano nowy plik",
+                                 runner=_runner_z_bramka(0))
+    checks.append(("Zielona bramka -> akcja 'scalone'", wynik.get("akcja") == "scalone"))
+    checks.append(("Po scaleniu piaskownica stoi na galezi glownej", _galaz(katalog) == "main"))
+    checks.append(("Galaz glowna ma commit agenta wg konwencji",
+                   "01 - dodano nowy plik" in _log(katalog)))
+    checks.append(("Opis dla czlowieka mowi o scaleniu",
+                   "scalony do galezi glownej" in repo_publish.opis_dla_czlowieka(wynik)))
+
+    # 2. Czerwona bramka -> galaz zostaje, galaz glowna NIETKNIETA.
+    katalog2 = _repo_testowe()
+    (katalog2 / "self_check.py").write_text("# udawane testy", encoding="utf-8")
+    (katalog2 / "psuje.txt").write_text("cos zepsutego", encoding="utf-8")
+    wynik2 = repo_publish.zamknij(_sandbox(katalog2, merge_to_main=True), "zmiana z bledem",
+                                  runner=_runner_z_bramka(1))
+    checks.append(("Czerwona bramka -> akcja 'bramka_czerwona'",
+                   wynik2.get("akcja") == "bramka_czerwona"))
+    checks.append(("Czerwona bramka: zostajemy na galezi zadania", _galaz(katalog2) == BRANCH))
+    checks.append(("Czerwona bramka: galaz glowna NIE dostala pracy",
+                   "zmiana z bledem" not in _log(katalog2, "main")))
+    checks.append(("Czerwona bramka: opis mowi wprost, ze praca zostaje na galezi",
+                   "ZOSTAJE na galezi" in repo_publish.opis_dla_czlowieka(wynik2)))
+
+    # 3. Repozytorium bez testow: bramka zielona z automatu (inaczej nowy projekt
+    #    nigdy nie moglby niczego scalic).
+    katalog3 = _repo_testowe()
+    (katalog3 / "cokolwiek.txt").write_text("praca", encoding="utf-8")
+    wynik3 = repo_publish.zamknij(_sandbox(katalog3, merge_to_main=True), "praca bez testow",
+                                  runner=_runner_z_bramka(1))
+    checks.append(("Repozytorium bez testow: scalenie mimo wszystko",
+                   wynik3.get("akcja") == "scalone"))
+    return checks
 
 
 def run():
@@ -148,6 +211,8 @@ def run():
     # 9. Brak piaskownicy -> nie wolamy gita w ogole.
     checks.append(("Brak piaskownicy -> brak_zmian, bez wolania gita",
                    repo_publish.zamknij(None, "cokolwiek")["akcja"] == "brak_zmian"))
+
+    checks += _checki_scalania()
 
     print("\n--- Wynik testu dymnego repo_publish ---")
     all_passed = True

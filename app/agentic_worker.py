@@ -53,6 +53,7 @@ from pathlib import Path
 import agentic_prompt
 import bot_content_check
 import cost_estimator
+import knowledge_sync
 import model_registry
 import repo_publish
 import repo_workspace
@@ -80,7 +81,11 @@ NARZEDZIA_SUBAGENTA = "Read Write Edit Bash Skill WebFetch WebSearch"
 # Publikacja, po której praca NIE jest dostarczona — fail-closed, runner_loop
 # eskaluje do człowieka (patrz repo_publish.zamknij). "brak_zmian" tu NIE jest:
 # zadanie analityczne w repo może legalnie nie zmienić ani jednego pliku.
-NIEUDANE_PUBLIKACJE = ("commit_odrzucony", "commit_nieudany")
+# "bramka_czerwona" i "branch_bez_scalenia" dopisane 12.09.2026: praca, ktora nie
+# przeszla testow albo nie dala sie scalic, NIE jest dostarczona — zadanie ma
+# trafic do czlowieka z logiem, a nie zamknac sie jako zrobione.
+NIEUDANE_PUBLIKACJE = ("commit_odrzucony", "commit_nieudany", "bramka_czerwona",
+                       "branch_bez_scalenia")
 
 
 def _slug(text, limit=60):
@@ -212,6 +217,15 @@ def run(task, thinking, client=None, context=None):
         return _nie_wykonano("nie udało się przygotować repozytorium zadania: "
                              + str(sandbox.get("powod") or "nieznany powód"),
                              cost_usd=ocena_planu["cost_usd"])
+
+    # Wiedza o projekcie z Projectly ląduje w repozytorium PRZED pracą subagenta,
+    # więc model widzi ją jako zwykłe pliki obok kodu (decyzja właściciela
+    # 12.09.2026). Jeden kierunek: Projectly nadpisuje repozytorium, nigdy odwrotnie.
+    # Fail-soft: brak wiedzy albo błąd Projectly nie blokuje wykonania zadania.
+    if sandbox and sandbox.get("ok") and task.get("project_id"):
+        wynik_wiedzy = knowledge_sync.synchronizuj(client, task["project_id"], sandbox["path"])
+        if wynik_wiedzy["bledy"]:
+            print(f"[agentic_worker] Kopiowanie wiedzy projektu: {'; '.join(wynik_wiedzy['bledy'][:3])}")
 
     sharepoint_folder = _onedrive_task_folder(task, client=client)
     prompt = agentic_prompt.build(task, plan_text, folder, client,

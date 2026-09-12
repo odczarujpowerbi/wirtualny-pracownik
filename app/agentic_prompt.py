@@ -46,6 +46,36 @@ def _kontekst_kesza_blok(task, context):
     return context_cache.context_block(context, task)
 
 
+def _polityka_projektu_blok(task, client):
+    """Zasady projektu i narzędzia dozwolone W TYM projekcie (Projectly, MCP
+    zbot_get_project_policy). Blok idzie NA POCZĄTEK promptu — decyzja właściciela
+    12.09.2026: to jest wiedza pierwszorzędna, ważniejsza niż kontekst firmy,
+    dokumentacja i treść zadania.
+
+    Fail-soft jak każdy blok: brak klienta / brak polityki / błąd -> pusty string,
+    a wtedy obowiązują ustawienia lokalne maszyny (nigdy „wolno wszystko")."""
+    if client is None or not task.get("project_id"):
+        return ""
+    try:
+        polityka = client.project_policy(task["project_id"])
+    except Exception:  # noqa: BLE001 — polityka jest dodatkiem do promptu, nie warunkiem wykonania
+        return ""
+    if not polityka:
+        return ""
+
+    linie = []
+    zasady = polityka.get("rules") or []
+    if zasady:
+        linie.append("=== ZASADY TEGO PROJEKTU (mają pierwszeństwo przed wszystkim poniżej) ===")
+        linie += [f"- {z}" for z in zasady]
+    narzedzia = polityka.get("allowedTools") or []
+    if narzedzia:
+        nazwy = ", ".join(str(n.get("name") or n.get("key")) for n in narzedzia)
+        linie.append(f"Narzędzia dozwolone w tym projekcie: {nazwy}. "
+                     "Niczego spoza tej listy nie używaj, nawet jeśli technicznie działa.")
+    return "\n".join(linie)
+
+
 def _kontekst_projektu_blok(task, client):
     """Fail-soft: brak client/project_id albo błąd -> pusty string."""
     if client is None or not task.get("project_id"):
@@ -132,6 +162,9 @@ def build(task, plan_text, folder, client=None, sharepoint_folder=None,
     (None, gdy zadanie nie dotyczy repozytorium)."""
     bloki_kontekstu = [
         blok for blok in (
+            # Zasady projektu PIERWSZE, przed kontekstem firmy — to twarde polecenia
+            # właściciela projektu, nie tło (decyzja właściciela 12.09.2026).
+            _polityka_projektu_blok(task, client),
             _kontekst_firmy_blok(task),
             _kontekst_projektu_blok(task, client),
             _kontekst_kesza_blok(task, context),

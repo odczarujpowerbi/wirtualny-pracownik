@@ -35,3 +35,16 @@ repo_work:
 
   clone_timeout_seconds: 300
   push_timeout_seconds: 180
+
+  # --- Bramka jakosci i scalanie do galezi glownej (12.09.2026) ---
+  # Decyzja wlasciciela: praca agenta idzie na galaz zadania, a po ZIELONEJ bramce
+  # jest scalana do galezi glownej automatycznie. Czerwona bramka zostawia galaz
+  # i eskaluje zadanie do czlowieka (repo_publish.py -> akcja "bramka_czerwona").
+  merge_to_main: true
+
+  # Polecenie testow. Puste = wykrywamy po zawartosci repozytorium
+  # (self_check.py -> python self_check.py, package.json -> npm test, tests/ -> pytest).
+  # Repozytorium bez testow przechodzi bramke, inaczej nowy projekt nigdy nie
+  # moglby niczego scalic.
+  quality_gate: null
+  quality_gate_timeout_seconds: 900

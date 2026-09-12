@@ -138,12 +138,15 @@ def _zamiar_z_projektu(task, client):
     if not repo:
         return None
 
+    url = str(repo.get("url") or "").strip()
     lokalny = _repo_lokalne(str(repo.get("local_path") or "").strip())
     if lokalny:
-        return {"tryb": "clone", "zrodlo": lokalny, "zrodlo_opis": "folder firmowy projektu"}
-    url = str(repo.get("url") or "").strip()
+        # github_url: dokad wypchnac KOPIE po scaleniu (repo_merge.py). Zrodlem
+        # jest folder firmowy, GitHub jest kopia — decyzja wlasciciela 12.09.2026.
+        return {"tryb": "clone", "zrodlo": lokalny, "zrodlo_opis": "folder firmowy projektu",
+                "github_url": url or None}
     if url:
-        return {"tryb": "clone", "zrodlo": url, "zrodlo_opis": "GitHub projektu"}
+        return {"tryb": "clone", "zrodlo": url, "zrodlo_opis": "GitHub projektu", "github_url": url}
     return {"tryb": "init", "zrodlo_opis": "projekt bez repozytorium — zakladamy nowe"}
 
 
@@ -283,5 +286,6 @@ def przygotuj(task, config=None, runner=subprocess.run, client=None):
         return {**zamiar, **przelaczenie, "path": str(docelowy), "branch": branch}
 
     return {"ok": True, "tryb": zamiar["tryb"], "zrodlo": zamiar.get("zrodlo"),
+            "github_url": zamiar.get("github_url"),
             "path": str(docelowy), "branch": branch, "base_branch": base_branch,
             "config": cfg}

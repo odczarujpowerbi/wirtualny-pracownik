@@ -23,12 +23,17 @@ Kolejne akcje zwracane przez zamknij():
   commit_lokalny    -> commit jest, push wylaczony w konfiguracji,
   branch_bez_push   -> commit jest, push sie nie udal (np. brak uprawnien),
   branch_bez_pr     -> branch wypchniety, PR nie powstal (brak gh / brak logowania),
-  pr_utworzony      -> pelna sciezka: commit + push + PR.
+  pr_utworzony      -> pelna sciezka: commit + push + PR,
+  bramka_czerwona   -> testy w repozytorium padly: galaz zostaje, main NIETKNIETY,
+  scalone           -> testy przeszly, praca scalona do galezi glownej i opublikowana.
 """
 
 import shutil
 import subprocess
 from pathlib import Path
+
+import repo_merge
+import repo_quality_gate
 
 MAX_DLUGOSC_OPISU = 72
 ILE_COMMITOW_WSTECZ = 50
@@ -150,6 +155,15 @@ def zamknij(sandbox, opis, runner=subprocess.run):
         return {"branch": sandbox["branch"], **wynik_commitu}
 
     wspolne = {"branch": sandbox["branch"], "commit": wynik_commitu}
+
+    # Automatyczne scalanie do galezi glownej (decyzja wlasciciela 12.09.2026).
+    # Warunek jest jeden i twardy: ZIELONA bramka jakosci. Czerwona zostawia
+    # galaz i NIE dotyka galezi glownej — czlowiek dostaje zadanie z logiem.
+    # Idzie PRZED pushem galezi zadania, bo publikacja wyniku (folder firmowy,
+    # GitHub) nalezy tu do repo_merge.py, nie do `git push origin <branch>`.
+    if config.get("merge_to_main", True):
+        return _scal_albo_zostaw(sandbox, config, wspolne, runner)
+
     if not config.get("push", True):
         return {"akcja": "commit_lokalny", **wspolne}
 
@@ -165,9 +179,40 @@ def zamknij(sandbox, opis, runner=subprocess.run):
     return {**pr, **wspolne} if pr["akcja"] == "pr_utworzony" else {**wspolne, **pr}
 
 
+def _scal_albo_zostaw(sandbox, config, wspolne, runner):
+    """Bramka jakosci -> scalenie do galezi glownej albo zostawienie galezi."""
+    bramka = repo_quality_gate.sprawdz(sandbox["path"], config, runner=runner)
+    if not bramka["zielona"]:
+        return {"akcja": "bramka_czerwona",
+                "powod": f"{bramka['powod']} ({bramka.get('polecenie') or 'brak polecenia'})",
+                "bramka": bramka, **wspolne}
+
+    publikacja = repo_merge.opublikuj(sandbox, runner=runner)
+    if not publikacja["ok"]:
+        return {"akcja": "branch_bez_scalenia", "powod": publikacja["powod"],
+                "bramka": bramka, **wspolne}
+    return {"akcja": "scalone", "powod": publikacja["powod"], "bramka": bramka,
+            "zrodlo": publikacja["zrodlo"], "kopia": publikacja["kopia"], **wspolne}
+
+
 def opis_dla_czlowieka(wynik):
     """Jedno zdanie do komentarza w Projectly / notatki akceptacyjnej."""
     akcja = wynik.get("akcja")
+    if akcja == "scalone":
+        czesci = [f'Commit "{wynik["commit"]}" scalony do galezi glownej']
+        for klucz, etykieta in (("zrodlo", "folder firmowy"), ("kopia", "GitHub")):
+            stan = wynik.get(klucz) or {}
+            if stan.get("ok"):
+                czesci.append(f"{etykieta}: zaktualizowany")
+            elif not stan.get("pominiete"):
+                czesci.append(f"{etykieta}: NIE zaktualizowany ({stan.get('powod', '?')})")
+        return ", ".join(czesci)
+    if akcja == "bramka_czerwona":
+        return (f'Praca ZOSTAJE na galezi {wynik["branch"]} — testy nie przeszly: '
+                f'{wynik.get("powod", "?")}')
+    if akcja == "branch_bez_scalenia":
+        return (f'Commit "{wynik["commit"]}" powstal, ale scalenie sie nie udalo: '
+                f'{wynik.get("powod", "?")}')
     if akcja == "pr_utworzony":
         return f"Commit \"{wynik['commit']}\" na branchu {wynik['branch']}, PR: {wynik.get('pr_url', '?')}"
     if akcja == "branch_bez_pr":

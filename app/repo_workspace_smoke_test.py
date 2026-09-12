@@ -76,7 +76,8 @@ def _checki_repo_z_projektu():
     checks.append(("Projekt z kodem bez folderu: klonujemy z GitHuba",
                    repo_workspace.wykryj(zadanie, client=klient_url)
                    == {"tryb": "clone", "zrodlo": "https://github.com/firma/kod.git",
-                       "zrodlo_opis": "GitHub projektu"}))
+                       "zrodlo_opis": "GitHub projektu",
+                       "github_url": "https://github.com/firma/kod.git"}))
 
     klient_pusty = _KlientProjektu({"local_path": None, "url": None, "branch": "main", "init_at": None})
     checks.append(("Projekt z kodem bez adresow: tryb zakladania repozytorium",
