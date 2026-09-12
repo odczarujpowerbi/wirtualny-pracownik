@@ -31,7 +31,7 @@
 - Operacje na bazie tylko SELECT, chyba że jawnie zlecone inaczej.
 
 ## Dokumentacja
-- Dokumentacja: docs/index.html — zestaw małych, samodzielnych stron (architektura, przepływ zadania, boty i persony, buyer persony, kontekst firmy, modele i koszty, bezpieczeństwo, panel operatora, skąd zadania, instalacja, mapa plików, stan i roadmapa). Jak dodać/zmienić stronę: docs/jak-edytowac.html. README.md w root = skrót o projekcie.
+- Dokumentacja: `docs/index.html` — powłoka z lewym paskiem nawigacji, treść w `docs/sekcje/NN-nazwa.html` (16 sekcji: czym to jest, droga zadania, architektura, kontrola jakości, zespół botów, skąd zadania, wiedza o firmie, sterowanie, bezpieczeństwo, koszty, instalacja, mapa repozytorium, co działa, co dalej, jak edytować). Ton BIZNESOWY, krótko, z diagramami SVG; nazwy plików `.py` chowaj do tabel i sekcji zwijanych. Lista sekcji jest w JEDNYM miejscu: `docs/assets/docs.js`. Kontrast minimum 6:1 (policzone wartości w komentarzu `docs/assets/style.css`). Jak dodać/zmienić sekcję: sekcja `15-jak-edytowac`. README.md w root = skrót o projekcie.
 - Instalacja i konfiguracja maszyny: folder instalacja/ (Przygotuj-srodowisko.bat, Zaloguj.bat, postaw-od-zera.ps1)
 - Stan kodu (co działa / czego brak): app/README.md
 - **Mapa skryptów — który skrypt do czego, kiedy wywołać, "chcę zrobić X → wywołaj Y": app/MAPA-SKRYPTOW.md. Sprawdź TO PIERWSZE, zanim zaczniesz grepować repo w poszukiwaniu właściwego skryptu.**

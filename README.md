@@ -4,15 +4,17 @@ Wirtualny pracownik działający niezależnie od laptopów zespołu: cyklicznie 
 
 ## Od czego zacząć
 
-Pełna dokumentacja (wiele małych, samodzielnych stron, wspólny wygląd, każda linkuje do innych): **[`docs/index.html`](./docs/index.html)**.
+Pełna dokumentacja: **[`docs/index.html`](./docs/index.html)**. Otwórz dwuklikiem, bez serwera.
+Lewy pasek prowadzi przez wszystkie sekcje, każda jest osobnym plikiem w `docs/sekcje/`.
 
-| Chcę... | Otwórz |
+| Chcę... | Otwórz sekcję |
 |---|---|
-| **Zainstalować i uruchomić** (krok po kroku, po ludzku) | [`docs/instalacja.html`](./docs/instalacja.html) |
-| **Zrozumieć architekturę** (warstwy, komponenty) | [`docs/architektura.html`](./docs/architektura.html) |
-| **Zobaczyć przepływ zadania krok po kroku** | [`docs/przeplyw-zadania.html`](./docs/przeplyw-zadania.html) |
-| **Zrozumieć buyer persony i kontekst marek** | [`docs/buyer-persony.html`](./docs/buyer-persony.html), [`docs/kontekst-firmy.html`](./docs/kontekst-firmy.html) |
-| **Zobaczyć stan projektu i roadmapę** | [`docs/stan-i-roadmapa.html`](./docs/stan-i-roadmapa.html) |
+| **Zrozumieć, czym to jest** (język biznesowy, bez kodu) | `01-co-to-jest` |
+| **Zobaczyć, jak płynie praca** (diagram drogi zadania) | `02-droga-zadania` |
+| **Wiedzieć, skąd pewność jakości wyniku** | `04-kontrola-jakosci` |
+| **Zainstalować i uruchomić** (krok po kroku) | `11-instalacja` |
+| **Włączyć, wyłączyć albo podejrzeć bota** | `08-sterowanie` |
+| **Sprawdzić, co działa, a co jest planem** | `13-co-dziala`, `14-co-dalej` |
 
 ## Szybki start (skrót instrukcji)
 
@@ -23,12 +25,12 @@ Pełna dokumentacja (wiele małych, samodzielnych stron, wspólny wygląd, każd
    Repo już jest? Kliknij `instalacja\Przygotuj-srodowisko.bat` (jako administrator). Instalacja jest **bezobsługowa**.
 2. Uzupełnij dostępy w `app\secrets\.env` (i `app\secrets\mcp\*.json`). Szczegóły w instrukcji.
 3. Zaloguj się na konta: `instalacja\Zaloguj.bat` (osobny, szybki krok po instalacji).
-4. Bot dev/marketing/zarząd startuje sam (autostart). Checker (dostęp do repo) startuje WYŁĄCZNIE ręcznie (`start-agent-checker.bat`) — świadomie bez autostartu, żeby nie zużywał tokenów w tle bez potrzeby. Podgląd: `start-dashboard.bat` (albo `python app\dashboard.py`) → http://127.0.0.1:8787/
+4. Przy zalogowaniu startuje **tylko nadzorca** (`start-nadzorca.bat`). To on odpala boty, i wyłącznie te włączone zadaniem sterującym w Projectly. Ręczny start jednego bota (diagnostyka): `start-agent-dev.bat`. Podgląd: `start-dashboard.bat` (albo `python app\dashboard.py`) → http://127.0.0.1:8787/
 
 ## Główny folder — co jest czym
 
 - **`instalacja/`** — instalator (`Przygotuj-srodowisko.bat`, `Zaloguj.bat`, `postaw-od-zera.ps1`).
-- **`docs/`** — dokumentacja (instrukcja, dokumentacja projektu, przepływ).
+- **`docs/`** — dokumentacja projektu: powłoka `index.html` z lewym paskiem nawigacji, sekcje w `docs/sekcje/`, wspólny wygląd w `docs/assets/`.
 - **`app/`** — kod (rdzeń agenta, boty, dashboard, skrypty instalacyjne). Stan i sekrety w `app/runs/` i `app/secrets/` (poza repo).
 - **`aktualizuj-repo.bat`** — pobranie nowego kodu z GitHub (dwuklik).
 - **`start-agent-dev.bat`** / **`start-agent-checker.bat`** / **`start-agent-marketing.bat`** / **`start-agent-zarzad.bat`** — ręczny start pętli jednego z czterech botów (każdy osobny proces/okno). **`start-agent-all.bat`** — odpala wszystkie cztery naraz, w osobnych oknach.

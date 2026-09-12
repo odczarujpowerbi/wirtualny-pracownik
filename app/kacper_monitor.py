@@ -1,5 +1,5 @@
 """
-Kacper — monitor i samo-naprawa (rola z docs/przeplyw.html: "czyta wspólny
+Kacper — monitor i samo-naprawa (rola z docs/sekcje/05-zespol-botow.html: "czyta wspólny
 dziennik ~co 30s, sprawdza status wszystkich bieżących zadań i nietypowe
 przebiegi... tworzy zadania naprawcze"). Status w dokumentacji: "brak" —
 ten moduł to pierwsza wersja.
