@@ -53,6 +53,16 @@ jobs:
   category: Status/monitoring
   interval_seconds: 3600
   enabled: true
+- name: connectors_report
+  description: Zglasza do Projectly, jakie polaczenia (MailerLite, SharePoint, poczta,
+    GitHub...) ma ta maszyna i czy dzialaja. Do bazy ida WYLACZNIE nazwa, opis i status
+    - nigdy wartosci kluczy. Dzieki temu wlasciciel widzi konektory w ustawieniach
+    aplikacji i decyduje tam, ktory projekt moze z ktorego korzystac.
+  module: connectors_manifest
+  function: zglos
+  category: Integracje
+  interval_seconds: 3600
+  enabled: true
 - name: knowledge_digest_publisher
   description: Cogodzinny digest "ostatnia aktywność" (zadania z tego tygodnia,
     per konto) do bazy wiedzy Projectly, po jednym wpisie na konto AI (dev/
