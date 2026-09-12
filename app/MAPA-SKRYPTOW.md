@@ -30,7 +30,10 @@ niżej, potem sekcję kategorii. Jeśli i tam nie ma odpowiedzi, dopiero wtedy p
 | Zarejestrować rolę maszyny (dev/marketing/...) | `python bootstrap_register.py <rola>` |
 | Uruchomić PEŁNY test dymny repo (bramka jakości commitu) | `python self_check.py` |
 | Zaktualizować kod na maszynie z GitHub (git pull) | `repo_updater.py` (job w schedulerze: `repo_update`) |
-| Kazać agentowi pracować w repozytorium (poprawić kod, zbudować projekt) | nic ręcznie: wystarczy, że zadanie w Projectly niesie URL repo / ścieżkę z `.git` / prośbę o nowy projekt. `agentic_worker.py` sam zrobi klon przez `repo_workspace.py`, a `repo_publish.py` zacommituje wg konwencji i otworzy PR |
+| Kazać agentowi pracować w repozytorium (poprawić kod, zbudować projekt) | nic ręcznie: **zaznacz w Projectly, w ustawieniach projektu, że projekt ma własny kod** (albo zostaw URL w treści zadania, stara droga działa dalej). `repo_workspace.py` weźmie repozytorium z projektu, `knowledge_sync.py` skopiuje wiedzę, `repo_publish.py` zacommituje, uruchomi bramkę jakości i scali do gałęzi głównej |
+| Założyć repozytorium nowego projektu | zaznacz w Projectly przy zakładaniu projektu „to jedna aplikacja" i NIE zaznaczaj „kod już istnieje" — Projectly samo założy zadanie inicjalizacyjne, a `repo_bootstrap.py` dokończy je na GitHubie i zapisze adresy z powrotem w projekcie (wymaga `GITHUB_TOKEN` albo `gh auth login`) |
+| Sprawdzić, jakie połączenia (MailerLite, poczta, GitHub...) widzi maszyna | `python connectors_manifest.py` — lista ze statusem; ten sam manifest leci co godzinę do Projectly (job `connectors_report`), bez żadnych wartości kluczy |
+| Zobaczyć, z czego agent może korzystać W DANYM PROJEKCIE | Projectly → projekt → Ustawienia → Narzędzia w tym projekcie. Bot czyta to przez `zbot_get_project_policy`, a zasady projektu trafiają na POCZĄTEK jego instrukcji (`agentic_prompt.py`) |
 | Sprawdzić, co agent zrobił w repozytorium zadania | `app/runs/repos/<task_id>_<tytuł>/` (klon per zadanie, poza gitem) plus branch `agent/<task_id>-<slug>` na origin |
 | Zmienić zakres pracy agenta z repo (push/PR, gdzie nowe projekty, tożsamość commitów) | `config/repos.yaml` |
 | Sprawdzić czy sekrety Microsoft Graph (mail) w ogóle łapią token | `python graph_verify.py` (NIE wysyła maila) |
@@ -86,7 +89,13 @@ niżej, potem sekcję kategorii. Jeśli i tam nie ma odpowiedzi, dopiero wtedy p
 | `agentic_worker.py` | Prawdziwy subagent Claude Code (Read/Write/Edit/**Bash**/Skill/WebFetch/WebSearch) dla zadań bez wąskiego workera. Pracuje w folderze zadania, a dla zadań o repozytorium w piaskownicy z `repo_workspace.py`. |
 | `agentic_prompt.py` | Co subagent WIE: kontekst firmy, projekt/etap, rodzeństwo podzadań, STANDARDY z `.claude/rules` (przez `zasady_pracy.py`) i instrukcja wykonania (repo albo folder zadania). |
 | `zasady_pracy.py` | Wstrzykuje standardy organizacyjne z `.claude/rules/*.md` do promptu: konwencja commitów, standardy kodu, standard Power BI. Dobór po treści zadania, pliki regul są jedynym źródłem prawdy (zero parafrazy). |
-| `repo_workspace.py` | Piaskownica repo dla zadania: wykrywa repozytorium w treści zadania, robi KLON PER ZADANIE do `runs/repos/`, zakłada branch `agent/<task_id>-<slug>`, ustawia tożsamość commitów. Nowy projekt = `git init` + commit `00 - pusty`. |
+| `repo_workspace.py` | Piaskownica repo dla zadania. Repozytorium bierze NAJPIERW z ustawień projektu w Projectly (folder firmowy = źródło, GitHub = kopia), potem z treści zadania. KLON PER ZADANIE do `runs/repos/`, branch `agent/<task_id>-<slug>`. Nowy projekt = `git init` + commit `00 - pusty`. |
+| `repo_quality_gate.py` | Bramka jakości repozytorium: wykrywa i uruchamia testy projektu (`self_check.py` / `npm test` / `pytest`). Repo bez testów przechodzi; timeout i brak narzędzia = czerwona (fail-closed). |
+| `repo_merge.py` | Po zielonej bramce: scalenie gałęzi zadania do głównej, aktualizacja folderu firmowego (tylko przy czystym drzewie) i push kopii na GitHuba. |
+| `repo_bootstrap.py` | Dokończenie nowego repozytorium: założenie go na GitHubie (`GITHUB_TOKEN` albo `gh`) i zapis obu adresów w projekcie przez `zbot_set_project_repo`. Brak dostępu = repo zostaje lokalne i zadanie idzie do człowieka. |
+| `knowledge_sync.py` | Kopiuje wiedzę o projekcie z Projectly (strony dokumentacji jako `.md` + załączniki) do `baza-wiedzy-projectly/` w repozytorium. Zawsze w jedną stronę. |
+| `task_folder.py` | Jedno miejsce liczące ścieżkę folderu zadania na SharePoincie: `<Projekt>/<zadanie nadrzędne>/<zadanie>`. Stare, płaskie foldery zostają nietknięte. |
+| `connectors_manifest.py` | Manifest połączeń maszyny (nazwa, opis, status) wysyłany do Projectly. NIGDY nie wysyła wartości kluczy. |
 | `repo_publish.py` | Publikacja pracy: commit wg konwencji `NN - opis po polsku` (numer liczony z `git log`, nie zgadywany przez model), push brancha, PR przez `gh`. Commit z plikiem wyglądającym na sekret jest ODRZUCANY. |
 | `host_policy.py` | Jedna reguła "gdzie agentowi wolno wejść w internecie", wspólna dla kontraktów i workerów. Od 05.09.2026: KAŻDA normalna witryna (`allowed_domains: "*"`), zablokowane na stałe tylko darknet (.onion/.i2p) i adresy wewnętrzne (localhost, 10.x, 192.168.x). |
 | `tool_registry.py` | "Czy TO narzędzie z TYMI parametrami wolno uruchomić" — kontrakty z `config/tool_contracts.yaml`. Model nie dostaje dowolnego shella. |
