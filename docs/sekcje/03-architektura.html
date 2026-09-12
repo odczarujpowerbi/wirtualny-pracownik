@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jak to jest zbudowane</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="doc">
+
+  <div class="doc-head">
+    <div class="doc-kicker">Jak to działa</div>
+    <h1 class="doc-title">Jak to jest zbudowane</h1>
+    <p class="doc-lead">
+      Wszystko chodzi na jednej maszynie. Model AI myśli i ocenia, zwykłe skrypty wykonują
+      powtarzalne czynności. Poniżej podział odpowiedzialności.
+    </p>
+  </div>
+
+  <figure class="dia">
+    <div class="dia-box">
+      <svg viewBox="0 0 900 430" role="img" aria-label="Warstwy systemu: kolejka zadań, nadzorca, pętla agenta, wykonawcy, bramka jakości, oparte na wspólnym fundamencie">
+        <defs>
+          <marker id="d1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#4d5769"></path>
+          </marker>
+        </defs>
+
+        <text x="40" y="24" font-size="12" font-weight="700" fill="#4d5769" letter-spacing="1">PRZEPŁYW PRACY</text>
+        <text x="630" y="24" font-size="12" font-weight="700" fill="#4d5769" letter-spacing="1">FUNDAMENT</text>
+
+        <rect x="40" y="36" width="560" height="56" rx="10" fill="#eaf0fe" stroke="#1d4ed8" stroke-width="2"></rect>
+        <text x="66" y="60" font-size="14" font-weight="700" fill="#10151f">📋  Kolejka zadań</text>
+        <text x="66" y="79" font-size="13" fill="#2c3648">Projectly jest jedynym źródłem prawdy o tym, co jest do zrobienia</text>
+
+        <rect x="40" y="106" width="560" height="56" rx="10" fill="#ffffff" stroke="#b9c2d0" stroke-width="2"></rect>
+        <text x="66" y="130" font-size="14" font-weight="700" fill="#10151f">🎛️  Nadzorca</text>
+        <text x="66" y="149" font-size="13" fill="#2c3648">Pilnuje, które role bota mają w ogóle chodzić. Sam nie pracuje</text>
+
+        <rect x="40" y="176" width="560" height="56" rx="10" fill="#ffffff" stroke="#b9c2d0" stroke-width="2"></rect>
+        <text x="66" y="200" font-size="14" font-weight="700" fill="#10151f">🔀  Pętla agenta</text>
+        <text x="66" y="219" font-size="13" fill="#2c3648">Prowadzi zadanie przez całą drogę i zapisuje każdą decyzję</text>
+
+        <rect x="40" y="246" width="560" height="56" rx="10" fill="#ffffff" stroke="#b9c2d0" stroke-width="2"></rect>
+        <text x="66" y="270" font-size="14" font-weight="700" fill="#10151f">🛠️  Wykonawcy</text>
+        <text x="66" y="289" font-size="13" fill="#2c3648">Realna praca: strony, pliki, przeglądarka, integracje, repozytorium</text>
+
+        <rect x="40" y="316" width="560" height="56" rx="10" fill="#e7f5ec" stroke="#0c6430" stroke-width="2"></rect>
+        <text x="66" y="340" font-size="14" font-weight="700" fill="#10151f">✅  Bramka jakości</text>
+        <text x="66" y="359" font-size="13" fill="#2c3648">Ostatni przystanek przed człowiekiem</text>
+
+        <line x1="320" y1="92"  x2="320" y2="102" stroke="#4d5769" stroke-width="2.5" marker-end="url(#d1)"></line>
+        <line x1="320" y1="162" x2="320" y2="172" stroke="#4d5769" stroke-width="2.5" marker-end="url(#d1)"></line>
+        <line x1="320" y1="232" x2="320" y2="242" stroke="#4d5769" stroke-width="2.5" marker-end="url(#d1)"></line>
+        <line x1="320" y1="302" x2="320" y2="312" stroke="#4d5769" stroke-width="2.5" marker-end="url(#d1)"></line>
+
+        <rect x="630" y="36" width="240" height="336" rx="10" fill="#f6f8fb" stroke="#b9c2d0" stroke-width="2"></rect>
+
+        <text x="652" y="70" font-size="13.5" font-weight="700" fill="#10151f">🔐  Kontrakt uprawnień</text>
+        <text x="652" y="89" font-size="13" fill="#2c3648">Co botowi wolno uruchomić</text>
+        <text x="652" y="106" font-size="13" fill="#2c3648">i gdzie</text>
+        <line x1="652" y1="122" x2="848" y2="122" stroke="#d8dee8" stroke-width="1.5"></line>
+
+        <text x="652" y="150" font-size="13.5" font-weight="700" fill="#10151f">🧠  Rejestr modeli</text>
+        <text x="652" y="169" font-size="13" fill="#2c3648">Który model do czego</text>
+        <text x="652" y="186" font-size="13" fill="#2c3648">i ile to kosztuje</text>
+        <line x1="652" y1="202" x2="848" y2="202" stroke="#d8dee8" stroke-width="1.5"></line>
+
+        <text x="652" y="230" font-size="13.5" font-weight="700" fill="#10151f">🏢  Wiedza o firmie</text>
+        <text x="652" y="249" font-size="13" fill="#2c3648">Marki, klienci, zasady,</text>
+        <text x="652" y="266" font-size="13" fill="#2c3648">standardy pracy</text>
+        <line x1="652" y1="282" x2="848" y2="282" stroke="#d8dee8" stroke-width="1.5"></line>
+
+        <text x="652" y="310" font-size="13.5" font-weight="700" fill="#10151f">📒  Pamięć i dziennik</text>
+        <text x="652" y="329" font-size="13" fill="#2c3648">Stan zadań i każda decyzja,</text>
+        <text x="652" y="346" font-size="13" fill="#2c3648">przeżywa restart maszyny</text>
+
+        <text x="450" y="408" text-anchor="middle" font-size="12.5" fill="#4d5769">Fundament obsługuje wszystkie warstwy naraz. Nie da się go ominąć „na skróty"</text>
+      </svg>
+    </div>
+    <figcaption>
+      Kolumna po prawej to rzeczy, które obowiązują zawsze, niezależnie od tego, jakie zadanie bot akurat robi.
+    </figcaption>
+  </figure>
+
+  <h2><span class="hico">🏛️</span> Trzy zasady, na których to stoi</h2>
+  <div class="cards">
+    <div class="card">
+      <h3>🔒 Przy niepewności odmawiaj</h3>
+      <p>Nieznane narzędzie, nieznana ścieżka, nieznany typ akcji: domyślną odpowiedzią jest odmowa
+         albo droższy, bezpieczniejszy wariant. Nigdy „pewnie będzie dobrze".</p>
+    </div>
+    <div class="card">
+      <h3>📄 Decyzje w ustawieniach, nie w kodzie</h3>
+      <p>Co blokuje odbiór, który model do czego, na jakie strony wolno wejść, kto dostaje maile:
+         to wszystko są pliki ustawień. Zmiana zasady nie wymaga programisty.</p>
+    </div>
+    <div class="card">
+      <h3>🧾 Liczy się dowód, nie deklaracja</h3>
+      <p>Każdy wykonawca zostawia ślad: zapisany plik, zrzut ekranu, komentarz przy zadaniu.
+         Bez dowodu zadanie nie przechodzi przez bramkę.</p>
+    </div>
+  </div>
+
+  <h2><span class="hico">🔎</span> Warstwy w szczegółach</h2>
+  <p class="muted">Dla osób, które będą przy tym pracować technicznie. Reszta może pominąć.</p>
+
+  <details class="acc">
+    <summary>Rozwiń tabelę warstw i odpowiadających im plików</summary>
+    <div class="acc-body">
+      <div class="tbl-wrap">
+        <table class="t">
+          <thead><tr><th style="width:20%">Warstwa</th><th>Co robi</th><th style="width:24%">Gdzie to siedzi</th></tr></thead>
+          <tbody>
+            <tr><td><b>Nadzorca</b></td><td>Jedyny proces uruchamiany przy starcie maszyny. Co 30 sekund sprawdza, które role mają być włączone, i odpala tylko je. Sam nie woła modelu.</td><td><code>agent_supervisor.py</code></td></tr>
+            <tr><td><b>Harmonogram</b></td><td>Centralne uruchamianie wszystkich skryptów cyklicznych, historia przebiegów, watchdog.</td><td><code>job_scheduler.py</code>, <code>config/schedule.yaml</code></td></tr>
+            <tr><td><b>Pętla agenta</b></td><td>Prowadzi zadanie przez całą drogę: kontrola treści, podział, ryzyko, routing, wykonanie, poprawki, bramka, zamknięcie.</td><td><code>runner_loop.py</code></td></tr>
+            <tr><td><b>Wykonawcy</b></td><td>Realna praca wg typu zadania: strony, PBIP, przeglądarka, MailerLite, SharePoint.</td><td><code>executor.py</code> i moduły <code>*_worker.py</code></td></tr>
+            <tr><td><b>Subagent</b></td><td>Dla zadań bez gotowego wykonawcy: prawdziwy agent Claude Code pracujący w folderze zadania albo w klonie repozytorium.</td><td><code>agentic_worker.py</code>, <code>agentic_prompt.py</code></td></tr>
+            <tr><td><b>Decyzje modelu</b></td><td>Dwie osobne, każda z bezpiecznym domyślnym wyjściem: czy podzielić zadanie i w jakim formacie zapisać wynik.</td><td><code>task_decomposer.py</code>, <code>output_decider.py</code></td></tr>
+            <tr><td><b>Pętla poprawek</b></td><td>Nanoszenie uwag bramki na materiał i ponowna ocena, do dwóch podejść.</td><td><code>poprawka_materialu.py</code></td></tr>
+            <tr><td><b>Kontrakt uprawnień</b></td><td>Rejestr narzędzi: co wolno, gdzie, z jakimi parametrami. Poza rejestrem to odmowa.</td><td><code>tool_registry.py</code>, <code>config/tool_contracts.yaml</code></td></tr>
+            <tr><td><b>Granice internetu</b></td><td>Jedna reguła dla wszystkich wykonawców: tylko HTTPS, blokada darknetu i adresów wewnętrznych.</td><td><code>host_policy.py</code></td></tr>
+            <tr><td><b>Rejestr modeli</b></td><td>Który model do jakiego wywołania i jaki jest jego cennik.</td><td><code>model_registry.py</code>, <code>config/models.yaml</code></td></tr>
+            <tr><td><b>Wiedza o firmie</b></td><td>Marki, projekty klientów, standardy pracy dokładane do polecenia zależnie od treści zadania.</td><td><code>kontekst_firmy.py</code>, <code>zasady_pracy.py</code>, <code>app/kontekst/</code></td></tr>
+            <tr><td><b>Pamięć i dziennik</b></td><td>Stan zadań i pełna historia decyzji (kto, co, dlaczego, model, koszt). Przeżywa restart.</td><td><code>state_store.py</code></td></tr>
+            <tr><td><b>Bramka jakości</b></td><td>Trzech oceniających i jeden orkiestrator wydający werdykt.</td><td><code>bot_gustaw_bramka.py</code> oraz Bartek, Franek, Oskar</td></tr>
+            <tr><td><b>Panel</b></td><td>Podgląd lokalny: zadania, decyzje na żywo, harmonogram, koszt.</td><td><code>dashboard.py</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="muted">
+        Pełny indeks „chcę zrobić X, wywołaj Y" jest w repozytorium w <code>app/MAPA-SKRYPTOW.md</code>.
+      </p>
+    </div>
+  </details>
+
+  <div class="doc-foot">
+    Dalej:
+    <a href="04-kontrola-jakosci.html" onclick="if(parent!==window){parent.docNav('04-kontrola-jakosci');return false}">Kontrola jakości</a>,
+    czyli najważniejsza warstwa całego systemu.
+  </div>
+
+</div>
+</body>
+</html>

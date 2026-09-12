@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Instalacja maszyny</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="doc">
+
+  <div class="doc-head">
+    <div class="doc-kicker">Wdrożenie</div>
+    <h1 class="doc-title">Instalacja maszyny</h1>
+    <p class="doc-lead">
+      Jak postawić wirtualnego pracownika na nowej maszynie. Instalacja jest bezobsługowa:
+      uruchamiasz i możesz wrócić później, nic się nie zatrzyma na pytaniu.
+    </p>
+  </div>
+
+  <h2><span class="hico">📦</span> Czego potrzebujesz</h2>
+  <div class="cards">
+    <div class="card">
+      <h3>🖥️ Maszyna</h3>
+      <p>Windows Server 2022 albo Windows 11. Dedykowana, włączona całą dobę, ze stałym internetem
+         i uprawnieniami administratora.</p>
+    </div>
+    <div class="card">
+      <h3>🔑 Konta</h3>
+      <p>Microsoft 365 Business Standard (Office, poczta, SharePoint) oraz subskrypcja Claude
+         do logowania w Claude Code.</p>
+    </div>
+    <div class="card">
+      <h3>🧩 Dostępy</h3>
+      <p>Klucz do Projectly. Reszta (Microsoft Graph, MailerLite, Meta Ads) opcjonalnie,
+         zależnie od tego, co bot ma robić.</p>
+    </div>
+  </div>
+
+  <h2><span class="hico">⚙️</span> Instalacja krok po kroku</h2>
+  <ol class="steps">
+    <li>
+      <h3>Pobierz projekt</h3>
+      <p>Na zupełnie pustej maszynie otwórz <b>PowerShell jako administrator</b> i wklej jedną linię:</p>
+      <pre class="code">$s="$env:TEMP\postaw.ps1"; irm https://raw.githubusercontent.com/odczarujpowerbi/wirtualny-pracownik/main/instalacja/skrypty/postaw-od-zera.ps1 -OutFile $s; powershell -ExecutionPolicy Bypass -File $s</pre>
+      <p>Jeśli repozytorium już jest na maszynie, przejdź od razu do kroku 2.</p>
+    </li>
+    <li>
+      <h3>Uruchom instalator</h3>
+      <p>W folderze <code>instalacja</code> kliknij prawym na <b>Przygotuj-srodowisko.bat</b>
+         i wybierz <b>Uruchom jako administrator</b>. Zainstaluje po kolei: Git, Python, Node.js,
+         Claude Code, VS Code, Office, aplikacje (Power BI, Teams, Outlook, Chrome), zależności,
+         autostart i test końcowy z raportem.</p>
+      <p class="muted">Każdy krok sprawdza, czy dana rzecz już jest, więc ponowne uruchomienie jest szybkie.</p>
+    </li>
+    <li>
+      <h3>Wpisz dostępy</h3>
+      <p>Uruchom <code>python bootstrap_init_secrets.py</code>. Utworzy plik na klucze
+         i szkielety połączeń. Uzupełnij je wartościami.</p>
+      <p><b>Dostępy nigdy nie trafiają do repozytorium.</b> Leżą lokalnie w folderze poza kontrolą wersji.</p>
+    </li>
+    <li>
+      <h3>Zaloguj się na konta</h3>
+      <p>Osobny, szybki krok po instalacji: <code>instalacja/Zaloguj.bat</code> przeprowadza po kolei
+         przez wszystkie logowania.</p>
+    </li>
+    <li>
+      <h3>Zarejestruj rolę maszyny</h3>
+      <p><code>python bootstrap_register.py dev</code> (albo inna rola). Maszyna zapisuje swoją rolę
+         i ogłasza się w Projectly pierwszym statusem.</p>
+    </li>
+  </ol>
+
+  <h2><span class="hico">🔑</span> Co wpisać w dostępy</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:34%">Klucz</th><th>Do czego</th></tr></thead>
+      <tbody>
+        <tr><td><code>PROJECTLY_API_KEY</code><br><code>PROJECTLY_BASE_URL</code></td>
+            <td><b>Wymagane.</b> Bez tego bot nie ma skąd brać zadań i pracuje na danych testowych.</td></tr>
+        <tr><td><code>ANTHROPIC_API_KEY</code></td>
+            <td>Opcjonalne, gdy logujesz się subskrypcją przez <code>claude login</code>.
+                Zapasowa droga do modelu.</td></tr>
+        <tr><td><code>MS_GRAPH_*</code></td>
+            <td>Opcjonalne. Wysyłka poczty i zapis na SharePoint.</td></tr>
+        <tr><td>Pliki połączeń w <code>secrets/mcp/</code></td>
+            <td>Po jednym na integrację: Projectly, Zoho CRM, Zanfia.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <span class="ct">Sprawdź, zanim uznasz że gotowe</span>
+    <code>python secrets_audit.py</code> pokazuje, czego kod szuka, co jest wypełnione i czego brakuje.
+    Nigdy nie wypisuje samych wartości. Osobno: <code>python graph_verify.py</code> (poczta, nic nie wysyła)
+    i <code>python sharepoint_verify.py</code> (dostęp do dokumentów).
+  </div>
+
+  <h2><span class="hico">▶️</span> Uruchomienie</h2>
+  <div class="card">
+    <p>
+      Przy zalogowaniu startuje <b>tylko nadzorca</b> (<code>start-nadzorca.bat</code>). To on odpala boty,
+      i tylko te, które są włączone w Projectly. Nie trzeba niczego dodawać do autostartu ręcznie.
+    </p>
+    <pre class="code"><span class="cm"># normalna praca: nic nie robisz, nadzorca startuje sam</span>
+start-nadzorca.bat
+
+<span class="cm"># diagnostyka: jeden bot ręcznie, z pominięciem nadzorcy</span>
+start-agent-dev.bat        <span class="cm">albo -checker / -marketing / -zarzad</span>
+
+<span class="cm"># podgląd na maszynie</span>
+start-dashboard.bat        <span class="hi">http://127.0.0.1:8787/</span></pre>
+    <p class="muted">
+      Sterowanie botami opisane jest w sekcji
+      <a href="08-sterowanie.html" onclick="if(parent!==window){parent.docNav('08-sterowanie');return false}">Sterowanie i nadzór</a>.
+    </p>
+  </div>
+
+  <h2><span class="hico">🔄</span> Codzienne użycie</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:36%">Chcę...</th><th>Zrób</th></tr></thead>
+      <tbody>
+        <tr><td>Wgrać nowy kod z GitHuba</td><td>Dwuklik <code>aktualizuj-repo.bat</code></td></tr>
+        <tr><td>Zobaczyć, co bot teraz robi</td><td>Panel na maszynie albo zakładka Monitorowanie agentów w Projectly</td></tr>
+        <tr><td>Zatrzymać go na chwilę</td><td>Pauza w panelu (bez utraty stanu)</td></tr>
+        <tr><td>Wyłączyć go na dłużej</td><td>Przełącznik roli, patrz Sterowanie i nadzór</td></tr>
+        <tr><td>Dodać zadanie bez Projectly</td><td>Formularz w panelu albo linia w <code>app/inbox/zadania.txt</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="hico">🩹</span> Gdy coś nie działa</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:40%">Objaw</th><th>Co zrobić</th></tr></thead>
+      <tbody>
+        <tr><td>Aplikacje się nie zainstalowały</td>
+            <td>Na Windows Server często brakuje menedżera pakietów. Instalator próbuje go doinstalować sam, ale warto sprawdzić raport końcowy.</td></tr>
+        <tr><td><code>claude</code> nie działa w terminalu</td>
+            <td>Dodaj <code>C:\Users\&lt;user&gt;\.local\bin</code> do zmiennej PATH i otwórz nowy terminal.</td></tr>
+        <tr><td>Bramka jakości odsyła wszystko</td>
+            <td>Sprawdź, czy jesteś zalogowany w <code>claude</code>. Bez modelu ocena nie działa i celowo odmawia zamiast przepuszczać.</td></tr>
+        <tr><td>Bot nie widzi zadania, które dodałeś</td>
+            <td><code>python queue_verify.py</code> pokazuje kolejkę każdej roli i luki w uprawnieniach kont AI do projektów.</td></tr>
+        <tr><td>Chcesz sprawdzić, czy repo jest zdrowe po zmianie</td>
+            <td><code>python self_check.py</code> uruchamia wszystkie testy dymne i wypisuje wynik.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="doc-foot">
+    Dalej:
+    <a href="12-mapa-repozytorium.html" onclick="if(parent!==window){parent.docNav('12-mapa-repozytorium');return false}">Mapa repozytorium</a>.
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Droga zadania</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="doc">
+
+  <div class="doc-head">
+    <div class="doc-kicker">Jak to działa</div>
+    <h1 class="doc-title">Droga zadania</h1>
+    <p class="doc-lead">
+      Co się dzieje od chwili, gdy zadanie trafia na listę, do chwili, gdy jest gotowy wynik.
+      Jeden diagram, potem krótki opis każdego przystanku.
+    </p>
+  </div>
+
+  <figure class="dia">
+    <div class="dia-box">
+      <svg viewBox="0 0 900 720" role="img" aria-label="Diagram drogi zadania: od pobrania z listy, przez kontrolę treści, ocenę wielkości, ocenę ryzyka, wykonanie i bramkę jakości, do zapisu wyniku i zamknięcia zadania">
+        <defs>
+          <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#4d5769"></path>
+          </marker>
+          <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#a81818"></path>
+          </marker>
+          <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#92400e"></path>
+          </marker>
+        </defs>
+
+        <!-- ===== kolumna glowna ===== -->
+        <rect x="40" y="20" width="340" height="58" rx="10" fill="#eaf0fe" stroke="#1d4ed8" stroke-width="2"></rect>
+        <text x="210" y="45" text-anchor="middle" font-size="14" font-weight="700" fill="#10151f">📥  Zadanie z listy</text>
+        <text x="210" y="65" text-anchor="middle" font-size="13" fill="#2c3648">Bot sam je bierze, nikt mu nie podaje</text>
+
+        <rect x="40" y="106" width="340" height="58" rx="10" fill="#ffffff" stroke="#b9c2d0" stroke-width="2"></rect>
+        <text x="210" y="131" text-anchor="middle" font-size="14" font-weight="700" fill="#10151f">🔍  Sprawdzenie treści zadania</text>
+        <text x="210" y="151" text-anchor="middle" font-size="13" fill="#2c3648">Czy ktoś nie próbuje przemycić polecenia</text>
+
+        <rect x="40" y="192" width="340" height="58" rx="10" fill="#fdf3e3" stroke="#92400e" stroke-width="2"></rect>
+        <text x="210" y="217" text-anchor="middle" font-size="14" font-weight="700" fill="#10151f">📏  Czy zadanie jest za duże?</text>
+        <text x="210" y="237" text-anchor="middle" font-size="13" fill="#2c3648">Decyzja podejmowana osobno dla każdego zadania</text>
+
+        <rect x="40" y="278" width="340" height="58" rx="10" fill="#fdf3e3" stroke="#92400e" stroke-width="2"></rect>
+        <text x="210" y="303" text-anchor="middle" font-size="14" font-weight="700" fill="#10151f">🚦  Jakie to ryzyko?</text>
+        <text x="210" y="323" text-anchor="middle" font-size="13" fill="#2c3648">Zielone, żółte czy czerwone</text>
+
+        <rect x="40" y="364" width="340" height="58" rx="10" fill="#ffffff" stroke="#b9c2d0" stroke-width="2"></rect>
+        <text x="210" y="389" text-anchor="middle" font-size="14" font-weight="700" fill="#10151f">⚙️  Wykonanie</text>
+        <text x="210" y="409" text-anchor="middle" font-size="13" fill="#2c3648">Tylko narzędziami, na które bot ma zgodę</text>
+
+        <rect x="40" y="450" width="340" height="58" rx="10" fill="#e7f5ec" stroke="#0c6430" stroke-width="2"></rect>
+        <text x="210" y="475" text-anchor="middle" font-size="14" font-weight="700" fill="#10151f">✅  Bramka jakości</text>
+        <text x="210" y="495" text-anchor="middle" font-size="13" fill="#2c3648">Trzy boty oceniają realny efekt</text>
+
+        <rect x="40" y="536" width="340" height="58" rx="10" fill="#ffffff" stroke="#b9c2d0" stroke-width="2"></rect>
+        <text x="210" y="561" text-anchor="middle" font-size="14" font-weight="700" fill="#10151f">📄  Jeden plik z wynikiem</text>
+        <text x="210" y="581" text-anchor="middle" font-size="13" fill="#2c3648">PDF, DOCX, XLSX albo MD</text>
+
+        <rect x="40" y="622" width="340" height="58" rx="10" fill="#eaf0fe" stroke="#1d4ed8" stroke-width="2"></rect>
+        <text x="210" y="647" text-anchor="middle" font-size="14" font-weight="700" fill="#10151f">🏁  Komentarz i zamknięcie</text>
+        <text x="210" y="667" text-anchor="middle" font-size="13" fill="#2c3648">Plus folder zadania na SharePoint</text>
+
+        <!-- strzalki w kolumnie glownej -->
+        <line x1="210" y1="78"  x2="210" y2="102" stroke="#4d5769" stroke-width="2.5" marker-end="url(#a1)"></line>
+        <line x1="210" y1="164" x2="210" y2="188" stroke="#4d5769" stroke-width="2.5" marker-end="url(#a1)"></line>
+        <line x1="210" y1="250" x2="210" y2="274" stroke="#4d5769" stroke-width="2.5" marker-end="url(#a1)"></line>
+        <line x1="210" y1="336" x2="210" y2="360" stroke="#4d5769" stroke-width="2.5" marker-end="url(#a1)"></line>
+        <line x1="210" y1="422" x2="210" y2="446" stroke="#4d5769" stroke-width="2.5" marker-end="url(#a1)"></line>
+        <line x1="210" y1="508" x2="210" y2="532" stroke="#4d5769" stroke-width="2.5" marker-end="url(#a1)"></line>
+        <line x1="210" y1="594" x2="210" y2="618" stroke="#4d5769" stroke-width="2.5" marker-end="url(#a1)"></line>
+
+        <text x="222" y="184" font-size="12.5" fill="#4d5769">nie</text>
+        <text x="222" y="270" font-size="12.5" fill="#4d5769">nie</text>
+        <text x="222" y="528" font-size="12.5" fill="#0c6430" font-weight="700">przeszło</text>
+
+        <!-- ===== odgalezienia w prawo ===== -->
+        <rect x="470" y="106" width="400" height="58" rx="10" fill="#fdeaea" stroke="#a81818" stroke-width="2"></rect>
+        <text x="670" y="131" text-anchor="middle" font-size="14" font-weight="700" fill="#10151f">🛑  Stop, sprawa dla człowieka</text>
+        <text x="670" y="151" text-anchor="middle" font-size="13" fill="#2c3648">Podejrzana treść nigdy nie jedzie dalej</text>
+        <line x1="380" y1="135" x2="466" y2="135" stroke="#a81818" stroke-width="2.5" marker-end="url(#a2)"></line>
+        <text x="390" y="127" font-size="12.5" fill="#a81818" font-weight="700">wykryto</text>
+
+        <rect x="470" y="192" width="400" height="58" rx="10" fill="#ffffff" stroke="#92400e" stroke-width="2"></rect>
+        <text x="670" y="217" text-anchor="middle" font-size="14" font-weight="700" fill="#10151f">🧩  Podział na 2 do 6 podzadań</text>
+        <text x="670" y="237" text-anchor="middle" font-size="13" fill="#2c3648">Każde proste, każde idzie tą samą drogą</text>
+        <line x1="380" y1="221" x2="466" y2="221" stroke="#92400e" stroke-width="2.5" marker-end="url(#a3)"></line>
+        <text x="404" y="213" font-size="12.5" fill="#92400e" font-weight="700">tak</text>
+
+        <rect x="470" y="278" width="400" height="58" rx="10" fill="#fdeaea" stroke="#a81818" stroke-width="2"></rect>
+        <text x="670" y="303" text-anchor="middle" font-size="14" font-weight="700" fill="#10151f">✋  Czekaj na zgodę człowieka</text>
+        <text x="670" y="323" text-anchor="middle" font-size="13" fill="#2c3648">Publikacja, budżet, kasowanie danych</text>
+        <line x1="380" y1="307" x2="466" y2="307" stroke="#a81818" stroke-width="2.5" marker-end="url(#a2)"></line>
+        <text x="390" y="299" font-size="12.5" fill="#a81818" font-weight="700">czerwone</text>
+
+        <rect x="470" y="436" width="400" height="86" rx="10" fill="#fdf3e3" stroke="#92400e" stroke-width="2"></rect>
+        <text x="670" y="461" text-anchor="middle" font-size="14" font-weight="700" fill="#10151f">🔁  Bot poprawia i wraca po ocenę</text>
+        <text x="670" y="481" text-anchor="middle" font-size="13" fill="#2c3648">Nanosi uwagi bramki, do dwóch podejść.</text>
+        <text x="670" y="500" text-anchor="middle" font-size="13" fill="#2c3648">Gdy się nie uda, idzie do człowieka.</text>
+
+        <path d="M380,460 L466,460" stroke="#92400e" stroke-width="2.5" fill="none" marker-end="url(#a3)"></path>
+        <text x="388" y="452" font-size="12.5" fill="#92400e" font-weight="700">nie przeszło</text>
+        <path d="M466,500 L380,500" stroke="#92400e" stroke-width="2.5" fill="none" marker-end="url(#a3)"></path>
+        <text x="388" y="516" font-size="12.5" fill="#92400e" font-weight="700">ponowna ocena</text>
+      </svg>
+    </div>
+    <figcaption>
+      Trzy odgałęzienia w prawo to jedyne wyjścia z tej drogi. Nie ma czwartego,
+      w którym bot po cichu uznaje zadanie za zrobione.
+    </figcaption>
+  </figure>
+
+  <h2><span class="hico">🗒️</span> Przystanki po kolei</h2>
+
+  <ol class="steps">
+    <li>
+      <h3>Bot bierze zadanie</h3>
+      <p>Cyklicznie zagląda na listę zadań przypisanych do swojego konta. Nikt mu nic nie podaje ręcznie.</p>
+    </li>
+    <li>
+      <h3>Sprawdza treść zadania</h3>
+      <p>Zanim cokolwiek zrobi, sprawdza, czy w treści nie ukryto polecenia, które miałoby nim pokierować
+         (np. „zignoruj poprzednie instrukcje"). Wykrycie zawsze kończy się zatrzymaniem i pytaniem do człowieka.</p>
+    </li>
+    <li>
+      <h3>Ocenia, czy zadanie jest do ugryzienia</h3>
+      <p>Zadanie zbyt duże albo niejasne bot dzieli na 2 do 6 prostych podzadań, a samo zadanie główne
+         oznacza jako <b>przeniesione</b> i przestaje je brać. Podzadania są prawdziwymi podzadaniami na liście,
+         nie samą notatką. Wyniki wszystkich lądują we wspólnym folderze.</p>
+    </li>
+    <li>
+      <h3>Przypisuje kolor ryzyka</h3>
+      <p>Zielone robi sam. Żółte robi sam, ale wynik musi przejść przez bramkę jakości.
+         Czerwone zatrzymuje i czeka na zgodę człowieka. Szczegóły:
+         <a href="09-bezpieczenstwo.html" onclick="if(parent!==window){parent.docNav('09-bezpieczenstwo');return false}">Bezpieczeństwo i granice</a>.</p>
+    </li>
+    <li>
+      <h3>Wykonuje pracę</h3>
+      <p>Tylko narzędziami z listy, na którą dostał zgodę, i tylko w miejscach, które są na niej wypisane.
+         Narzędzie spoza listy to odmowa, nie próba obejścia.</p>
+    </li>
+    <li>
+      <h3>Oddaje wynik do kontroli</h3>
+      <p>Trzy boty oceniają realny efekt: czy powtórzenie zadania daje to samo, czy plik faktycznie
+         istnieje i się otwiera, czy zrzut ekranu pokazuje to, co miał pokazywać.
+         Szczegóły: <a href="04-kontrola-jakosci.html" onclick="if(parent!==window){parent.docNav('04-kontrola-jakosci');return false}">Kontrola jakości</a>.</p>
+    </li>
+    <li>
+      <h3>Zapisuje wynik i zamyka zadanie</h3>
+      <p>Powstaje jeden plik w formacie dobranym do treści, komentarz przy zadaniu i link do folderu
+         na SharePoint. Status zadania zmienia się na zamknięty.</p>
+    </li>
+  </ol>
+
+  <div class="callout ok">
+    <span class="ct">Przy niepewności bot się zatrzymuje</span>
+    Jeśli czegoś nie wie albo coś się nie udało, nie improwizuje i nie wykonuje działań nieodwracalnych.
+    Zapisuje stan i zakłada zadanie dla człowieka. Tę zasadę widać w każdym miejscu systemu.
+  </div>
+
+  <div class="callout warn">
+    <span class="ct">Wyjątek: złe zadanie zamyka się bez zawracania głowy</span>
+    Gdy problem leży w samym poleceniu (brak danych, zły link, niejasne oczekiwanie), bot zamyka zadanie
+    z konkretną informacją, czego zabrakło, i <b>nie</b> zakłada nikomu nowego zadania. Wystarczy poprawić
+    polecenie i wrzucić je ponownie. Wcześniej każdy drobiazg lądował u człowieka, więc bot dokładał
+    pracy zamiast ją zdejmować.
+  </div>
+
+  <div class="doc-foot">
+    Dalej:
+    <a href="03-architektura.html" onclick="if(parent!==window){parent.docNav('03-architektura');return false}">Jak to jest zbudowane</a>,
+    czyli z jakich warstw składa się to, co widać na diagramie.
+  </div>
+
+</div>
+</body>
+</html>

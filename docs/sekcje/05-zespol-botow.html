@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zespół botów</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="doc">
+
+  <div class="doc-head">
+    <div class="doc-kicker">Jak to działa</div>
+    <h1 class="doc-title">Zespół botów</h1>
+    <p class="doc-lead">
+      Żaden pojedynczy model nie robi wszystkiego. Praca jest podzielona na role, a imiona
+      są tylko po to, żeby dało się o nich rozmawiać po ludzku. To role wewnętrzne systemu,
+      nie profile klientów.
+    </p>
+  </div>
+
+  <h2><span class="hico">👷</span> Prowadzą zadanie</h2>
+  <div class="cards">
+    <div class="card">
+      <h3>🧭 Paweł <span class="tag ok">działa</span></h3>
+      <p><b>Dyspozytor.</b> Przygląda się zadaniu, przypisuje kolor ryzyka, wybiera metodę wykonania
+         i decyduje, kiedy oddać sprawę człowiekowi. Większość jego decyzji to twarde reguły,
+         model wchodzi tylko przy zrozumieniu treści zadania.</p>
+    </div>
+    <div class="card">
+      <h3>🛠️ Patrycja <span class="tag ok">działa</span></h3>
+      <p><b>Wykonawczyni zadań typowych.</b> Rzeczy, dla których istnieje gotowa ścieżka:
+         pobranie strony, walidacja projektu Power BI, zestawienie z MailerLite, napisanie tekstu
+         z gotowych danych.</p>
+    </div>
+    <div class="card">
+      <h3>🤖 Subagent <span class="tag ok">działa</span></h3>
+      <p><b>Dla zadań nietypowych.</b> Gdy nie ma gotowej ścieżki, uruchamiany jest prawdziwy agent
+         Claude Code z dostępem do plików, internetu i terminala. Pracuje w folderze zadania,
+         a przy zadaniach o kodzie w osobnym klonie repozytorium. Zna kontekst firmy,
+         projekt, rodzeństwo podzadań i standardy pracy.</p>
+    </div>
+    <div class="card">
+      <h3>🖱️ Aldona <span class="tag ok">działa</span></h3>
+      <p><b>Przeglądarka.</b> Zadania, w których trzeba klikać, a nie tylko czytać: logowanie,
+         formularze, zrzut ekranu po interakcji. Ma trwałe, zalogowane profile (MailerLite, Meta Ads).</p>
+    </div>
+  </div>
+
+  <h2><span class="hico">🧪</span> Oceniają wynik</h2>
+  <div class="cards">
+    <div class="card">
+      <h3>⚖️ Gustaw <span class="tag ok">działa</span></h3>
+      <p><b>Bramka jakości.</b> Zbiera oceny trójki poniżej i wydaje werdykt: przepuścić czy odesłać do poprawki.</p>
+    </div>
+    <div class="card">
+      <h3>🎭 Bartek <span class="tag ok">działa</span></h3>
+      <p><b>Powtórka.</b> Robi zadanie drugi raz i porównuje wyniki. Łapie sytuacje,
+         w których coś wyszło przypadkiem. Bez możliwości powtórzenia mówi „pomijam", nie zgaduje.</p>
+    </div>
+    <div class="card">
+      <h3>🔧 Franek <span class="tag ok">działa</span></h3>
+      <p><b>Twarde testy.</b> Czy plik istnieje, czy się otwiera, czy struktura jest poprawna.
+         Czysta mechanika, bez udziału modelu, więc jest w pełni powtarzalny.</p>
+    </div>
+    <div class="card">
+      <h3>👁️ Oskar <span class="tag ok">działa</span></h3>
+      <p><b>Ocena wzrokowa.</b> Patrzy na zrzut ekranu i ocenia, czy widać to, co miało być.
+         Celowo na najmocniejszym modelu, bo tu potrzeba pewności na cyfrach i detalach.</p>
+    </div>
+  </div>
+
+  <h2><span class="hico">📡</span> Pilnują całości</h2>
+  <div class="cards">
+    <div class="card">
+      <h3>🎛️ Nadzorca <span class="tag ok">działa</span></h3>
+      <p>Jedyny proces startujący razem z maszyną. Pilnuje, które role bota mają chodzić, i odpala
+         tylko te włączone. Sam nie wykonuje zadań. Więcej:
+         <a href="08-sterowanie.html" onclick="if(parent!==window){parent.docNav('08-sterowanie');return false}">Sterowanie i nadzór</a>.</p>
+    </div>
+    <div class="card">
+      <h3>🩺 Kacper <span class="tag ok">działa</span></h3>
+      <p><b>Monitor.</b> Czyta wspólny dziennik, wykrywa awarie, które się <b>powtarzają</b>,
+         i zakłada jedno zadanie naprawcze dziennie. Dedukuje z faktów, nie alarmuje przy pierwszym błędzie.</p>
+    </div>
+    <div class="card">
+      <h3>🧩 Agent sterujący <span class="tag ok">działa</span></h3>
+      <p>Dwie osobne decyzje bez przypisanego imienia: czy zadanie podzielić na podzadania
+         i w jakim formacie zapisać wynik. Obie mają bezpieczne wyjście domyślne na wypadek awarii.</p>
+    </div>
+  </div>
+
+  <h2><span class="hico">📋</span> Zaplanowane, jeszcze nie zbudowane</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:16%">Rola</th><th>Co ma robić</th><th style="width:12%">Stan</th></tr></thead>
+      <tbody>
+        <tr><td><b>Asia</b></td><td>Sterowanie pulpitem poza przeglądarką: klikanie w aplikacjach desktopowych.
+            Podstawy (zrzuty, okna, odczyt tekstu z obrazu, blokada ekranu) już są.</td><td><span class="tag err">plan</span></td></tr>
+        <tr><td><b>Michał</b></td><td>Praca na wielu oknach naraz i podglądanie tego, co robią pozostali.</td><td><span class="tag err">plan</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout">
+    <span class="ct">Dlaczego imiona</span>
+    Bo o „module oceny wizualnej zwracającym werdykt z progiem zgód" nie da się normalnie rozmawiać,
+    a o „Oskarze, który patrzy na zrzuty" już tak. Imię nie oznacza osobnego modelu ani osobnej licencji.
+  </div>
+
+  <div class="doc-foot">
+    Dalej:
+    <a href="06-skad-zadania.html" onclick="if(parent!==window){parent.docNav('06-skad-zadania');return false}">Skąd biorą się zadania</a>.
+  </div>
+
+</div>
+</body>
+</html>

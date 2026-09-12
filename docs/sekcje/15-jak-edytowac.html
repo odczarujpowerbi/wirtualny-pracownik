@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jak edytować tę dokumentację</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="doc">
+
+  <div class="doc-head">
+    <div class="doc-kicker">Stan projektu</div>
+    <h1 class="doc-title">Jak edytować tę dokumentację</h1>
+    <p class="doc-lead">
+      Dokumentacja to zestaw małych, samodzielnych stron o wspólnym wyglądzie. Zmiana jednego tematu
+      nie wymaga dotykania reszty.
+    </p>
+  </div>
+
+  <h2><span class="hico">🧱</span> Z czego to się składa</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:30%">Plik</th><th>Rola</th></tr></thead>
+      <tbody>
+        <tr><td><code>docs/index.html</code></td><td>Powłoka: lewy pasek, filtr, okruszek, ramka na treść. Rzadko się zmienia.</td></tr>
+        <tr><td><code>docs/assets/docs.js</code></td><td><b>Lista sekcji.</b> Jedyne miejsce, gdzie jest spis treści i ikony.</td></tr>
+        <tr><td><code>docs/assets/style.css</code></td><td>Wygląd wszystkiego. Zmiana tutaj działa na całości.</td></tr>
+        <tr><td><code>docs/sekcje/*.html</code></td><td>Treść. Jeden plik to jedna sekcja z menu.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="hico">➕</span> Dodanie nowej sekcji</h2>
+  <ol class="steps">
+    <li>
+      <h3>Skopiuj istniejącą sekcję</h3>
+      <p>Najprościej wziąć plik o podobnej strukturze i podmienić treść. Nazwa według wzorca
+         <code>NN-krotka-nazwa.html</code>, żeby kolejność w folderze zgadzała się z kolejnością w menu.</p>
+    </li>
+    <li>
+      <h3>Dopisz jeden wiersz w <code>docs.js</code></h3>
+      <p>W tablicy <code>SECTIONS</code>, w odpowiedniej grupie:</p>
+      <pre class="code">{ id: <span class="hi">"16-nowa-sekcja"</span>, ikona: <span class="hi">"📌"</span>, label: <span class="hi">"Nowa sekcja"</span> }</pre>
+      <p><code>id</code> musi być dokładnie nazwą pliku bez rozszerzenia. To wszystko: menu, okruszek,
+         filtr i adres z kotwicą zadziałają same.</p>
+    </li>
+    <li>
+      <h3>Sprawdź w przeglądarce</h3>
+      <p>Otwórz <code>docs/index.html</code> dwuklikiem. Serwer nie jest potrzebny.</p>
+    </li>
+  </ol>
+
+  <h2><span class="hico">🔗</span> Linkowanie między sekcjami</h2>
+  <div class="card">
+    <p>Link musi działać w dwóch sytuacjach: wewnątrz powłoki i gdy ktoś otworzy sam plik sekcji.
+       Dlatego zawsze w tej formie:</p>
+    <pre class="code">&lt;a href=<span class="hi">"02-droga-zadania.html"</span>
+   onclick="if(parent!==window){parent.docNav(<span class="hi">'02-droga-zadania'</span>);return false}"&gt;
+  Droga zadania &amp;rarr;
+&lt;/a&gt;</pre>
+    <p class="muted">W powłoce przeładuje ramkę i podświetli pozycję w menu. Poza powłoką zadziała jak zwykły link.</p>
+  </div>
+
+  <h2><span class="hico">🎨</span> Gotowe klocki</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:26%">Klasa</th><th>Do czego</th></tr></thead>
+      <tbody>
+        <tr><td><code>card</code> / <code>cards</code> / <code>two</code></td><td>Karta, siatka kart, układ dwukolumnowy</td></tr>
+        <tr><td><code>kpis</code> + <code>kpi</code></td><td>Kafle z liczbami na górze sekcji</td></tr>
+        <tr><td><code>tbl-wrap</code> + <code>table.t</code></td><td>Tabela, przewijana w poziomie na wąskim ekranie</td></tr>
+        <tr><td><code>callout</code></td><td>Wyróżnik. Warianty: <code>ok</code>, <code>warn</code>, <code>danger</code>, <code>info</code></td></tr>
+        <tr><td><code>tag</code></td><td>Plakietka stanu. Warianty jak wyżej</td></tr>
+        <tr><td><code>steps</code></td><td>Numerowana lista kroków</td></tr>
+        <tr><td><code>kv</code></td><td>Lista „pojęcie i wyjaśnienie"</td></tr>
+        <tr><td><code>acc</code></td><td>Sekcja zwijana, na szczegóły techniczne</td></tr>
+        <tr><td><code>dia</code></td><td>Ramka na diagram SVG z podpisem</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="hico">📏</span> Zasady, których warto się trzymać</h2>
+  <div class="cards">
+    <div class="card">
+      <h3>🎯 Język biznesowy</h3>
+      <p>Najpierw po co i dla kogo, dopiero potem jak. Nazwy plików z kodu chowamy do tabel
+         i sekcji zwijanych, żeby nie zasłaniały treści.</p>
+    </div>
+    <div class="card">
+      <h3>✂️ Krótko</h3>
+      <p>Jeśli akapit ma pięć zdań, prawdopodobnie są to dwa akapity albo tabela.</p>
+    </div>
+    <div class="card">
+      <h3>🖼️ Diagram zamiast opisu</h3>
+      <p>Wszystko, co ma więcej niż trzy kroki albo rozgałęzienie, rysujemy. Diagramy są w SVG,
+         bo skalują się i zostają ostre.</p>
+    </div>
+    <div class="card">
+      <h3>🌓 Kontrast minimum 6:1</h3>
+      <p>Wyższy niż wymóg dostępności. Policzone wartości palety są w komentarzu na górze
+         <code>style.css</code>. Nowy kolor sprawdź, zanim go dodasz.</p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <span class="ct">Dwa uzgodnienia redakcyjne</span>
+    Nie używamy długiego myślnika (typowy ślad pisania przez AI, widoczny gołym okiem);
+    zamiast niego przecinek, kropka, nawias albo inne zdanie. I nie wpisujemy do dokumentacji
+    rzeczy niesprawdzonych: jeśli coś nie zostało zweryfikowane, piszemy o tym wprost.
+  </div>
+
+  <div class="doc-foot">
+    Wróć do
+    <a href="00-start.html" onclick="if(parent!==window){parent.docNav('00-start');return false}">strony startowej</a>.
+  </div>
+
+</div>
+</body>
+</html>

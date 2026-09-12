@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skąd biorą się zadania</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="doc">
+
+  <div class="doc-head">
+    <div class="doc-kicker">Praca na co dzień</div>
+    <h1 class="doc-title">Skąd biorą się zadania</h1>
+    <p class="doc-lead">
+      Trzy źródła, jedna kolejka, cztery role bota. Niezależnie od tego, skąd zadanie przyszło,
+      idzie dokładnie tą samą drogą.
+    </p>
+  </div>
+
+  <figure class="dia">
+    <div class="dia-box">
+      <svg viewBox="0 0 900 400" role="img" aria-label="Trzy źródła zadań trafiają do wspólnej kolejki, z której zadania rozchodzą się do czterech ról bota; zadania sterujące, eskalacyjne i feedbackowe są odsiewane">
+        <defs>
+          <marker id="s1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#4d5769"></path>
+          </marker>
+          <marker id="s2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#a81818"></path>
+          </marker>
+        </defs>
+
+        <text x="16" y="22" font-size="12" font-weight="700" fill="#4d5769" letter-spacing="1">SKĄD</text>
+        <text x="266" y="22" font-size="12" font-weight="700" fill="#4d5769" letter-spacing="1">FILTR</text>
+        <text x="546" y="22" font-size="12" font-weight="700" fill="#4d5769" letter-spacing="1">DO KOGO</text>
+
+        <rect x="16" y="36" width="200" height="60" rx="10" fill="#eaf0fe" stroke="#1d4ed8" stroke-width="2"></rect>
+        <text x="116" y="62" text-anchor="middle" font-size="13.5" font-weight="700" fill="#10151f">📋  Projectly</text>
+        <text x="116" y="82" text-anchor="middle" font-size="12.5" fill="#2c3648">główne źródło pracy</text>
+
+        <rect x="16" y="116" width="200" height="60" rx="10" fill="#ffffff" stroke="#b9c2d0" stroke-width="2"></rect>
+        <text x="116" y="142" text-anchor="middle" font-size="13.5" font-weight="700" fill="#10151f">📝  Notatnik</text>
+        <text x="116" y="162" text-anchor="middle" font-size="12.5" fill="#2c3648">jedna linia, jedno zadanie</text>
+
+        <rect x="16" y="196" width="200" height="60" rx="10" fill="#ffffff" stroke="#b9c2d0" stroke-width="2"></rect>
+        <text x="116" y="222" text-anchor="middle" font-size="13.5" font-weight="700" fill="#10151f">🖥️  Panel</text>
+        <text x="116" y="242" text-anchor="middle" font-size="12.5" fill="#2c3648">formularz na maszynie</text>
+
+        <rect x="266" y="76" width="220" height="140" rx="10" fill="#e7f5ec" stroke="#0c6430" stroke-width="2"></rect>
+        <text x="376" y="112" text-anchor="middle" font-size="24">🧹</text>
+        <text x="376" y="142" text-anchor="middle" font-size="14" font-weight="700" fill="#10151f">Kolejka pracy</text>
+        <text x="376" y="165" text-anchor="middle" font-size="12.5" fill="#2c3648">Wpuszcza tylko realną</text>
+        <text x="376" y="183" text-anchor="middle" font-size="12.5" fill="#2c3648">pracę. Resztę odsiewa,</text>
+        <text x="376" y="201" text-anchor="middle" font-size="12.5" fill="#2c3648">żeby nie było pętli.</text>
+
+        <rect x="546" y="16" width="330" height="56" rx="10" fill="#ffffff" stroke="#b9c2d0" stroke-width="2"></rect>
+        <text x="568" y="40" font-size="13.5" font-weight="700" fill="#10151f">💻  Dev</text>
+        <text x="568" y="60" font-size="12.5" fill="#2c3648">raporty, kod, projekty klientów</text>
+
+        <rect x="546" y="84" width="330" height="56" rx="10" fill="#ffffff" stroke="#b9c2d0" stroke-width="2"></rect>
+        <text x="568" y="108" font-size="13.5" font-weight="700" fill="#10151f">🔎  Checker</text>
+        <text x="568" y="128" font-size="12.5" fill="#2c3648">kontrola dostępów i stanu maszyny</text>
+
+        <rect x="546" y="152" width="330" height="56" rx="10" fill="#ffffff" stroke="#b9c2d0" stroke-width="2"></rect>
+        <text x="568" y="176" font-size="13.5" font-weight="700" fill="#10151f">📣  Marketing</text>
+        <text x="568" y="196" font-size="12.5" fill="#2c3648">treści, kampanie, zestawienia wysyłek</text>
+
+        <rect x="546" y="220" width="330" height="56" rx="10" fill="#ffffff" stroke="#b9c2d0" stroke-width="2"></rect>
+        <text x="568" y="244" font-size="13.5" font-weight="700" fill="#10151f">📊  Zarząd</text>
+        <text x="568" y="264" font-size="12.5" fill="#2c3648">raporty zbiorcze i podsumowania</text>
+
+        <path d="M216,66 L242,66 L242,140 L262,140" fill="none" stroke="#4d5769" stroke-width="2.5" marker-end="url(#s1)"></path>
+        <path d="M216,146 L262,146" fill="none" stroke="#4d5769" stroke-width="2.5" marker-end="url(#s1)"></path>
+        <path d="M216,226 L242,226 L242,152 L262,152" fill="none" stroke="#4d5769" stroke-width="2.5" marker-end="url(#s1)"></path>
+
+        <path d="M486,140 L514,140 L514,44 L542,44" fill="none" stroke="#4d5769" stroke-width="2.5" marker-end="url(#s1)"></path>
+        <path d="M486,144 L514,144 L514,112 L542,112" fill="none" stroke="#4d5769" stroke-width="2.5" marker-end="url(#s1)"></path>
+        <path d="M486,148 L514,148 L514,180 L542,180" fill="none" stroke="#4d5769" stroke-width="2.5" marker-end="url(#s1)"></path>
+        <path d="M486,152 L514,152 L514,248 L542,248" fill="none" stroke="#4d5769" stroke-width="2.5" marker-end="url(#s1)"></path>
+
+        <rect x="266" y="292" width="610" height="72" rx="10" fill="#fdeaea" stroke="#a81818" stroke-width="2"></rect>
+        <text x="290" y="318" font-size="13.5" font-weight="700" fill="#10151f">🚮  Odsiewane, nigdy nie wracają do pracy</text>
+        <text x="290" y="341" font-size="12.5" fill="#2c3648">zadania sterujące (włącznik bota)  ·  zadania eskalacyjne (pytania do człowieka)  ·  prośby o feedback</text>
+
+        <path d="M376,216 L376,288" fill="none" stroke="#a81818" stroke-width="2.5" marker-end="url(#s2)"></path>
+      </svg>
+    </div>
+    <figcaption>
+      Czerwony blok na dole jest ważniejszy, niż wygląda. Bez niego bot brał własne pytania do człowieka
+      jako nową pracę i kręcił się w kółko.
+    </figcaption>
+  </figure>
+
+  <h2><span class="hico">📥</span> Trzy źródła</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:18%">Źródło</th><th>Do czego</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>Projectly</b> <span class="tag ok">główne</span></td>
+          <td>Normalna praca. Bot bierze zadania przypisane do konta AI swojej roli. Jedna maszyna
+              może obsługiwać kilka ról naraz, każdą jako osobny proces.</td>
+        </tr>
+        <tr>
+          <td><b>Notatnik</b></td>
+          <td>Plik tekstowy na maszynie, jedna linia to jedno zadanie. Dobre do szybkich testów,
+              bez zakładania niczego w Projectly.</td>
+        </tr>
+        <tr>
+          <td><b>Panel</b></td>
+          <td>Formularz „Dodaj zadanie" w panelu na maszynie. Zadanie przetwarza się od razu.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="hico">🔢</span> Priorytety</h2>
+  <p>Kolejka nie jest kolejnością wpisania. Bot bierze najpierw to, co pilne.</p>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:20%">Priorytet</th><th>Znaczenie</th></tr></thead>
+      <tbody>
+        <tr><td><span class="tag err">priorytet</span></td><td>Bierze natychmiast, przed wszystkim innym.</td></tr>
+        <tr><td><span class="tag warn">bieżące</span></td><td>Normalna praca na teraz.</td></tr>
+        <tr><td><span class="tag">backlog</span></td><td>Zrobi, gdy nie ma nic pilniejszego.</td></tr>
+        <tr><td><span class="tag">parking</span></td><td>Świadomie odłożone. Nie bierze go samo z siebie.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="hico">🔗</span> Jak bot rozumie, o czym jest zadanie</h2>
+  <div class="card">
+    <p>
+      Zadania nie mają osobnych pól na link czy nazwę klienta. Wszystko siedzi w tytule i opisie,
+      więc bot sam to wyłuskuje:
+    </p>
+    <dl class="kv">
+      <dt>Adres źródła</dt>
+      <dd>Bierze każdy normalny adres strony z treści. Zadanie może wskazać kilka naraz
+          („porównaj kurs EUR i USD"), wtedy pobiera każdy. Linki do samego Projectly pomija.</dd>
+      <dt>Projekt klienta</dt>
+      <dd>Szuka nazwy projektu w treści. Znalazł, dokłada wiedzę o tym kliencie do polecenia.</dd>
+      <dt>Marka</dt>
+      <dd>Wymaga jednoznacznej frazy. Samo słowo „kurs" nie wystarcza, bo „kurs EUR" to notowanie
+          waluty, a nie szkolenie. Ten błąd złapał własny test przy pierwszym uruchomieniu.</dd>
+      <dt>Repozytorium</dt>
+      <dd>Adres repo albo prośba o nowy projekt uruchamia pracę w klonie, na osobnej gałęzi.</dd>
+    </dl>
+    <p class="muted">
+      Zawsze fail-closed: brak jednoznacznego sygnału oznacza brak dopasowania, nigdy zgadywanie.
+    </p>
+  </div>
+
+  <h2><span class="hico">⚠️</span> Gdy źródło jest złe albo niedostępne</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:38%">Sytuacja</th><th>Reakcja</th></tr></thead>
+      <tbody>
+        <tr><td>Adres zablokowany na stałe</td><td>Odmowa z konkretnym powodem i zadanie dla człowieka. Nigdy ciche „zrobione".</td></tr>
+        <tr><td>Strona nie zawiera odpowiedzi<br><span class="muted">np. inna waluta w tej samej tabeli</span></td><td>Bot próbuje raz poprawić adres samodzielnie.</td></tr>
+        <tr><td>Strona zwraca błąd<br><span class="muted">np. dzień wolny, brak notowania</span></td><td>Bierze zakres dni kończący się zamówioną datą. <b>Nigdy</b> „najnowsze dostępne", bo to dałoby dane z innego dnia niż zamówiony.</td></tr>
+        <tr><td>Błędu nie da się naprawić</td><td>Zamknięcie zadania z opisem, czego zabrakło, bez zakładania zadania człowiekowi.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <span class="ct">Bot nie widzi zadania, które dodałeś?</span>
+    Najczęstsza przyczyna to brak uprawnień konta AI do projektu, w którym leży zadanie, albo zła rola.
+    Na maszynie jest gotowa diagnostyka: <code>python queue_verify.py</code> pokazuje kolejkę każdej roli,
+    przeszukiwane projekty i luki w uprawnieniach.
+  </div>
+
+  <div class="doc-foot">
+    Dalej:
+    <a href="07-wiedza-o-firmie.html" onclick="if(parent!==window){parent.docNav('07-wiedza-o-firmie');return false}">Wiedza o firmie</a>,
+    czyli skąd bot wie, do kogo pisze i o czym mowa.
+  </div>
+
+</div>
+</body>
+</html>

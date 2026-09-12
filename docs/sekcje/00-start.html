@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Start</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="doc">
+
+  <div class="doc-head">
+    <div class="doc-kicker">Dokumentacja projektu</div>
+    <h1 class="doc-title">Wirtualny Pracownik AI</h1>
+    <p class="doc-lead">
+      Pracownik, który nie jest człowiekiem. Siedzi na własnej maszynie, sam bierze zadania
+      z listy, wykonuje je, sam sprawdza swoją robotę i dopiero gotowy wynik oddaje człowiekowi.
+      Gdy czegoś nie jest pewien, zatrzymuje się i pyta, zamiast zgadywać.
+    </p>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi">
+      <div class="k-label">Pracuje</div>
+      <div class="k-value">24/7</div>
+      <div class="k-foot">Własna maszyna, niezależnie od laptopów zespołu</div>
+    </div>
+    <div class="kpi">
+      <div class="k-label">Role bota</div>
+      <div class="k-value">4</div>
+      <div class="k-foot">Dev, checker, marketing, zarząd. Każda ze swoją kolejką</div>
+    </div>
+    <div class="kpi">
+      <div class="k-label">Kontrola wyniku</div>
+      <div class="k-value ok">3 boty</div>
+      <div class="k-foot">Sprawdzają robotę, zanim zobaczy ją człowiek</div>
+    </div>
+    <div class="kpi">
+      <div class="k-label">Klasy ryzyka</div>
+      <div class="k-value">3</div>
+      <div class="k-foot">Zielone samo, żółte pod kontrolą, czerwone zawsze do człowieka</div>
+    </div>
+  </div>
+
+  <h2><span class="hico">🔎</span> Jak to działa w czterech krokach</h2>
+
+  <figure class="dia">
+    <div class="dia-box">
+      <svg viewBox="0 0 920 190" role="img" aria-label="Cztery kroki: zadanie trafia do kolejki, bot je wykonuje, trzy boty sprawdzają wynik, wynik trafia do człowieka">
+        <defs>
+          <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#4d5769"></path>
+          </marker>
+        </defs>
+
+        <rect x="8" y="30" width="195" height="110" rx="11" fill="#eaf0fe" stroke="#1d4ed8" stroke-width="2"></rect>
+        <text x="105" y="65" text-anchor="middle" font-size="24">📥</text>
+        <text x="105" y="94" text-anchor="middle" font-size="14.5" font-weight="700" fill="#10151f">1. Zadanie</text>
+        <text x="105" y="115" text-anchor="middle" font-size="12.5" fill="#2c3648">Bot sam bierze je</text>
+        <text x="105" y="131" text-anchor="middle" font-size="12.5" fill="#2c3648">z listy zadań</text>
+
+        <rect x="246" y="30" width="195" height="110" rx="11" fill="#ffffff" stroke="#b9c2d0" stroke-width="2"></rect>
+        <text x="343" y="65" text-anchor="middle" font-size="24">⚙️</text>
+        <text x="343" y="94" text-anchor="middle" font-size="14.5" font-weight="700" fill="#10151f">2. Wykonanie</text>
+        <text x="343" y="115" text-anchor="middle" font-size="12.5" fill="#2c3648">Zbiera dane, pisze,</text>
+        <text x="343" y="131" text-anchor="middle" font-size="12.5" fill="#2c3648">klika, poprawia kod</text>
+
+        <rect x="484" y="30" width="195" height="110" rx="11" fill="#e7f5ec" stroke="#0c6430" stroke-width="2"></rect>
+        <text x="581" y="65" text-anchor="middle" font-size="24">✅</text>
+        <text x="581" y="94" text-anchor="middle" font-size="14.5" font-weight="700" fill="#10151f">3. Kontrola</text>
+        <text x="581" y="115" text-anchor="middle" font-size="12.5" fill="#2c3648">Trzy boty oceniają</text>
+        <text x="581" y="131" text-anchor="middle" font-size="12.5" fill="#2c3648">efekt, nie obietnicę</text>
+
+        <rect x="722" y="30" width="190" height="110" rx="11" fill="#ffffff" stroke="#b9c2d0" stroke-width="2"></rect>
+        <text x="817" y="65" text-anchor="middle" font-size="24">📄</text>
+        <text x="817" y="94" text-anchor="middle" font-size="14.5" font-weight="700" fill="#10151f">4. Wynik</text>
+        <text x="817" y="115" text-anchor="middle" font-size="12.5" fill="#2c3648">Gotowy plik, albo</text>
+        <text x="817" y="131" text-anchor="middle" font-size="12.5" fill="#2c3648">pytanie do człowieka</text>
+
+        <line x1="205" y1="85" x2="240" y2="85" stroke="#4d5769" stroke-width="2.5" marker-end="url(#arr)"></line>
+        <line x1="443" y1="85" x2="478" y2="85" stroke="#4d5769" stroke-width="2.5" marker-end="url(#arr)"></line>
+        <line x1="681" y1="85" x2="716" y2="85" stroke="#4d5769" stroke-width="2.5" marker-end="url(#arr)"></line>
+
+        <text x="460" y="172" text-anchor="middle" font-size="12.5" fill="#4d5769">Każdy krok zapisuje się w dzienniku: kto, co, dlaczego, ile to kosztowało</text>
+      </svg>
+    </div>
+    <figcaption>
+      Krok 3 jest tym, co odróżnia to narzędzie od zwykłej rozmowy z AI. Bot nie oddaje pierwszej
+      wersji, tylko wynik, który sam wcześniej sprawdził i poprawił.
+    </figcaption>
+  </figure>
+
+  <h2><span class="hico">🎯</span> Po co to jest</h2>
+  <div class="two">
+    <div class="card">
+      <h3>🔁 Problem</h3>
+      <p>
+        W firmie jest dużo pracy powtarzalnej, która wymaga uwagi, ale nie wymaga myślenia:
+        zebrać dane ze strony, przygotować raport, sprawdzić strukturę projektu, napisać podsumowanie
+        kampanii, poprawić drobiazg w kodzie. Każda z osobna zajmuje 20 minut. Razem zjadają dzień.
+      </p>
+    </div>
+    <div class="card">
+      <h3>✔️ Rozwiązanie</h3>
+      <p>
+        Ta praca trafia na listę zadań wirtualnego pracownika. On ją wykonuje w tle, o każdej porze,
+        i oddaje gotowy plik razem z komentarzem. Człowiek zostaje przy tym, co wymaga decyzji,
+        rozmowy z klientem albo odpowiedzialności.
+      </p>
+    </div>
+  </div>
+
+  <div class="callout ok">
+    <span class="ct">Zasada, na której stoi cały projekt</span>
+    Najpierw udowodnić na małym: pobranie zadania, poprawne wykonanie, samodzielna kontrola,
+    ślad w dzienniku, bezpieczne zatrzymanie. Dopiero potem rozszerzać uprawnienia i zakres.
+    Dlatego rzeczy nieodwracalne (publikacja, budżet, kasowanie danych) do dziś wymagają zgody człowieka.
+  </div>
+
+  <h2><span class="hico">🗺️</span> Mapa dokumentacji</h2>
+  <p class="muted">Po lewej stronie masz pełne menu. Poniżej najkrótsza droga do tego, czego szukasz.</p>
+
+  <div class="cards">
+    <div class="card">
+      <h3>💡 Chcę zrozumieć, co to jest</h3>
+      <p>Czym to się różni od czatu z AI, co potrafi, a czego świadomie nie robi.</p>
+      <p><a href="01-co-to-jest.html" onclick="if(parent!==window){parent.docNav('01-co-to-jest');return false}">Czym jest wirtualny pracownik &rarr;</a></p>
+    </div>
+    <div class="card">
+      <h3>🔀 Chcę zobaczyć, jak płynie praca</h3>
+      <p>Pełna droga zadania na jednym diagramie, od wpisania na listę do gotowego pliku.</p>
+      <p><a href="02-droga-zadania.html" onclick="if(parent!==window){parent.docNav('02-droga-zadania');return false}">Droga zadania &rarr;</a></p>
+    </div>
+    <div class="card">
+      <h3>✅ Skąd pewność, że wynik jest dobry</h3>
+      <p>Bramka jakości, pętla poprawek i to, dlaczego bot nie oddaje pierwszej wersji.</p>
+      <p><a href="04-kontrola-jakosci.html" onclick="if(parent!==window){parent.docNav('04-kontrola-jakosci');return false}">Kontrola jakości &rarr;</a></p>
+    </div>
+    <div class="card">
+      <h3>🛡️ Czy to jest bezpieczne</h3>
+      <p>Co botowi wolno, czego nie wolno nigdy i co się dzieje, gdy czegoś nie jest pewien.</p>
+      <p><a href="09-bezpieczenstwo.html" onclick="if(parent!==window){parent.docNav('09-bezpieczenstwo');return false}">Bezpieczeństwo i granice &rarr;</a></p>
+    </div>
+    <div class="card">
+      <h3>🎛️ Chcę go włączyć albo wyłączyć</h3>
+      <p>Jeden przełącznik, trzy drogi do niego. Plus podgląd na żywo, co bot teraz robi.</p>
+      <p><a href="08-sterowanie.html" onclick="if(parent!==window){parent.docNav('08-sterowanie');return false}">Sterowanie i nadzór &rarr;</a></p>
+    </div>
+    <div class="card">
+      <h3>📈 Co już działa, a co jest planem</h3>
+      <p>Uczciwy stan projektu: zweryfikowane zdolności osobno, lista rzeczy do zrobienia osobno.</p>
+      <p><a href="13-co-dziala.html" onclick="if(parent!==window){parent.docNav('13-co-dziala');return false}">Co już działa &rarr;</a></p>
+    </div>
+  </div>
+
+  <div class="doc-foot">
+    Dokumentacja jest zestawem małych, samodzielnych stron. Każdą można otworzyć osobno, bez serwera.
+    Jak dodać albo poprawić sekcję:
+    <a href="15-jak-edytowac.html" onclick="if(parent!==window){parent.docNav('15-jak-edytowac');return false}">Jak edytować tę dokumentację</a>.
+  </div>
+
+</div>
+</body>
+</html>

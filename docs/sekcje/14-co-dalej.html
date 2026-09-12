@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Co dalej</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="doc">
+
+  <div class="doc-head">
+    <div class="doc-kicker">Stan projektu</div>
+    <h1 class="doc-title">Co dalej</h1>
+    <p class="doc-lead">
+      Wyłącznie rzeczy jeszcze niezrobione. Wszystko, co działa, przeniosło się do sekcji
+      <a href="13-co-dziala.html" onclick="if(parent!==window){parent.docNav('13-co-dziala');return false}">Co już działa</a>
+      i z tej listy zniknęło.
+    </p>
+  </div>
+
+  <div class="callout">
+    <span class="ct">Zasada prowadzenia tej listy</span>
+    Pozycja trafia na nią, gdy jest realnie potrzebna, i znika z niej w dniu, w którym zaczyna działać.
+    Lista, na której wisi coś zrobionego pół roku temu, przestaje być planem, a staje się archiwum.
+  </div>
+
+  <h2><span class="hico">🔨</span> Zaczęte, jeszcze nie domknięte</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:32%">Rzecz</th><th>Czego brakuje</th><th style="width:14%">Waga</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>Generatory treści jako zadania</b></td>
+          <td>Tekst reklamowy i draft maila działają jako osobne skrypty, ale nie są jeszcze wpięte
+              jako typ zadania. Dziś zrobi to subagent, tylko drożej i mniej przewidywalnie.</td>
+          <td><span class="tag warn">średnia</span></td>
+        </tr>
+        <tr>
+          <td><b>Zrzuty raportów Power BI</b></td>
+          <td>Otwarcie projektu i walidacja struktury działa. Zrzut realnego, wyrenderowanego raportu
+              wymaga jeszcze dopilnowania, żeby ocena wzrokowa miała co oceniać.</td>
+          <td><span class="tag warn">średnia</span></td>
+        </tr>
+        <tr>
+          <td><b>Uruchamianie testów reklamowych</b></td>
+          <td>Szkielet jest, ale prawdziwe wywołanie po stronie Meta i TikTok nie zostało napisane.
+              Zresztą i tak wymagałoby zgody człowieka, bo to wydatek.</td>
+          <td><span class="tag">niska</span></td>
+        </tr>
+        <tr>
+          <td><b>Integracja z Zanfią</b></td>
+          <td>Klient jest napisany, ale serwer odrzuca autoryzację. Blokada jest po stronie dostępu,
+              nie kodu.</td>
+          <td><span class="tag warn">zablokowane</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="hico">📋</span> Niezaczęte</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:32%">Rzecz</th><th>Po co</th><th style="width:14%">Waga</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>Sterowanie pulpitem</b><br><span class="muted">rola „Asia"</span></td>
+          <td>Klikanie w aplikacjach desktopowych, poza przeglądarką. Ostatnia metoda w hierarchii,
+              używana dopiero gdy zawiodą trzy wcześniejsze. Podstawy (zrzuty, okna, odczyt tekstu
+              z obrazu, blokada ekranu) są już zbudowane, brakuje samego wykonawcy.</td>
+          <td><span class="tag warn">średnia</span></td>
+        </tr>
+        <tr>
+          <td><b>Praca na wielu oknach</b><br><span class="muted">rola „Michał"</span></td>
+          <td>Prowadzenie kilku zadań ekranowych naraz i podglądanie ich stanu.
+              Sensowne dopiero po sterowaniu pulpitem.</td>
+          <td><span class="tag">niska</span></td>
+        </tr>
+        <tr>
+          <td><b>Obraz, głos, transkrypcja</b></td>
+          <td>Osobny dostawca modeli tam, gdzie Anthropic jest słabszy. Miejsce w ustawieniach jest
+              przygotowane i jawnie oznaczone jako nieużywane, żeby nikt nie zakładał, że działa.</td>
+          <td><span class="tag">niska</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="hico">🧭</span> Kierunek na najbliższy etap</h2>
+  <div class="two">
+    <div class="card">
+      <h3>1️⃣ Domknąć fazę C</h3>
+      <p>
+        „Wykonawca za zgodą" znaczy: operacje na zewnątrz (publikacja testowa, poczta, CRM)
+        wykonywane przez bota po akceptacji człowieka, z tą samą ścieżką kontroli co reszta.
+        Dopóki to nie jest zamknięte, lista działań czerwonych dozwolonych w limicie zostaje pusta.
+      </p>
+    </div>
+    <div class="card">
+      <h3>2️⃣ Zejść z kosztu zadań nietypowych</h3>
+      <p>
+        Subagent jest uniwersalny, ale drogi. Każde zadanie, które powtarza się na tyle często,
+        żeby dało się je opisać jednym schematem, powinno dostać własnego, tańszego wykonawcę.
+        Generatory treści są tu pierwsze w kolejce.
+      </p>
+    </div>
+  </div>
+
+  <h2><span class="hico">⚠️</span> Znane słabe punkty</h2>
+  <p class="muted">Rzeczy, które działają, ale mają udokumentowaną historię problemów. Warto o nich pamiętać.</p>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:32%">Obszar</th><th>Na co uważać</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>Pętle zadań o zadaniach</b></td>
+          <td>Bot potrafił zakładać zadania o swoich własnych zadaniach i kręcić się w kółko
+              („Wymaga decyzji: Wymaga decyzji: ..."). Naprawione dwutorowo: filtrem kolejki
+              i sprawdzaniem prefiksu w całym tytule, nie tylko na początku. Przy dodawaniu nowego
+              rodzaju zadania systemowego trzeba pamiętać o obu.</td>
+        </tr>
+        <tr>
+          <td><b>Koszt niewidoczny dla licznika</b></td>
+          <td>Skrypt, który woła model, ale nie zgłasza kosztu, potrafi wydać setki dolarów
+              bez żadnego sygnału. Każde nowe miejsce wołające model musi raportować koszt.</td>
+        </tr>
+        <tr>
+          <td><b>Stary kod w pamięci działającego bota</b></td>
+          <td>Żywy proces trzyma wersję sprzed aktualizacji, więc subagent może nie mieć zdolności,
+              którą właśnie dodano. Objaw wygląda jak błąd w kodzie, a lekarstwem jest restart roli.</td>
+        </tr>
+        <tr>
+          <td><b>Powiadomienia masowe</b></td>
+          <td>Mechanizm proszący o feedback po zamkniętym zadaniu raz wysłał maila do wszystkich
+              zamkniętych zadań naraz. Adresaci są dziś w jednym miejscu, a pusta lista blokuje wysyłkę,
+              ale każdy nowy kanał powiadomień wymaga tej samej ostrożności.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="doc-foot">
+    Dalej:
+    <a href="15-jak-edytowac.html" onclick="if(parent!==window){parent.docNav('15-jak-edytowac');return false}">Jak edytować tę dokumentację</a>.
+  </div>
+
+</div>
+</body>
+</html>

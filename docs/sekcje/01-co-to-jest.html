@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Czym jest wirtualny pracownik</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="doc">
+
+  <div class="doc-head">
+    <div class="doc-kicker">Jak to działa</div>
+    <h1 class="doc-title">Czym jest wirtualny pracownik</h1>
+    <p class="doc-lead">
+      Nie jest to czat, do którego się pisze. Jest to pracownik, któremu się przydziela zadanie
+      na liście i wraca się po wynik.
+    </p>
+  </div>
+
+  <h2><span class="hico">⚖️</span> Czat z AI kontra wirtualny pracownik</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead>
+        <tr><th style="width:22%"></th><th style="width:39%">Czat z AI</th><th>Wirtualny pracownik</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>Kto zaczyna</b></td>
+          <td>Człowiek. Bez pytania nic się nie dzieje.</td>
+          <td>Bot. Sam sprawdza listę zadań i bierze kolejne.</td>
+        </tr>
+        <tr>
+          <td><b>Kiedy pracuje</b></td>
+          <td>Gdy siedzisz przy komputerze.</td>
+          <td>Cały czas, na własnej maszynie.</td>
+        </tr>
+        <tr>
+          <td><b>Co oddaje</b></td>
+          <td>Tekst w oknie rozmowy.</td>
+          <td>Plik w uzgodnionym miejscu, komentarz przy zadaniu, zamknięty status.</td>
+        </tr>
+        <tr>
+          <td><b>Kto sprawdza wynik</b></td>
+          <td>Ty, po fakcie.</td>
+          <td>Trzy inne boty, zanim wynik do ciebie trafi.</td>
+        </tr>
+        <tr>
+          <td><b>Co przy niepewności</b></td>
+          <td>Zwykle zgaduje dalej.</td>
+          <td>Zatrzymuje się, zapisuje stan i pyta człowieka.</td>
+        </tr>
+        <tr>
+          <td><b>Ślad</b></td>
+          <td>Historia rozmowy.</td>
+          <td>Dziennik decyzji: kto, co, dlaczego, jaki model, ile kosztowało.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="hico">🧰</span> Co dziś realnie potrafi</h2>
+  <div class="cards">
+    <div class="card">
+      <h3>🌐 Zbierać informacje</h3>
+      <p>Wchodzi na wskazane strony, czyta je i odpowiada na pytanie z zadania.
+         Gdy link okazuje się zły, próbuje go sam poprawić.</p>
+    </div>
+    <div class="card">
+      <h3>📝 Pisać materiały</h3>
+      <p>Raporty, podsumowania, teksty reklamowe, drafty maili. Zawsze z realnych danych,
+         nigdy z pamięci.</p>
+    </div>
+    <div class="card">
+      <h3>🖱️ Klikać w przeglądarce</h3>
+      <p>Gdy czegoś nie da się wziąć przez API: loguje się, wypełnia formularze,
+         robi zrzut ekranu jako dowód.</p>
+    </div>
+    <div class="card">
+      <h3>📊 Sprawdzać raporty Power BI</h3>
+      <p>Waliduje strukturę projektu PBIP bez otwierania Power BI Desktop.</p>
+    </div>
+    <div class="card">
+      <h3>✉️ Pracować na integracjach</h3>
+      <p>Zestawienia wysyłek MailerLite, dane z Meta Ads, zapis dokumentów na SharePoint.</p>
+    </div>
+    <div class="card">
+      <h3>💻 Pracować w repozytorium</h3>
+      <p>Klonuje repo, zakłada gałąź, poprawia kod, commituje wg konwencji firmy i otwiera PR.
+         Nigdy prosto do gałęzi głównej.</p>
+    </div>
+  </div>
+
+  <h2><span class="hico">🚫</span> Czego świadomie nie robi</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:42%">Nie robi</th><th>Dlaczego</th></tr></thead>
+      <tbody>
+        <tr><td>Nie publikuje niczego na zewnątrz sam</td><td>Publikacja jest nieodwracalna. Zawsze potrzebna zgoda człowieka.</td></tr>
+        <tr><td>Nie zmienia budżetów reklamowych</td><td>To wydatek. Ta sama zasada co wyżej.</td></tr>
+        <tr><td>Nie wysyła masowych wiadomości do klientów</td><td>Błąd dotknąłby od razu setek osób.</td></tr>
+        <tr><td>Nie kasuje danych, repozytoriów ani kont</td><td>Nie ma drogi powrotnej.</td></tr>
+        <tr><td>Nie doradza podatkowo ani prawnie</td><td>Drobna nadinterpretacja jest tu realnym błędem merytorycznym.</td></tr>
+        <tr><td>Nie podaje cen ani nazw klientów z pamięci</td><td>Ceny bywają nieaktualne, realizacje publikujemy anonimowo.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="hico">🪜</span> Zawsze najprostszą metodą, jaka wystarcza</h2>
+  <p>
+    Do tego samego zadania prowadzi kilka dróg. Bot zawsze schodzi tak nisko, jak się da:
+    im prościej, tym taniej, stabilniej i łatwiej sprawdzić, co zrobił.
+  </p>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:8%">#</th><th style="width:26%">Metoda</th><th style="width:14%">Stan</th><th>Kiedy</th></tr></thead>
+      <tbody>
+        <tr><td class="c"><b>1</b></td><td>Połączenie z systemem (API)</td><td><span class="tag ok">działa</span></td><td>Zawsze pierwszy wybór. Najpewniejsze i najłatwiejsze do skontrolowania.</td></tr>
+        <tr><td class="c"><b>2</b></td><td>Skrypt na plikach</td><td><span class="tag ok">działa</span></td><td>Gdy nie ma API, ale są pliki albo adres strony.</td></tr>
+        <tr><td class="c"><b>3</b></td><td>Przeglądarka</td><td><span class="tag ok">działa</span></td><td>Gdy trzeba się zalogować i klikać.</td></tr>
+        <tr><td class="c"><b>4</b></td><td>Sterowanie pulpitem</td><td><span class="tag err">plan</span></td><td>Ostateczność, gdy zawiodą trzy poprzednie. Jeszcze niezbudowane.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout">
+    <span class="ct">Jedno zadanie, jeden plik</span>
+    Z każdego przetworzonego zadania powstaje dokładnie jeden dokument z wynikiem. Bot sam wybiera format
+    (PDF do czytania, DOCX do dalszej edycji, XLSX gdy wynik to liczby, MD dla krótkiej notatki technicznej)
+    i odkłada go do wspólnego folderu zadania na SharePoint.
+  </div>
+
+  <div class="doc-foot">
+    Dalej:
+    <a href="02-droga-zadania.html" onclick="if(parent!==window){parent.docNav('02-droga-zadania');return false}">Droga zadania</a>,
+    czyli co się dzieje krok po kroku między przydzieleniem a wynikiem.
+  </div>
+
+</div>
+</body>
+</html>

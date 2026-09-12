@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modele i koszty</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="doc">
+
+  <div class="doc-head">
+    <div class="doc-kicker">Ramy</div>
+    <h1 class="doc-title">Modele i koszty</h1>
+    <p class="doc-lead">
+      Mocny model tam, gdzie trzeba ocenić i zdecydować. Tańszy tam, gdzie zadanie jest już
+      dokładnie opisane i wystarczy je wykonać. Przypisanie jest w pliku ustawień, nie w kodzie.
+    </p>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi">
+      <div class="k-label">Poziomy modelu</div>
+      <div class="k-value">2</div>
+      <div class="k-foot">Osąd kontra wykonanie</div>
+    </div>
+    <div class="kpi">
+      <div class="k-label">Miejsc przypisanych</div>
+      <div class="k-value">15</div>
+      <div class="k-foot">8 na osąd, 7 na wykonanie</div>
+    </div>
+    <div class="kpi">
+      <div class="k-label">Próg ostrzeżenia</div>
+      <div class="k-value warn">85%</div>
+      <div class="k-foot">Przestaje brać nowe zadania</div>
+    </div>
+    <div class="kpi">
+      <div class="k-label">Wznowienie</div>
+      <div class="k-value">po 4h</div>
+      <div class="k-foot">Od pierwszego przekroczenia progu</div>
+    </div>
+  </div>
+
+  <h2><span class="hico">🧠</span> Dwa poziomy, jedna zasada</h2>
+  <div class="two">
+    <div class="card">
+      <h3>🎯 Osąd: model mocniejszy</h3>
+      <p>
+        Tam, gdzie trzeba coś zrozumieć, ocenić albo zdecydować: analiza zadania, decyzja
+        o podziale, wybór formatu wyniku, ocena zrzutu ekranu, sprawdzenie czy wynik faktycznie
+        odpowiada na zadanie, realna praca subagenta.
+      </p>
+      <p class="muted">Subtelny błąd jest tu kosztowny, na przykład przepuszczenie wymyślonej cechy oferty do klienta.</p>
+    </div>
+    <div class="card">
+      <h3>⚙️ Wykonanie: model tańszy</h3>
+      <p>
+        Tam, gdzie zadanie jest już precyzyjnie opisane i ma jasny rezultat: napisanie tekstu
+        z gotowych danych, naniesienie konkretnej listy poprawek, warianty tekstu reklamowego,
+        odczyt liczb ze zrzutu, raport tygodniowy.
+      </p>
+      <p class="muted">Mało miejsca na interpretację, więc mało miejsca na błąd.</p>
+    </div>
+  </div>
+
+  <div class="callout">
+    <span class="ct">Przy niepewności system przepłaca</span>
+    Wywołanie, którego nie ma w tabeli przypisań, trafia automatycznie na <b>mocniejszy</b> model.
+    Lepiej zapłacić więcej niż przepuścić błędny materiał przez słabszy model.
+  </div>
+
+  <h2><span class="hico">💰</span> Cennik modeli</h2>
+  <p class="muted">USD za milion tokenów. Zmiana modelu na nowszy to edycja jednego pliku, nie kodu.</p>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th>Model</th><th style="width:16%">Wejście</th><th style="width:16%">Wyjście</th><th style="width:34%">Używany do</th></tr></thead>
+      <tbody>
+        <tr><td><b>Opus 5</b></td><td>5,00</td><td>25,00</td><td>Osąd i decyzje <span class="tag ok">poziom wysoki</span></td></tr>
+        <tr><td><b>Sonnet 4.6</b></td><td>3,00</td><td>15,00</td><td>Wykonanie <span class="tag">poziom niski</span></td></tr>
+        <tr><td><b>Haiku 4.5</b></td><td>1,00</td><td>5,00</td><td>Dostępny, dziś nieużywany</td></tr>
+        <tr><td class="muted">Fable 5</td><td class="muted">10,00</td><td class="muted">50,00</td><td class="muted">Wycofany z użycia, patrz niżej</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout danger">
+    <span class="ct">Lekcja z 29.08.2026: 200 USD w kilka godzin</span>
+    Cztery miejsca zostały 25.08 przestawione na Fable 5, dwa razy droższy od Opusa 5.
+    W połączeniu ze skryptem naprawczym chodzącym co dwie minuty wygenerowało to 200 USD wydatku
+    <b>bez żadnej widoczności w Projectly</b>, bo ten skrypt nie zgłaszał kosztu do licznika.
+    Decyzja: powrót na Opus 5 i osobna poprawka, żeby każdy wydatek był widoczny. Wniosek został:
+    <b>koszt niewidoczny to koszt niekontrolowany</b>.
+  </div>
+
+  <h2><span class="hico">🛑</span> Trzy bezpieczniki</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:26%">Bezpiecznik</th><th>Co robi</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>Próg 85%</b> <span class="tag warn">miękki</span></td>
+          <td>Po przekroczeniu bot <b>nie przerywa</b> trwającego zadania, tylko przestaje brać nowe.
+              Wraca do pracy po 4 godzinach od pierwszego przekroczenia albo gdy zużycie samo spadnie.</td>
+        </tr>
+        <tr>
+          <td><b>Dzienny limit</b> <span class="tag err">twardy</span></td>
+          <td>Po przekroczeniu zatrzymuje pętlę. Limit ustawiany w jednym pliku, dziś 3000 USD.
+              Licznik zeruje się następnego dnia.</td>
+        </tr>
+        <tr>
+          <td><b>Widoczność</b> <span class="tag ok">stała</span></td>
+          <td>Koszt każdego zadania jest widoczny w Projectly i w panelu na maszynie. Nie ma wydatków
+              „gdzieś w tle".</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="hico">🧾</span> Jak liczony jest koszt</h2>
+  <div class="card">
+    <p>
+      Są dwie ścieżki, bo bot może pracować na dwa sposoby:
+    </p>
+    <dl class="kv">
+      <dt>Przez subskrypcję Claude</dt>
+      <dd>Subskrypcja nie ma ceny za token, więc licznik zapisuje stały koszt zastępczy za wywołanie.
+          To bezpiecznik <b>ilości pracy</b>, nie faktura.</dd>
+      <dt>Przez klucz API</dt>
+      <dd>Koszt liczony realnie, wg cennika modelu użytego w danym wywołaniu.</dd>
+    </dl>
+    <p class="muted">
+      Do 21.08.2026 ścieżka API liczyła zawsze wg zawyżonej stawki, trzykrotnie wyższej niż prawdziwa
+      cena Opusa. Naprawione, ale warto pamiętać przy porównywaniu starych raportów.
+    </p>
+  </div>
+
+  <h2><span class="hico">📦</span> Poza zakresem, świadomie</h2>
+  <div class="card">
+    <p>
+      OpenRouter jest zadeklarowany w ustawieniach jako miejsce na obraz, głos i transkrypcję,
+      ale <b>nie ma jeszcze działającego połączenia</b>. Audyt dostępów jawnie oznacza go jako
+      zadeklarowany i nieużywany, żeby nikt nie zakładał, że to działa.
+    </p>
+  </div>
+
+  <div class="doc-foot">
+    Dalej:
+    <a href="11-instalacja.html" onclick="if(parent!==window){parent.docNav('11-instalacja');return false}">Instalacja maszyny</a>.
+  </div>
+
+</div>
+</body>
+</html>

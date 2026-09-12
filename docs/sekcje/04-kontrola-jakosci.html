@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kontrola jakości</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="doc">
+
+  <div class="doc-head">
+    <div class="doc-kicker">Jak to działa</div>
+    <h1 class="doc-title">Kontrola jakości</h1>
+    <p class="doc-lead">
+      Sedno produktu. Bot nie oddaje pierwszej wersji, tylko taką, która wcześniej przeszła
+      przez trzech niezależnych oceniających. Gdy nie przejdzie, poprawia i wraca po ocenę.
+    </p>
+  </div>
+
+  <figure class="dia">
+    <div class="dia-box">
+      <svg viewBox="0 0 900 400" role="img" aria-label="Bramka jakości: wynik zadania trafia do trzech oceniających, ich oceny idą do werdyktu, który kieruje wynik do zamknięcia albo do poprawki">
+        <defs>
+          <marker id="g1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#4d5769"></path>
+          </marker>
+          <marker id="g2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#0c6430"></path>
+          </marker>
+          <marker id="g3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#92400e"></path>
+          </marker>
+        </defs>
+
+        <rect x="16" y="140" width="140" height="70" rx="10" fill="#eaf0fe" stroke="#1d4ed8" stroke-width="2"></rect>
+        <text x="86" y="168" text-anchor="middle" font-size="20">📦</text>
+        <text x="86" y="192" text-anchor="middle" font-size="13.5" font-weight="700" fill="#10151f">Wynik zadania</text>
+
+        <rect x="196" y="30" width="260" height="86" rx="10" fill="#ffffff" stroke="#b9c2d0" stroke-width="2"></rect>
+        <text x="216" y="57" font-size="14" font-weight="700" fill="#10151f">🎭  Bartek: powtórka</text>
+        <text x="216" y="78" font-size="13" fill="#2c3648">Robi zadanie drugi raz i porównuje.</text>
+        <text x="216" y="97" font-size="13" fill="#2c3648">Łapie wynik z przypadku.</text>
+
+        <rect x="196" y="132" width="260" height="86" rx="10" fill="#ffffff" stroke="#b9c2d0" stroke-width="2"></rect>
+        <text x="216" y="159" font-size="14" font-weight="700" fill="#10151f">🔧  Franek: twarde testy</text>
+        <text x="216" y="180" font-size="13" fill="#2c3648">Czy plik istnieje, czy się otwiera,</text>
+        <text x="216" y="199" font-size="13" fill="#2c3648">czy struktura jest poprawna.</text>
+
+        <rect x="196" y="234" width="260" height="86" rx="10" fill="#ffffff" stroke="#b9c2d0" stroke-width="2"></rect>
+        <text x="216" y="261" font-size="14" font-weight="700" fill="#10151f">👁️  Oskar: ocena wzrokowa</text>
+        <text x="216" y="282" font-size="13" fill="#2c3648">Patrzy na zrzut ekranu i mówi,</text>
+        <text x="216" y="301" font-size="13" fill="#2c3648">czy widać to, co miało być.</text>
+
+        <rect x="496" y="132" width="140" height="86" rx="10" fill="#e7f5ec" stroke="#0c6430" stroke-width="2"></rect>
+        <text x="566" y="164" text-anchor="middle" font-size="20">⚖️</text>
+        <text x="566" y="188" text-anchor="middle" font-size="13.5" font-weight="700" fill="#10151f">Gustaw</text>
+        <text x="566" y="206" text-anchor="middle" font-size="13" fill="#2c3648">werdykt</text>
+
+        <rect x="676" y="52" width="210" height="76" rx="10" fill="#e7f5ec" stroke="#0c6430" stroke-width="2"></rect>
+        <text x="781" y="82" text-anchor="middle" font-size="14" font-weight="700" fill="#10151f">✅  Gotowe</text>
+        <text x="781" y="105" text-anchor="middle" font-size="13" fill="#2c3648">Wynik idzie do człowieka</text>
+
+        <rect x="676" y="208" width="210" height="86" rx="10" fill="#fdf3e3" stroke="#92400e" stroke-width="2"></rect>
+        <text x="781" y="236" text-anchor="middle" font-size="14" font-weight="700" fill="#10151f">🔁  Poprawka</text>
+        <text x="781" y="258" text-anchor="middle" font-size="13" fill="#2c3648">Bot nanosi uwagi i wraca.</text>
+        <text x="781" y="277" text-anchor="middle" font-size="13" fill="#2c3648">Maksymalnie dwa podejścia.</text>
+
+        <path d="M156,168 L176,168 L176,73 L192,73" fill="none" stroke="#4d5769" stroke-width="2.5" marker-end="url(#g1)"></path>
+        <path d="M156,175 L192,175" fill="none" stroke="#4d5769" stroke-width="2.5" marker-end="url(#g1)"></path>
+        <path d="M156,182 L176,182 L176,277 L192,277" fill="none" stroke="#4d5769" stroke-width="2.5" marker-end="url(#g1)"></path>
+
+        <path d="M456,73 L476,73 L476,168 L492,168" fill="none" stroke="#4d5769" stroke-width="2.5" marker-end="url(#g1)"></path>
+        <path d="M456,175 L492,175" fill="none" stroke="#4d5769" stroke-width="2.5" marker-end="url(#g1)"></path>
+        <path d="M456,277 L476,277 L476,182 L492,182" fill="none" stroke="#4d5769" stroke-width="2.5" marker-end="url(#g1)"></path>
+
+        <path d="M636,160 L656,160 L656,90 L672,90" fill="none" stroke="#0c6430" stroke-width="2.5" marker-end="url(#g2)"></path>
+        <text x="600" y="122" font-size="12.5" font-weight="700" fill="#0c6430">przeszło</text>
+
+        <path d="M636,190 L656,190 L656,251 L672,251" fill="none" stroke="#92400e" stroke-width="2.5" marker-end="url(#g3)"></path>
+        <text x="576" y="242" font-size="12.5" font-weight="700" fill="#92400e">nie przeszło</text>
+
+        <path d="M781,294 L781,352 L86,352 L86,214" fill="none" stroke="#92400e" stroke-width="2.5" stroke-dasharray="7 4" marker-end="url(#g3)"></path>
+        <text x="430" y="373" text-anchor="middle" font-size="12.5" font-weight="700" fill="#92400e">poprawiony materiał wraca na początek bramki</text>
+      </svg>
+    </div>
+    <figcaption>
+      Każdy z trzech ocenia coś innego, więc nie powielają tego samego błędu. Gdy któryś nie ma czego oceniać
+      (np. nie ma zrzutu ekranu), uczciwie mówi „pomijam" zamiast zgadywać.
+    </figcaption>
+  </figure>
+
+  <h2><span class="hico">❓</span> Dlaczego to jest najważniejsza część</h2>
+  <div class="two">
+    <div class="card">
+      <h3>😐 Bez bramki</h3>
+      <p>
+        Dostajesz pierwszą wersję. Musisz ją sprawdzić sam, bo nie wiesz, czy bot faktycznie
+        wykonał zadanie, czy tylko ładnie napisał, że je wykonał. Oszczędność czasu znika.
+      </p>
+    </div>
+    <div class="card">
+      <h3>🙂 Z bramką</h3>
+      <p>
+        Dostajesz wersję, która przeżyła powtórkę, twarde testy i ocenę wzrokową. Gdy coś było nie tak,
+        bot poprawił to sam. Twoja rola to odbiór, nie kontrola techniczna.
+      </p>
+    </div>
+  </div>
+
+  <h2><span class="hico">🔁</span> Co się dzieje, gdy wynik nie przechodzi</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:34%">Sytuacja</th><th>Co robi bot</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>Drobna wada materiału</b><br><span class="muted">np. brak jednostki przy liczbie</span></td>
+          <td>Nanosi uwagi bramki na materiał (bez dorzucania nowych faktów) i oddaje do ponownej oceny.
+              Do dwóch podejść. <span class="tag ok">zwykle wystarcza</span></td>
+        </tr>
+        <tr>
+          <td><b>Zadanie było źle postawione</b><br><span class="muted">brak danych, zły link, niejasne polecenie</span></td>
+          <td>Zamyka zadanie z konkretnym opisem, czego zabrakło. <b>Nie</b> zakłada nikomu nowego zadania.
+              <span class="tag warn">popraw polecenie i wrzuć ponownie</span></td>
+        </tr>
+        <tr>
+          <td><b>Poprawka nie pomogła</b></td>
+          <td>Zakłada zadanie dla człowieka z pełnym kontekstem i linkiem do tego, co powstało.
+              <span class="tag err">sprawa dla człowieka</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout ok">
+    <span class="ct">Zweryfikowane na żywo</span>
+    Notatka odrzucana trzy razy z rzędu przeszła bramkę po automatycznych poprawkach, bez udziału człowieka.
+    Zadanie ze złym adresem źródła zostało zamknięte z informacją „czego zabrakło", również bez zawracania głowy.
+  </div>
+
+  <h2><span class="hico">⚙️</span> Co można tu ustawić</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:44%">Chcę...</th><th>Gdzie</th></tr></thead>
+      <tbody>
+        <tr><td>Zmienić kolejność oceniających albo dodać nowego</td><td><code>app/config/validation_gate.yaml</code></td></tr>
+        <tr><td>Ustawić, ilu musi się zgodzić, żeby przepuścić</td><td>tamże, pole <code>required_approvals</code></td></tr>
+        <tr><td>Dać któremuś prawo weta</td><td>tamże, lista <code>mandatory</code> (dziś pusta, świadomie)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <span class="ct">Decyzja z 22.08.2026: jeden oceniający mniej</span>
+    Z bramki usunięto bota odbioru biznesowego (Bożena). Zbyt często odsyłał poprawnie wykonane zadania,
+    przez co bot dokładał pracy zamiast ją zdejmować. Bramka nadal działa fail-closed przez pozostałą trójkę.
+  </div>
+
+  <div class="doc-foot">
+    Dalej:
+    <a href="05-zespol-botow.html" onclick="if(parent!==window){parent.docNav('05-zespol-botow');return false}">Zespół botów</a>,
+    czyli kto jeszcze bierze udział w pracy nad zadaniem.
+  </div>
+
+</div>
+</body>
+</html>

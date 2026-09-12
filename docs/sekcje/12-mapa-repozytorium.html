@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapa repozytorium</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="doc">
+
+  <div class="doc-head">
+    <div class="doc-kicker">Wdrożenie</div>
+    <h1 class="doc-title">Mapa repozytorium</h1>
+    <p class="doc-lead">
+      Co gdzie leży. Sekcja techniczna, przydatna przy pierwszym kontakcie z kodem.
+      Osoba biznesowa może ją pominąć.
+    </p>
+  </div>
+
+  <h2><span class="hico">🗂️</span> Główne foldery</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:22%">Folder</th><th>Co w nim jest</th></tr></thead>
+      <tbody>
+        <tr><td><code>app/</code></td><td>Cały kod agenta. Skrypty leżą płasko, bez podkatalogów na moduły.</td></tr>
+        <tr><td><code>app/config/</code></td><td>Ustawienia. Tu zapadają decyzje biznesowe: ryzyko, bramka, narzędzia, modele, harmonogram, adresaci poczty.</td></tr>
+        <tr><td><code>app/kontekst/</code></td><td>Wiedza o firmie i projektach klientów, dokładana do poleceń.</td></tr>
+        <tr><td><code>app/templates/</code></td><td>Szablony materiałów, głównie maili.</td></tr>
+        <tr><td><code>app/inbox/</code></td><td>Notatnik z zadaniami, lokalna alternatywa dla Projectly.</td></tr>
+        <tr><td><code>app/runs/</code></td><td><b>Wszystko, co powstaje w trakcie pracy:</b> baza stanu, zrzuty, dokumenty, klony repozytoriów, historia przebiegów. Poza kontrolą wersji.</td></tr>
+        <tr><td><code>app/secrets/</code></td><td>Klucze i dostępy. Poza kontrolą wersji, nigdy w repozytorium.</td></tr>
+        <tr><td><code>instalacja/</code></td><td>Przygotowanie nowej maszyny: instalator, logowania, skrypty stawiania od zera.</td></tr>
+        <tr><td><code>docs/</code></td><td>Ta dokumentacja.</td></tr>
+        <tr><td><code>.claude/rules/</code></td><td>Standardy organizacyjne: konwencja commitów, standardy kodu, standard raportowania Power BI. Bot dostaje je do ręki przy zadaniach o kodzie.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <span class="ct">Ważna zasada techniczna</span>
+    Wszystko, co powstaje podczas pracy (stan, flagi, raporty, pamięć podręczna), <b>musi</b> trafiać
+    do <code>app/runs/</code> albo <code>app/secrets/</code>. Plik śledzony przez git, który zmienia się
+    w trakcie pracy, powoduje konflikt przy każdej aktualizacji kodu na maszynie. Gdy plik śledzony
+    musi mieć wartości domyślne, w repozytorium leży szablon <code>*.default.*</code>, a lokalna kopia
+    tworzy się przy starcie.
+  </div>
+
+  <h2><span class="hico">🧭</span> Gdzie szukać czego</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:46%">Szukam...</th><th>Zajrzyj do</th></tr></thead>
+      <tbody>
+        <tr><td><b>Który skrypt robi X</b></td><td><code>app/MAPA-SKRYPTOW.md</code> <span class="tag ok">sprawdź to pierwsze</span></td></tr>
+        <tr><td>Co realnie działa, a co nie, i kiedy było testowane</td><td><code>app/README.md</code></td></tr>
+        <tr><td>Standardów pracy i konwencji</td><td><code>.claude/rules/*.md</code></td></tr>
+        <tr><td>Reguł projektu dla agentów pracujących w repo</td><td><code>CLAUDE.md</code></td></tr>
+        <tr><td>Skrótu o projekcie</td><td><code>README.md</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="hico">🎚️</span> Najważniejsze pliki ustawień</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:38%">Plik</th><th>Co ustawia</th></tr></thead>
+      <tbody>
+        <tr><td><code>config/approval_policy.yaml</code></td><td>Kolory ryzyka i progi zgody</td></tr>
+        <tr><td><code>config/validation_gate.yaml</code></td><td>Kolejność oceniających w bramce i próg zgód</td></tr>
+        <tr><td><code>config/tool_contracts.yaml</code></td><td>Co botowi wolno uruchomić i z jakimi parametrami</td></tr>
+        <tr><td><code>config/models.yaml</code> + <code>model_tiers.yaml</code></td><td>Jakie modele istnieją, ile kosztują, które wywołanie dostaje który poziom</td></tr>
+        <tr><td><code>config/projectly.yaml</code></td><td>Konta AI ról, zakres pobierania zadań, przełączniki botów</td></tr>
+        <tr><td><code>config/schedule.yaml</code></td><td>Harmonogram wszystkich skryptów cyklicznych</td></tr>
+        <tr><td><code>config/email_safety.yaml</code></td><td>Kto realnie dostaje maile. Jedyne miejsce z adresatami</td></tr>
+        <tr><td><code>config/repos.yaml</code></td><td>Praca w repozytoriach: gdzie klony, prefiks gałęzi, tożsamość commitów</td></tr>
+        <tr><td><code>config/sharepoint.yaml</code></td><td>Docelowa witryna i biblioteka na dokumenty</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="hico">📁</span> Gdzie lądują wyniki pracy</h2>
+  <div class="card">
+    <p>
+      Każde zadanie dostaje <b>jeden folder</b> na SharePoint, nazwany od numeru i tytułu zadania.
+      Ląduje w nim dokument z wynikiem i wszystko, co przy okazji powstało. Podzadania dzielą folder
+      z zadaniem nadrzędnym, więc rodzeństwo widzi nawzajem swoje materiały.
+    </p>
+    <p>
+      Link do folderu trafia do komentarza przy zamkniętym zadaniu, więc nie trzeba go szukać.
+    </p>
+  </div>
+
+  <div class="doc-foot">
+    Dalej:
+    <a href="13-co-dziala.html" onclick="if(parent!==window){parent.docNav('13-co-dziala');return false}">Co już działa</a>.
+  </div>
+
+</div>
+</body>
+</html>

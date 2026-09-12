@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Co już działa</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="doc">
+
+  <div class="doc-head">
+    <div class="doc-kicker">Stan projektu</div>
+    <h1 class="doc-title">Co już działa</h1>
+    <p class="doc-lead">
+      Uczciwa lista zdolności zweryfikowanych na żywo, nie tylko w testach. Rzeczy niezrobione
+      są w osobnej sekcji, żeby nie mieszać planów ze stanem faktycznym.
+    </p>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi">
+      <div class="k-label">Kolejka zadań</div>
+      <div class="k-value ok">na żywo</div>
+      <div class="k-foot">Realne zadania z Projectly, nie dane testowe</div>
+    </div>
+    <div class="kpi">
+      <div class="k-label">Role bota</div>
+      <div class="k-value ok">4</div>
+      <div class="k-foot">Na jednej maszynie, osobne procesy</div>
+    </div>
+    <div class="kpi">
+      <div class="k-label">Faza autonomii</div>
+      <div class="k-value ok">B</div>
+      <div class="k-foot">Producent. Faza C w toku</div>
+    </div>
+    <div class="kpi">
+      <div class="k-label">Stan kodu</div>
+      <div class="k-value">wrz. 2026</div>
+      <div class="k-foot">Dokumentacja zgodna z tym stanem</div>
+    </div>
+  </div>
+
+  <h2><span class="hico">🔀</span> Rdzeń pracy</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:36%">Zdolność</th><th>Uwaga</th></tr></thead>
+      <tbody>
+        <tr><td><b>Pełna droga zadania</b> <span class="tag ok">działa</span></td>
+            <td>Pobranie, kontrola treści, ryzyko, routing, wykonanie, bramka, zamknięcie. Każda decyzja z uzasadnieniem w dzienniku.</td></tr>
+        <tr><td><b>Kolejka z Projectly</b> <span class="tag ok">działa</span></td>
+            <td>Bot bierze i komentuje prawdziwe zadania, zamyka statusy.</td></tr>
+        <tr><td><b>Filtr kolejki</b> <span class="tag ok">działa</span></td>
+            <td>Zadania sterujące, eskalacyjne i feedbackowe nie wracają do pracy. Koniec kręcenia się w kółko.</td></tr>
+        <tr><td><b>Priorytety</b> <span class="tag ok">działa</span></td>
+            <td>Parking, backlog, bieżące, priorytet. Uwzględniane w całej drodze zadania.</td></tr>
+        <tr><td><b>Podział dużych zadań</b> <span class="tag ok">działa</span></td>
+            <td>Prawdziwa hierarchia podzadań w Projectly, zadanie główne oznaczane jako przeniesione i wypadające z kolejki.</td></tr>
+        <tr><td><b>Wybór formatu wyniku</b> <span class="tag ok">działa</span></td>
+            <td>Model wybiera PDF, DOCX, XLSX albo MD. Treść dokumentu budowana zawsze z realnego wyniku, nie wymyślana.</td></tr>
+        <tr><td><b>Domknięcie eskalacji</b> <span class="tag ok">działa</span></td>
+            <td>Odpowiedź człowieka na pytanie bota tworzy zadanie kontynuacyjne, z widocznym ciągiem oryginał, eskalacja, kontynuacja.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="hico">🛠️</span> Wykonawcy</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:36%">Zdolność</th><th>Uwaga</th></tr></thead>
+      <tbody>
+        <tr><td><b>Strony internetowe</b> <span class="tag ok">działa</span></td>
+            <td>Pobranie, odpowiedź na pytanie z zadania, samodzielna korekta złego adresu, rozsądny plan awaryjny przy braku danych na dany dzień.</td></tr>
+        <tr><td><b>Przeglądarka z klikaniem</b> <span class="tag ok">działa</span></td>
+            <td>Zweryfikowane na żywo, 72 realne zrzuty ekranu. Profile logowania MailerLite i Meta Ads trwałe.</td></tr>
+        <tr><td><b>Subagent do zadań nietypowych</b> <span class="tag ok">działa</span></td>
+            <td>Prawdziwy agent Claude Code z dostępem do plików, terminala i internetu. Zna kontekst firmy, projekt i standardy pracy.</td></tr>
+        <tr><td><b>Praca w repozytorium</b> <span class="tag ok">działa</span></td>
+            <td>Klon per zadanie, osobna gałąź, commit wg konwencji NN z numerem liczonym z historii, pull request. Nigdy prosto do gałęzi głównej.</td></tr>
+        <tr><td><b>Walidacja Power BI (PBIP)</b> <span class="tag ok">działa</span></td>
+            <td>Sprawdzenie struktury projektu bez otwierania Power BI Desktop.</td></tr>
+        <tr><td><b>Dokumenty na SharePoint</b> <span class="tag ok">działa</span></td>
+            <td>Jeden folder na zadanie, wspólny dla rodzeństwa podzadań, z klikalnym linkiem w komentarzu.</td></tr>
+        <tr><td><b>Odczyt z SharePoint</b> <span class="tag ok">działa</span></td>
+            <td>Tylko odczyt, z rejestru zatwierdzonych witryn firmowych.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="hico">✅</span> Kontrola jakości</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:36%">Zdolność</th><th>Uwaga</th></tr></thead>
+      <tbody>
+        <tr><td><b>Bramka trzech oceniających</b> <span class="tag ok">działa</span></td>
+            <td>Powtarzalna: to samo zadanie daje ten sam werdykt. Rozdziela uwagi blokujące od sugestii.</td></tr>
+        <tr><td><b>Pętla poprawek</b> <span class="tag ok">działa</span></td>
+            <td>Zweryfikowane: materiał odrzucany trzy razy z rzędu przeszedł po automatycznych poprawkach, bez udziału człowieka.</td></tr>
+        <tr><td><b>Sprawdzenie zgodności z zadaniem</b> <span class="tag ok">działa</span></td>
+            <td>Osobna ocena, czy plan i wynik faktycznie odpowiadają na to, o co proszono. Złapała realny przypadek, w którym bot napisał coś sensownego, ale nie na temat.</td></tr>
+        <tr><td><b>Ochrona przed sterowaniem botem</b> <span class="tag ok">działa</span></td>
+            <td>Treść z zadania i z internetu sprawdzana przed podaniem modelowi.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="hico">🎛️</span> Nadzór i sterowanie</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:36%">Zdolność</th><th>Uwaga</th></tr></thead>
+      <tbody>
+        <tr><td><b>Nadzorca</b> <span class="tag ok">działa</span></td>
+            <td>Jedyny proces w autostarcie. Odpala tylko włączone role, sam nie pracuje.</td></tr>
+        <tr><td><b>Jeden przełącznik bota</b> <span class="tag ok">działa</span></td>
+            <td>Status zadania w Projectly jako jedyne źródło prawdy. Panel i terminal zapisują w tym samym miejscu.</td></tr>
+        <tr><td><b>Samo-zamykanie procesu</b> <span class="tag ok">działa</span></td>
+            <td>Wyłączony bot dokańcza bieżące zadanie i zamyka się sam. Bez wiszących procesów.</td></tr>
+        <tr><td><b>Cztery role na maszynie</b> <span class="tag ok">działa</span></td>
+            <td>Dev, checker, marketing, zarząd. Osobne procesy, osobne kolejki, osobne konta AI.</td></tr>
+        <tr><td><b>Monitorowanie floty</b> <span class="tag ok">działa</span></td>
+            <td>Zakładka w Projectly, karta na rolę: bieżące zadanie, kolejka, koszt, zdrowie. Zweryfikowane na produkcji.</td></tr>
+        <tr><td><b>Panel na maszynie</b> <span class="tag ok">działa</span></td>
+            <td>Zadania, decyzje na żywo, harmonogram z historią przebiegów, pauza i stop.</td></tr>
+        <tr><td><b>Wykrywanie powtarzalnych awarii</b> <span class="tag ok">działa</span></td>
+            <td>Jedno zadanie naprawcze dziennie, bez zalewu alertów przy pierwszym błędzie.</td></tr>
+        <tr><td><b>Watchdog i blokada pojedynczej instancji</b> <span class="tag ok">działa</span></td>
+            <td>Dodane po realnym zawieszeniu bota na ponad dwie godziny. Jedna żywa instancja na rolę.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="hico">🛡️</span> Ramy</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:36%">Zdolność</th><th>Uwaga</th></tr></thead>
+      <tbody>
+        <tr><td><b>Lista dozwolonych narzędzi</b> <span class="tag ok">działa</span></td>
+            <td>Egzekwowana w ścieżce wykonania, odmowa przy czymkolwiek spoza listy.</td></tr>
+        <tr><td><b>Granice internetu</b> <span class="tag ok">działa</span></td>
+            <td>Jedna reguła dla wszystkich wykonawców. Blokada darknetu i adresów wewnętrznych, sprawdzana ponownie przy każdym przekierowaniu.</td></tr>
+        <tr><td><b>Poziomy modelu i cennik</b> <span class="tag ok">działa</span></td>
+            <td>15 miejsc przypisanych, cennik w jednym pliku. Koszt widoczny per zadanie.</td></tr>
+        <tr><td><b>Bezpiecznik kosztowy</b> <span class="tag ok">działa</span></td>
+            <td>Miękki próg 85% (przestaje brać nowe zadania, wraca po 4h) i twardy limit dzienny.</td></tr>
+        <tr><td><b>Bezpieczeństwo poczty</b> <span class="tag ok">działa</span></td>
+            <td>Jedno miejsce z adresatami, pusta lista blokuje wysyłkę. Dodane po realnej fali maili.</td></tr>
+        <tr><td><b>Instalator i autostart</b> <span class="tag ok">działa</span></td>
+            <td>Bezobsługowy, z testem końcowym i raportem.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="hico">🪜</span> Faza autonomii</h2>
+  <p class="muted">Uprawnienia rozszerzamy dopiero wtedy, gdy poprzednia faza jest udowodniona w praktyce.</p>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:26%">Faza</th><th>Zakres</th><th style="width:18%">Stan</th></tr></thead>
+      <tbody>
+        <tr><td><b>A. Obserwator</b></td><td>Odczyt i raportowanie</td><td><span class="tag ok">osiągnięte</span></td></tr>
+        <tr><td><b>B. Producent</b></td><td>Wersje robocze i zmiany na osobnej gałęzi, z samodzielną poprawką przed oddaniem człowiekowi</td><td><span class="tag ok">osiągnięte</span></td></tr>
+        <tr><td><b>C. Wykonawca za zgodą</b></td><td>Operacje na zewnątrz po akceptacji: publikacja testowa, poczta, CRM</td><td><span class="tag warn">w toku</span></td></tr>
+        <tr><td><b>D. Ograniczona autonomia</b></td><td>Wybrane działania czerwone w twardych limitach liczbowych</td><td><span class="tag err">plan</span></td></tr>
+        <tr><td><b>E. Platforma zespołowa</b></td><td>Wiele maszyn, centralne zarządzanie, role i uprawnienia</td><td><span class="tag err">plan</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout ok">
+    <span class="ct">Lista czerwonych działań bez zgody jest dziś pusta</span>
+    Mechanizm „wolno, ale tylko w granicy liczbowej" jest zbudowany i przetestowany, a lista rzeczy
+    nim objętych jest celowo pusta. Uruchomimy ją dopiero, gdy faza C będzie zamknięta.
+  </div>
+
+  <div class="doc-foot">
+    Dalej:
+    <a href="14-co-dalej.html" onclick="if(parent!==window){parent.docNav('14-co-dalej');return false}">Co dalej</a>,
+    czyli wyłącznie rzeczy jeszcze niezrobione.
+  </div>
+
+</div>
+</body>
+</html>

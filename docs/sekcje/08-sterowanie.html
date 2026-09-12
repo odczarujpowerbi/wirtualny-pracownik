@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sterowanie i nadzór</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="doc">
+
+  <div class="doc-head">
+    <div class="doc-kicker">Praca na co dzień</div>
+    <h1 class="doc-title">Sterowanie i nadzór</h1>
+    <p class="doc-lead">
+      Włączanie i wyłączanie bota ma jedno źródło prawdy: status zadania w Projectly.
+      Prowadzą do niego trzy drogi, ale wszystkie zapisują w tym samym miejscu, więc nie da się
+      doprowadzić do sytuacji „panel mówi co innego niż Projectly".
+    </p>
+  </div>
+
+  <figure class="dia">
+    <div class="dia-box">
+      <svg viewBox="0 0 900 420" role="img" aria-label="Trzy drogi sterowania zapisują status w jednym zadaniu sterującym w Projectly, nadzorca odczytuje ten status i uruchamia tylko włączone role bota">
+        <defs>
+          <marker id="c1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#4d5769"></path>
+          </marker>
+        </defs>
+
+        <rect x="16" y="20" width="268" height="64" rx="10" fill="#ffffff" stroke="#b9c2d0" stroke-width="2"></rect>
+        <text x="150" y="46" text-anchor="middle" font-size="13.5" font-weight="700" fill="#10151f">📋  Projectly wprost</text>
+        <text x="150" y="67" text-anchor="middle" font-size="12.5" fill="#2c3648">zmiana statusu zadania</text>
+
+        <rect x="316" y="20" width="268" height="64" rx="10" fill="#ffffff" stroke="#b9c2d0" stroke-width="2"></rect>
+        <text x="450" y="46" text-anchor="middle" font-size="13.5" font-weight="700" fill="#10151f">🖥️  Panel na maszynie</text>
+        <text x="450" y="67" text-anchor="middle" font-size="12.5" fill="#2c3648">zakładka Agenci</text>
+
+        <rect x="616" y="20" width="268" height="64" rx="10" fill="#ffffff" stroke="#b9c2d0" stroke-width="2"></rect>
+        <text x="750" y="46" text-anchor="middle" font-size="13.5" font-weight="700" fill="#10151f">⌨️  Terminal</text>
+        <text x="750" y="67" text-anchor="middle" font-size="12.5" fill="#2c3648">jedno polecenie</text>
+
+        <path d="M150,84 L150,106 L440,106 L440,126" fill="none" stroke="#4d5769" stroke-width="2.5" marker-end="url(#c1)"></path>
+        <path d="M450,84 L450,126" fill="none" stroke="#4d5769" stroke-width="2.5" marker-end="url(#c1)"></path>
+        <path d="M750,84 L750,106 L460,106 L460,126" fill="none" stroke="#4d5769" stroke-width="2.5" marker-end="url(#c1)"></path>
+
+        <rect x="166" y="130" width="568" height="84" rx="10" fill="#eaf0fe" stroke="#1d4ed8" stroke-width="2.5"></rect>
+        <text x="450" y="161" text-anchor="middle" font-size="14.5" font-weight="700" fill="#10151f">🎛️  Zadanie sterujące „Kontrola bota: rola"</text>
+        <text x="450" y="184" text-anchor="middle" font-size="13" fill="#2c3648">Jedyne źródło prawdy o tym, czy bot ma pracować.</text>
+        <text x="450" y="203" text-anchor="middle" font-size="13" fill="#2c3648">Status „done" znaczy: wyłączony.</text>
+
+        <path d="M450,214 L450,246" fill="none" stroke="#4d5769" stroke-width="2.5" marker-end="url(#c1)"></path>
+
+        <rect x="316" y="250" width="268" height="64" rx="10" fill="#e7f5ec" stroke="#0c6430" stroke-width="2"></rect>
+        <text x="450" y="276" text-anchor="middle" font-size="13.5" font-weight="700" fill="#10151f">👮  Nadzorca</text>
+        <text x="450" y="297" text-anchor="middle" font-size="12.5" fill="#2c3648">czyta status co 30 sekund</text>
+
+        <path d="M450,314 L450,332" fill="none" stroke="#4d5769" stroke-width="2.5"></path>
+        <path d="M196,332 L784,332" fill="none" stroke="#4d5769" stroke-width="2.5"></path>
+        <path d="M196,332 L196,344" fill="none" stroke="#4d5769" stroke-width="2.5" marker-end="url(#c1)"></path>
+        <path d="M366,332 L366,344" fill="none" stroke="#4d5769" stroke-width="2.5" marker-end="url(#c1)"></path>
+        <path d="M534,332 L534,344" fill="none" stroke="#4d5769" stroke-width="2.5" marker-end="url(#c1)"></path>
+        <path d="M704,332 L704,344" fill="none" stroke="#4d5769" stroke-width="2.5" marker-end="url(#c1)"></path>
+
+        <rect x="116" y="352" width="161" height="52" rx="9" fill="#ffffff" stroke="#b9c2d0" stroke-width="2"></rect>
+        <text x="196" y="383" text-anchor="middle" font-size="13.5" font-weight="700" fill="#10151f">💻  Dev</text>
+
+        <rect x="285" y="352" width="161" height="52" rx="9" fill="#ffffff" stroke="#b9c2d0" stroke-width="2"></rect>
+        <text x="366" y="383" text-anchor="middle" font-size="13.5" font-weight="700" fill="#10151f">🔎  Checker</text>
+
+        <rect x="454" y="352" width="161" height="52" rx="9" fill="#ffffff" stroke="#b9c2d0" stroke-width="2"></rect>
+        <text x="534" y="383" text-anchor="middle" font-size="13.5" font-weight="700" fill="#10151f">📣  Marketing</text>
+
+        <rect x="623" y="352" width="161" height="52" rx="9" fill="#ffffff" stroke="#b9c2d0" stroke-width="2"></rect>
+        <text x="704" y="383" text-anchor="middle" font-size="13.5" font-weight="700" fill="#10151f">📊  Zarząd</text>
+      </svg>
+    </div>
+    <figcaption>
+      Przy starcie maszyny uruchamia się tylko nadzorca. Boty odpala on, i tylko te, które są włączone.
+      Dzięki temu maszyna po restarcie wraca do dokładnie tego stanu, w jakim ją zostawiono.
+    </figcaption>
+  </figure>
+
+  <h2><span class="hico">🔘</span> Trzy drogi do jednego przełącznika</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:22%">Droga</th><th>Jak</th><th style="width:22%">Kiedy wygodna</th></tr></thead>
+      <tbody>
+        <tr><td><b>Projectly</b></td><td>Zmiana statusu zadania „Kontrola bota: rola". Zamknięte znaczy wyłączony.</td><td>Zdalnie, z telefonu</td></tr>
+        <tr><td><b>Panel</b></td><td>Zakładka Agenci, przełącznik przy roli.</td><td>Przy maszynie</td></tr>
+        <tr><td><b>Terminal</b></td><td><code>python agent_supervisor.py --wylacz dev</code> albo <code>--wlacz dev</code></td><td>Przy diagnostyce</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout ok">
+    <span class="ct">Wyłączenie nie ucina pracy w połowie</span>
+    Bot dokańcza zadanie, które właśnie robi, i dopiero potem sam zamyka swój proces.
+    Nie ma limitu czasowego, kryterium jest proste: czy cokolwiek jeszcze pracuje.
+    Dzięki temu nie zostają wiszące procesy, a ponowne włączenie odpala świeży, czysty proces.
+  </div>
+
+  <h2><span class="hico">🖥️</span> Panel na maszynie</h2>
+  <p>
+    <code>python app/dashboard.py</code> i adres <b>127.0.0.1:8787</b>. Tylko lokalnie, do pracy na miejscu.
+  </p>
+  <div class="cards">
+    <div class="card">
+      <h3>📊 Pasek stanu</h3>
+      <p>Czy pracuje, ile ma w kolejce, ile wydał, jak wygląda zużycie limitu i ile zadań jeszcze zmieści.</p>
+    </div>
+    <div class="card">
+      <h3>➕ Dodaj zadanie</h3>
+      <p>Formularz do szybkiego testu. Zadanie przechodzi tą samą drogą co zadanie z Projectly.</p>
+    </div>
+    <div class="card">
+      <h3>🧾 Zadania i przepływy</h3>
+      <p>Oś czasu każdego zadania i decyzje wszystkich botów na żywo: kto, co, dlaczego, jaki model, ile kosztowało.</p>
+    </div>
+    <div class="card">
+      <h3>⏱️ Harmonogram</h3>
+      <p>Lista skryptów cyklicznych, edycja częstotliwości, „uruchom teraz" i historia przebiegów z pełnym wyjściem.</p>
+    </div>
+  </div>
+
+  <h2><span class="hico">🛑</span> Trzy przyciski awaryjne</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:16%">Przycisk</th><th>Efekt</th></tr></thead>
+      <tbody>
+        <tr><td><b>PAUZA</b></td><td>Przestaje brać nowe zadania. Bieżące dokańcza. Stan zostaje nienaruszony.</td></tr>
+        <tr><td><b>STOP</b></td><td>Wyłącznik awaryjny. Żadna pętla nie podejmuje działania, dopóki nie zdejmiesz flagi.</td></tr>
+        <tr><td><b>START</b></td><td>Wznawia pracę.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="hico">📡</span> Podgląd całej floty</h2>
+  <div class="card">
+    <p>
+      Panel opisany wyżej jest <b>lokalny</b>: działa tylko na tej maszynie. Widok zdalny, na żywo,
+      dla wszystkich maszyn i ról jest w Projectly, w zakładce <b>Monitorowanie agentów</b>
+      (widocznej dla roli master).
+    </p>
+    <p>
+      Każda karta to jedna rola: co teraz robi, ile ma w kolejce, ile wydała, jak się czuje maszyna
+      i jakie były ostatnie zdarzenia. Status publikuje się sam, co minutę lub dwie.
+      Osobno, raz na godzinę, raportowany jest stan maszyny (wersje narzędzi, pamięć, ostatnia instalacja).
+    </p>
+  </div>
+
+  <div class="doc-foot">
+    Dalej:
+    <a href="09-bezpieczenstwo.html" onclick="if(parent!==window){parent.docNav('09-bezpieczenstwo');return false}">Bezpieczeństwo i granice</a>.
+  </div>
+
+</div>
+</body>
+</html>

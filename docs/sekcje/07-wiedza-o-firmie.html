@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wiedza o firmie</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="doc">
+
+  <div class="doc-head">
+    <div class="doc-kicker">Praca na co dzień</div>
+    <h1 class="doc-title">Wiedza o firmie</h1>
+    <p class="doc-lead">
+      To, czego nie da się wyczytać z treści zadania ani z kodu: kto jest kim, czym różnią się
+      dwie marki, na czym stanął projekt u klienta. Bez tego bot wykonuje zadania poprawnie
+      technicznie, ale obok realiów.
+    </p>
+  </div>
+
+  <h2><span class="hico">🏢</span> Dwie marki, jeden właściciel</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:22%"></th><th style="width:39%">Odczaruj Power BI</th><th>Clickless</th></tr></thead>
+      <tbody>
+        <tr><td><b>Co sprzedaje</b></td><td>Wiedzę: kursy, szkolenia, społeczność</td><td>Wdrożenia: raporty, aplikacje, automatyzacje</td></tr>
+        <tr><td><b>Kto kupuje</b></td><td>Osoba, która chce <b>sama umieć</b></td><td>Firma, która chce <b>mieć zrobione</b></td></tr>
+        <tr><td><b>Efekt dla klienta</b></td><td>„Umiem zbudować raport"</td><td>„Mam raport, który sam się aktualizuje"</td></tr>
+        <tr><td><b>Podmiot</b></td><td>Działalność szkoleniowa</td><td>Clickless Sp. z o.o. (Poznań)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout">
+    <span class="ct">Jedna osoba, dwie role w różnym czasie</span>
+    Ta sama osoba może być odbiorcą obu marek: najpierw uczy się na kursie, potem zleca wdrożenie,
+    albo odwrotnie. <b>Ale nigdy nie mieszamy tych dwóch komunikatów w jednym materiale.</b>
+  </div>
+
+  <h2><span class="hico">🚫</span> Czego bot nigdy nie robi w materiałach</h2>
+  <div class="cards">
+    <div class="card">
+      <h3>💸 Nie podaje ceny z pamięci</h3>
+      <p>Ceny w plikach wiedzy są punktem odniesienia dla bota, nie ofertą dla klienta.
+         Do materiału trafiają dopiero po sprawdzeniu aktualnej wersji na stronie.</p>
+    </div>
+    <div class="card">
+      <h3>📉 Nie obiecuje efektu w liczbach</h3>
+      <p>Nie zmyśla oszczędności ani zwrotu z inwestycji, jeśli liczba nie pochodzi z materiałów firmy.</p>
+    </div>
+    <div class="card">
+      <h3>🕵️ Nie ujawnia nazw klientów</h3>
+      <p>Realizacje publikujemy anonimowo: branża plus efekt. Nazwy widoczne na zrzutach są demonstracyjne.</p>
+    </div>
+    <div class="card">
+      <h3>⚖️ Nie doradza podatkowo ani prawnie</h3>
+      <p>Nawet gdy odpowiedź wydaje się oczywista. To obszar, w którym drobna nadinterpretacja
+         jest realnym błędem merytorycznym.</p>
+    </div>
+  </div>
+
+  <h2><span class="hico">📚</span> Co dokładnie bot dostaje do ręki</h2>
+  <p>Wiedza jest podzielona na krótkie pliki i dokładana do polecenia zależnie od treści zadania.
+     Zadanie o kursie walut nie dostaje wiedzy o ofercie szkoleń.</p>
+
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:26%">Rodzaj wiedzy</th><th>Kiedy się dokłada</th></tr></thead>
+      <tbody>
+        <tr><td><b>Podstawy firmy</b></td><td>Zawsze. Kto jesteśmy, jak pracujemy, czego nie robimy.</td></tr>
+        <tr><td><b>Marka</b></td><td>Gdy w zadaniu pada jednoznaczna fraza. Zgadywanie jest wyłączone.</td></tr>
+        <tr><td><b>Projekt klienta</b></td><td>Gdy w zadaniu pada nazwa projektu. Jeden plik na klienta: kto jest po drugiej stronie, jakie systemy, na czym stanęło.</td></tr>
+        <tr><td><b>Standardy pracy</b></td><td>Gdy zadanie dotyczy kodu albo Power BI. Konwencja commitów, standardy kodu, standard raportowania. Pliki reguł są jedynym źródłem, bez parafrazy.</td></tr>
+        <tr><td><b>Rodzeństwo podzadań</b></td><td>Gdy zadanie jest częścią większego. Bot wie, co robią pozostałe kawałki.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout ok">
+    <span class="ct">Najbardziej szczegółowa wiedza wygrywa</span>
+    Plik konkretnego projektu dokładany jest na końcu, więc bije ogólne zasady marki.
+    Szkic, w którym wszystko jest jeszcze „do uzupełnienia", nie trafia do polecenia wcale,
+    żeby nie zajmować miejsca bez treści.
+  </div>
+
+  <h2><span class="hico">✏️</span> Gdzie to zmieniać</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:44%">Chcę...</th><th>Edytuj</th></tr></thead>
+      <tbody>
+        <tr><td>Poprawić fakty o marce (oferta, proces, ceny)</td><td><code>app/kontekst/marka-*.md</code></td></tr>
+        <tr><td>Dopisać zasadę obowiązującą obie marki</td><td><code>app/kontekst/firma-podstawy.md</code></td></tr>
+        <tr><td>Uzupełnić wiedzę o kliencie lub projekcie</td><td><code>app/kontekst/projekty/&lt;projekt&gt;.md</code></td></tr>
+        <tr><td>Zmienić standardy kodu lub raportowania</td><td><code>.claude/rules/*.md</code></td></tr>
+        <tr><td>Wygenerować szkice nowych projektów z danych w Projectly</td><td><code>python kontekst_projektow_seed.py --yes</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="doc-foot">
+    Dalej:
+    <a href="08-sterowanie.html" onclick="if(parent!==window){parent.docNav('08-sterowanie');return false}">Sterowanie i nadzór</a>,
+    czyli jak go włączyć, wyłączyć i podejrzeć.
+  </div>
+
+</div>
+</body>
+</html>

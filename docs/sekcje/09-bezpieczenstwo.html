@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bezpieczeństwo i granice</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="doc">
+
+  <div class="doc-head">
+    <div class="doc-kicker">Ramy</div>
+    <h1 class="doc-title">Bezpieczeństwo i granice</h1>
+    <p class="doc-lead">
+      Model nigdy nie dostaje wolnej ręki na maszynie. Może uruchomić tylko narzędzia z listy,
+      tylko w miejscach wypisanych na tej liście. Wszystko inne to odmowa.
+    </p>
+  </div>
+
+  <h2><span class="hico">🚦</span> Trzy kolory ryzyka</h2>
+
+  <figure class="dia">
+    <div class="dia-box">
+      <svg viewBox="0 0 900 300" role="img" aria-label="Trzy klasy ryzyka: zielone bot robi sam, żółte robi sam ale wynik przechodzi przez bramkę jakości, czerwone zawsze wymaga zgody człowieka">
+        <rect x="16" y="16" width="282" height="262" rx="12" fill="#e7f5ec" stroke="#0c6430" stroke-width="2.5"></rect>
+        <circle cx="157" cy="62" r="22" fill="#0c6430"></circle>
+        <text x="157" y="110" text-anchor="middle" font-size="16" font-weight="700" fill="#10151f">ZIELONE</text>
+        <text x="157" y="140" text-anchor="middle" font-size="13" fill="#2c3648">odczyt danych</text>
+        <text x="157" y="161" text-anchor="middle" font-size="13" fill="#2c3648">zrzut ekranu, raport</text>
+        <text x="157" y="182" text-anchor="middle" font-size="13" fill="#2c3648">pobranie strony</text>
+        <line x1="46" y1="204" x2="268" y2="204" stroke="#a9dcbd" stroke-width="2"></line>
+        <text x="157" y="230" text-anchor="middle" font-size="13.5" font-weight="700" fill="#0c6430">Robi sam</text>
+        <text x="157" y="253" text-anchor="middle" font-size="12.5" fill="#2c3648">Nic nieodwracalnego</text>
+
+        <rect x="309" y="16" width="282" height="262" rx="12" fill="#fdf3e3" stroke="#92400e" stroke-width="2.5"></rect>
+        <circle cx="450" cy="62" r="22" fill="#92400e"></circle>
+        <text x="450" y="110" text-anchor="middle" font-size="16" font-weight="700" fill="#10151f">ŻÓŁTE</text>
+        <text x="450" y="140" text-anchor="middle" font-size="13" fill="#2c3648">zmiana statusu zadania</text>
+        <text x="450" y="161" text-anchor="middle" font-size="13" fill="#2c3648">wersja robocza materiału</text>
+        <text x="450" y="182" text-anchor="middle" font-size="13" fill="#2c3648">commit na osobnej gałęzi</text>
+        <line x1="339" y1="204" x2="561" y2="204" stroke="#eccf9c" stroke-width="2"></line>
+        <text x="450" y="230" text-anchor="middle" font-size="13.5" font-weight="700" fill="#92400e">Robi sam, ale wynik</text>
+        <text x="450" y="253" text-anchor="middle" font-size="13.5" font-weight="700" fill="#92400e">idzie przez bramkę</text>
+
+        <rect x="602" y="16" width="282" height="262" rx="12" fill="#fdeaea" stroke="#a81818" stroke-width="2.5"></rect>
+        <circle cx="743" cy="62" r="22" fill="#a81818"></circle>
+        <text x="743" y="110" text-anchor="middle" font-size="16" font-weight="700" fill="#10151f">CZERWONE</text>
+        <text x="743" y="140" text-anchor="middle" font-size="13" fill="#2c3648">publikacja na zewnątrz</text>
+        <text x="743" y="161" text-anchor="middle" font-size="13" fill="#2c3648">zmiana budżetu, masowy mail</text>
+        <text x="743" y="182" text-anchor="middle" font-size="13" fill="#2c3648">kasowanie danych, nadanie roli</text>
+        <line x1="632" y1="204" x2="854" y2="204" stroke="#f0b4b4" stroke-width="2"></line>
+        <text x="743" y="230" text-anchor="middle" font-size="13.5" font-weight="700" fill="#a81818">Zawsze zgoda człowieka</text>
+        <text x="743" y="253" text-anchor="middle" font-size="12.5" fill="#2c3648">Bez wyjątków</text>
+      </svg>
+    </div>
+    <figcaption>
+      Gdy typ akcji nie jest rozpoznany, wpada do czerwonych. Nigdy odwrotnie.
+    </figcaption>
+  </figure>
+
+  <h2><span class="hico">🔒</span> Zasada: przy niepewności odmawiaj</h2>
+  <p>Ten sam wzorzec powtarza się w całym systemie. Nie ma miejsca, w którym „pewnie będzie dobrze".</p>
+  <div class="cards">
+    <div class="card">
+      <h3>🧰 Narzędzie</h3>
+      <p>Nieznane narzędzie albo ścieżka spoza dozwolonych: <b>odmowa</b>.</p>
+    </div>
+    <div class="card">
+      <h3>🧠 Model</h3>
+      <p>Nieznane wywołanie w tabeli poziomów: idzie na <b>mocniejszy model</b>.
+         Lepiej przepłacić niż przepuścić błąd.</p>
+    </div>
+    <div class="card">
+      <h3>🚦 Ryzyko</h3>
+      <p>Nieznany typ akcji: <b>czerwone</b>. Decyduje człowiek.</p>
+    </div>
+    <div class="card">
+      <h3>🏢 Marka</h3>
+      <p>Niejednoznaczny sygnał w treści: <b>brak dopasowania</b>, zamiast zgadywania.</p>
+    </div>
+  </div>
+
+  <h2><span class="hico">🛡️</span> Co system realnie ma</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:28%">Mechanizm</th><th>Co robi</th></tr></thead>
+      <tbody>
+        <tr><td><b>Lista dozwolonych narzędzi</b> <span class="tag ok">jest</span></td>
+            <td>Model uruchamia wyłącznie zarejestrowane narzędzia, w wypisanych folderach i domenach.</td></tr>
+        <tr><td><b>Klasy ryzyka</b> <span class="tag ok">jest</span></td>
+            <td>Trzy kolory z diagramu wyżej, konfigurowane w pliku ustawień.</td></tr>
+        <tr><td><b>Panel awaryjny</b> <span class="tag ok">jest</span></td>
+            <td>Pauza i stop respektowane przez wszystkie pętle, również te cykliczne.</td></tr>
+        <tr><td><b>Ochrona haseł i kluczy</b> <span class="tag ok">jest</span></td>
+            <td>Nigdy w repozytorium, logach ani na zrzutach ekranu. Maskowane przed zapisem.</td></tr>
+        <tr><td><b>Dziennik decyzji</b> <span class="tag ok">jest</span></td>
+            <td>Każda decyzja z uzasadnieniem, modelem i kosztem. Da się wyeksportować do analizy.</td></tr>
+        <tr><td><b>Ochrona przed sterowaniem botem</b> <span class="tag ok">jest</span></td>
+            <td>Treść z zadania i z internetu jest sprawdzana, zanim dojdzie do modelu. Wykrycie zawsze zatrzymuje pracę.</td></tr>
+        <tr><td><b>Bezpiecznik kosztowy</b> <span class="tag ok">jest</span></td>
+            <td>Po przekroczeniu dziennego limitu pętla się zatrzymuje. Szczegóły:
+                <a href="10-koszty.html" onclick="if(parent!==window){parent.docNav('10-koszty');return false}">Modele i koszty</a>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="hico">🌐</span> Internet: szeroko otwarty, z dwiema twardymi granicami</h2>
+  <div class="card">
+    <p>
+      Od 05.09.2026 bot może wejść na <b>każdą normalną witrynę</b>. Wcześniejsza lista wyjątków
+      blokowała realną pracę częściej, niż cokolwiek chroniła. Zostały dwie granice, których nie da się przekroczyć:
+    </p>
+    <ul>
+      <li>Adres musi być <b>https</b>, tylko odczyt.</li>
+      <li>Zablokowane na stałe: <b>darknet</b> (.onion, .i2p) oraz <b>adresy wewnętrzne</b> maszyny i sieci.</li>
+    </ul>
+    <p>
+      Każde przekierowanie sprawdzane jest ponownie wobec tej samej reguły, więc serwer nie obejdzie kontroli,
+      odsyłając bota gdzie indziej. Pobrana treść jest z definicji niezaufana: trafia do modelu <b>oznaczona jako dane</b>,
+      nie jako polecenia.
+    </p>
+  </div>
+
+  <h2><span class="hico">⛔</span> Twarde zakazy</h2>
+  <div class="tbl-wrap">
+    <table class="t">
+      <thead><tr><th style="width:58%">Działanie</th><th>Zasada</th></tr></thead>
+      <tbody>
+        <tr><td>Nadawanie ról administracyjnych, kasowanie użytkowników, danych, repozytoriów</td><td><span class="tag err">zabronione</span></td></tr>
+        <tr><td>Zwiększanie wydatków reklamowych, masowe wiadomości do klientów</td><td><span class="tag warn">tylko za zgodą</span></td></tr>
+        <tr><td>Dowolne polecenia systemowe poza listą narzędzi</td><td><span class="tag err">zabronione</span></td></tr>
+        <tr><td>Zapis prosto do głównej gałęzi repozytorium</td><td><span class="tag err">zabronione</span><br><span class="muted">zawsze osobna gałąź i pull request</span></td></tr>
+        <tr><td>Porady podatkowe, prawne, rozliczeniowe</td><td><span class="tag err">zabronione</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout danger">
+    <span class="ct">Commit z czymś, co wygląda na hasło, jest odrzucany</span>
+    Zanim praca w repozytorium zostanie opublikowana, sprawdzane jest, czy w zmienionych plikach
+    nie ma czegoś przypominającego klucz lub token. Znalezienie blokuje publikację.
+  </div>
+
+  <div class="doc-foot">
+    Dalej:
+    <a href="10-koszty.html" onclick="if(parent!==window){parent.docNav('10-koszty');return false}">Modele i koszty</a>.
+  </div>
+
+</div>
+</body>
+</html>
