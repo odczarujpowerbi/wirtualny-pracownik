@@ -48,3 +48,11 @@ repo_work:
   # moglby niczego scalic.
   quality_gate: null
   quality_gate_timeout_seconds: 900
+
+  # --- Zakladanie nowego repozytorium (12.09.2026) ---
+  # Wlasciciel konta/organizacji na GitHubie, w ktorym powstaja repozytoria
+  # projektow. Puste = repozytorium na koncie wlasciciela tokenu.
+  github_owner: odczarujpowerbi
+  # Dostep do GitHuba: GITHUB_TOKEN w secrets/.env (REST API) albo `gh auth login`
+  # na maszynie. Bez zadnego z nich repozytorium zostaje LOKALNE, a zadanie trafia
+  # do czlowieka z jasnym powodem (repo_bootstrap.py) - nigdy cichy sukces.

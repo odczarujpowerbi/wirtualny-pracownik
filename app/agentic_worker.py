@@ -55,6 +55,7 @@ import bot_content_check
 import cost_estimator
 import knowledge_sync
 import model_registry
+import repo_bootstrap
 import repo_publish
 import repo_workspace
 import task_thinker
@@ -282,6 +283,19 @@ def run(task, thinking, client=None, context=None):
         return _nie_wykonano(repo_publish.opis_dla_czlowieka(publikacja),
                              cost_usd=cost_wykonania,
                              output={"folder": str(folder), "repo": publikacja})
+
+    # Nowe repozytorium: po zacommitowaniu pracy zakładamy je na GitHubie i
+    # zapisujemy oba adresy w projekcie, żeby KOLEJNE zadania trafiały prosto do
+    # kodu, bez szukania. Nieudane założenie NIE jest cichym sukcesem: zadanie
+    # idzie do człowieka, bo bez adresu w projekcie nic dalej nie zadziała.
+    if sandbox and sandbox.get("tryb") == "init":
+        zalozenie = repo_bootstrap.dokoncz(client, task, sandbox)
+        if not zalozenie["ok"]:
+            return _nie_wykonano(f"repozytorium nie zostało w pełni założone: {zalozenie['powod']}",
+                                 cost_usd=cost_wykonania,
+                                 output={"folder": str(folder), "repo": publikacja,
+                                         "zalozenie": zalozenie})
+        publikacja = {**(publikacja or {}), "repozytorium": zalozenie["url"]}
 
     opis_repo = f"\n\nRepozytorium: {repo_publish.opis_dla_czlowieka(publikacja)}" if publikacja else ""
     return {
