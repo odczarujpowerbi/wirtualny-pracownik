@@ -22,7 +22,7 @@ from pathlib import Path
 import env_bootstrap
 
 
-def _lock_path_for_role(role):
+def _domyslna_sciezka_blokady(role):
     """Blokada per ROLA (nie globalna) — dodane 29.08.2026: kilka procesów
     job_scheduler.py na tej samej maszynie/repo (dev/checker/marketing, patrz
     BOT_ROLE w env_bootstrap._current_role) mają pilnować SIEBIE nawzajem
@@ -34,7 +34,23 @@ def _lock_path_for_role(role):
     return Path(__file__).parent / "runs" / f"job_scheduler{suffix}.lock"
 
 
-LOCK_PATH = _lock_path_for_role(env_bootstrap._current_role())
+LOCK_PATH = _domyslna_sciezka_blokady(env_bootstrap._current_role())
+
+
+def _lock_path_for_role(role):
+    """Ścieżka blokady danej roli. Dla roli BIEŻĄCEJ zwraca modułowe LOCK_PATH,
+    a nie policzoną od nowa ścieżkę — to jedno źródło prawdy o blokadzie tego
+    procesu.
+
+    Bez tego moduł miał DWIE drogi do tej samej blokady: acquire/release/_read
+    przez LOCK_PATH, a is_running/running_pid przez tę funkcję. Rozjeżdżały się
+    wszędzie tam, gdzie LOCK_PATH jest podmieniane, czyli w testach izolujących
+    blokadę w katalogu tymczasowym: taki test zwalniał WŁASNĄ blokadę, a potem
+    pytał running_pid() i dostawał PID ŻYWEGO bota tej maszyny (bramka jakości
+    świeciła na czerwono niezależnie od stanu kodu, 05-12.09.2026)."""
+    if role == env_bootstrap._current_role():
+        return LOCK_PATH
+    return _domyslna_sciezka_blokady(role)
 
 
 def _now_iso():
