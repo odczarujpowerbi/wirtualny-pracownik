@@ -77,19 +77,26 @@ def run():
             checks.append(("Bez execution_result: plik i tak powstaje",
                            folder3_path is not None and (folder3_path / "wynik_T-BEZ-EXEC.md").exists()))
 
-            # 3b. Podzadanie (parent_task_id ustawione) pisze do folderu RODZICA
-            #     (glob po prefiksie task_id), nie tworzy własnego folderu — bez
-            #     lokalnego mapowania, źródłem prawdy jest samo Projectly.
+            # 3b. Podzadanie (parent_task_id ustawione) dostaje WŁASNY folder POD
+            #     folderem rodzica (decyzja właściciela 12.09.2026, task_folder.py).
+            #     Wcześniej pisało wprost do folderu rodzica, przez co wyniki
+            #     rodzeństwa leżały wymieszane w jednym katalogu.
             task_thinker.ask_model = _atrapa('{"format": "pdf", "reasoning": "Do wysłania."}')
             folder_child = runner_loop._save_result_to_onedrive(
                 {"task_id": "T-DZIECKO-1", "title": "Podzadanie 1", "parent_task_id": "T-XLSX"},
                 "done", "Podzadanie zrobione.", {"acceptance_notes": "Wynik podzadania."})
-            checks.append(("Podzadanie: folder taki sam jak rodzica (T-XLSX_*)",
-                           folder_child == folder))
-            checks.append(("Podzadanie: własny plik wynik_T-DZIECKO-1.* w folderze rodzica",
-                           folder_path is not None and (folder_path / "wynik_T-DZIECKO-1.pdf").exists()))
-            checks.append(("Współdzielony folder: pliki rodzica i dziecka NIE nadpisują się",
-                           folder_path is not None and len(list(folder_path.glob("wynik_*.*"))) == 2))
+            folder_child_path = Path(folder_child) if folder_child else None
+            checks.append(("Podzadanie: własny folder, nie folder rodzica",
+                           folder_child is not None and folder_child != folder))
+            checks.append(("Podzadanie: folder leży POD folderem rodzica",
+                           folder_child_path is not None and folder_path is not None
+                           and folder_child_path.parent == folder_path))
+            checks.append(("Podzadanie: własny plik wynik_T-DZIECKO-1.* we własnym folderze",
+                           folder_child_path is not None and (folder_child_path / "wynik_T-DZIECKO-1.pdf").exists()))
+            checks.append(("Rozdzielone foldery: plik rodzica zostaje u rodzica, dziecka u dziecka",
+                           folder_path is not None
+                           and len(list(folder_path.glob("wynik_*.*"))) == 1
+                           and len(list(folder_child_path.glob("wynik_*.*"))) == 1))
 
             # 4. Error case: katalog nadrzędny ONEDRIVE_TASKS_ROOT nie istnieje ->
             #    fail-soft, zwraca None, nie rzuca (model nie jest nawet wołany).

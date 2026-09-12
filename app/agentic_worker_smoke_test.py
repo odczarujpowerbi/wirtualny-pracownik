@@ -193,9 +193,15 @@ def run():
         try:
             agentic_worker.subprocess.run = _fake_run_success
             wynik_onedrive = agentic_worker.run(TASK, THINKING_OK)
-            foldery_utworzone = list(onedrive_tmp.glob("T-AGENT_*"))
+            # Od 12.09.2026 folder zadania leży pod folderem PROJEKTU
+            # (task_folder.py), a nie płasko w korzeniu — stąd rglob.
+            foldery_utworzone = list(onedrive_tmp.rglob("T-AGENT_*"))
             checks.append(("ONEDRIVE_TASKS_ROOT ustawiony: dokładnie JEDEN folder zadania utworzony",
                            len(foldery_utworzone) == 1))
+            checks.append(("ONEDRIVE_TASKS_ROOT ustawiony: folder zadania leży POD folderem projektu",
+                           len(foldery_utworzone) == 1
+                           and foldery_utworzone[0].parent != onedrive_tmp
+                           and foldery_utworzone[0].parent.parent == onedrive_tmp))
             checks.append(("ONEDRIVE_TASKS_ROOT ustawiony: komenda niesie OBA foldery (lokalny + SharePoint)",
                            captured["cmd"].count(str(foldery_utworzone[0])) == 1
                            and captured["cmd"].count(captured["cwd"]) == 1))
@@ -209,7 +215,7 @@ def run():
             # Drugie wywołanie (to samo zadanie) -> BRAK duplikatu folderu (dopasowanie po prefiksie).
             agentic_worker.run(TASK, THINKING_OK)
             checks.append(("ONEDRIVE_TASKS_ROOT ustawiony: drugie wywołanie NIE dubluje folderu",
-                           len(list(onedrive_tmp.glob("T-AGENT_*"))) == 1))
+                           len(list(onedrive_tmp.rglob("T-AGENT_*"))) == 1))
         finally:
             os.environ.pop("ONEDRIVE_TASKS_ROOT", None)
 

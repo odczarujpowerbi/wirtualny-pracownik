@@ -116,7 +116,8 @@ def run():
         checks.append(("Happy path: status = done", result.get("status") == "done"))
 
         onedrive_root = Path(os.environ["ONEDRIVE_TASKS_ROOT"])
-        folders = list(onedrive_root.glob("T-REALNY-WYNIK_*"))
+        folders = list(# Folder zadania leży pod folderem projektu (task_folder.py, 12.09.2026).
+        onedrive_root.rglob("T-REALNY-WYNIK_*"))
         checks.append(("Happy path: dokładnie jeden folder wyniku", len(folders) == 1))
         if folders:
             wynik_files = list(folders[0].glob("wynik_*.*"))

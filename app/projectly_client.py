@@ -794,6 +794,80 @@ class ProjectlyClient:
             args["links"] = links
         return self._mcp.call_tool("zbot_update_knowledge", args)
 
+    # --- Projekt z własnym kodem i polityka narzędzi (12.09.2026) ---
+
+    def project_repo(self, project_id):
+        """Ustawienia repozytorium PROJEKTU albo None, gdy projekt nie ma własnego kodu.
+
+        Źródłem prawdy o tym, GDZIE agent pracuje z kodem, jest projekt w Projectly,
+        nie treść zadania (wcześniej URL musiał być w każdym zadaniu z osobna, więc
+        podzadania go gubiły — patrz repo_workspace.wykryj).
+
+        Zwraca {"url", "local_path", "branch", "init_at"} albo None. Fail-soft: błąd
+        MCP / nieznany projekt -> None, czyli "to nie jest zadanie w repozytorium".
+        """
+        if not project_id:
+            return None
+        try:
+            self._ensure_directory()
+        except MCPError as exc:
+            print(f"[Projectly] Nie mogę odczytać katalogu projektów ({exc}) — pomijam repo projektu.")
+            return None
+        for p in self._projects:
+            if p.get("id") != project_id:
+                continue
+            repo = p.get("repo") or {}
+            if not repo.get("isRepoProject"):
+                return None
+            return {
+                "url": repo.get("url"),
+                "local_path": repo.get("localPath"),
+                "branch": repo.get("branch") or "main",
+                "init_at": repo.get("initAt"),
+            }
+        return None
+
+    def set_project_repo(self, project_id, repo_url, repo_local_path):
+        """MCP: zbot_set_project_repo. Zapis adresów repozytorium, które agent właśnie
+        założył. Projectly odmawia nadpisania istniejącego adresu — to celowe."""
+        return self._mcp.call_tool("zbot_set_project_repo", {
+            "projectId": project_id,
+            "repoUrl": repo_url,
+            "repoLocalPath": repo_local_path,
+        })
+
+    def project_policy(self, project_id):
+        """MCP: zbot_get_project_policy. Zasady projektu (wiedza pierwszorzędna) i lista
+        narzędzi dozwolonych W TYM projekcie. Fail-soft: brak project_id / błąd -> None,
+        a wtedy obowiązuje dotychczasowa konfiguracja lokalna (nigdy „wolno wszystko")."""
+        if not project_id:
+            return None
+        try:
+            wynik = self._mcp.call_tool("zbot_get_project_policy", {"projectId": project_id})
+        except MCPError as exc:
+            print(f"[Projectly] Nie mogę pobrać polityki projektu ({exc}) — zostaje konfiguracja lokalna.")
+            return None
+        return wynik if isinstance(wynik, dict) else None
+
+    def documentation(self, project_id):
+        """MCP: get_documentation. Strony dokumentacji projektu (wiedza o projekcie)
+        z formatem, datą zmiany i listą załączników."""
+        wynik = self._mcp.call_tool("get_documentation", {"projectId": project_id})
+        return wynik if isinstance(wynik, dict) else {"pages": []}
+
+    def doc_file(self, project_id, page_id):
+        """MCP: zbot_get_doc_file. Strona dokumentacji jako gotowy plik .md."""
+        return self._mcp.call_tool("zbot_get_doc_file", {"projectId": project_id, "pageId": page_id})
+
+    def doc_attachment(self, attachment_id):
+        """MCP: zbot_get_doc_attachment. Załącznik dokumentacji (base64)."""
+        return self._mcp.call_tool("zbot_get_doc_attachment", {"attachmentId": attachment_id})
+
+    def report_connectors(self, connectors):
+        """MCP: zbot_report_connectors. Zgłasza, jakie połączenia ma ta maszyna i czy
+        działają. NIGDY nie wysyła wartości kluczy — tylko nazwę, opis i status."""
+        return self._mcp.call_tool("zbot_report_connectors", {"connectors": connectors})
+
 
 class MockProjectlyClient:
     """Symuluje Projectly przy użyciu lokalnych plików JSON — do testowania
@@ -947,6 +1021,33 @@ class MockProjectlyClient:
                 return {"id": knowledge_id}
         print(f"[MOCK Projectly] baza wiedzy: {knowledge_id} nie znaleziony")
         return {"id": knowledge_id}
+
+    # --- Projekt z własnym kodem i polityka narzędzi (kontrakt jak ProjectlyClient) ---
+    # Mock celowo nie ma projektu z kodem: tryb mockowy służy do testów pętli bez sieci,
+    # a praca w repozytorium wymaga realnego projektu w Projectly.
+
+    def project_repo(self, project_id):
+        return None
+
+    def set_project_repo(self, project_id, repo_url, repo_local_path):
+        print(f"[MOCK Projectly] zapis repo projektu {project_id}: {repo_url} / {repo_local_path}")
+        return {"id": project_id, "repoUrl": repo_url, "repoLocalPath": repo_local_path}
+
+    def project_policy(self, project_id):
+        return None
+
+    def documentation(self, project_id):
+        return {"count": 0, "pages": []}
+
+    def doc_file(self, project_id, page_id):
+        return {"error": "Mock nie ma dokumentacji projektu."}
+
+    def doc_attachment(self, attachment_id):
+        return {"error": "Mock nie ma załączników dokumentacji."}
+
+    def report_connectors(self, connectors):
+        print(f"[MOCK Projectly] zgłoszono {len(connectors)} połączeń (bez wysyłki)")
+        return {"reported": len(connectors)}
 
     @staticmethod
     def _load(path, default):

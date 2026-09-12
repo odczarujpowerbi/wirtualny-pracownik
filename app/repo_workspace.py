@@ -112,11 +112,53 @@ def _repo_lokalne(token):
     return None
 
 
-def wykryj(task):
+def _zamiar_z_projektu(task, client):
+    """Repozytorium wzięte z USTAWIEN PROJEKTU w Projectly (najwyzszy priorytet).
+
+    Dodane 12.09.2026: wczesniej repozytorium musialo byc w tresci KAZDEGO zadania,
+    wiec podzadania tworzone przez task_decomposer.decompose (tytul + opis od modelu)
+    gubily je po cichu i pracowaly w pustym folderze zadania. Projekt jest trwalszym
+    nosnikiem tej informacji niz zadanie.
+
+    Folder firmowy (local_path) jest ZRODLEM klonu, GitHub (url) kopia — decyzja
+    wlasciciela 12.09.2026. Gdy folderu nie ma, klonujemy z GitHuba; gdy nie ma ani
+    jednego, projekt czeka na zalozenie repozytorium (tryb init).
+
+    Fail-soft: brak klienta / brak project_id / blad -> None, czyli szukamy dalej
+    w tresci zadania, dokladnie jak przed ta zmiana."""
+    if client is None:
+        return None
+    project_id = (task or {}).get("project_id")
+    if not project_id:
+        return None
+    try:
+        repo = client.project_repo(project_id)
+    except Exception:  # noqa: BLE001 — ustawienia projektu sa wskazowka, nie warunkiem pracy
+        return None
+    if not repo:
+        return None
+
+    lokalny = _repo_lokalne(str(repo.get("local_path") or "").strip())
+    if lokalny:
+        return {"tryb": "clone", "zrodlo": lokalny, "zrodlo_opis": "folder firmowy projektu"}
+    url = str(repo.get("url") or "").strip()
+    if url:
+        return {"tryb": "clone", "zrodlo": url, "zrodlo_opis": "GitHub projektu"}
+    return {"tryb": "init", "zrodlo_opis": "projekt bez repozytorium — zakladamy nowe"}
+
+
+def wykryj(task, client=None):
     """Zamiar zadania wobec repozytorium albo None, gdy zadanie go nie dotyczy.
+
+    Kolejnosc zrodel: ustawienia PROJEKTU (client), potem jawne pola zadania,
+    potem tresc zadania, na koncu slowa o zalozeniu projektu od zera.
 
     Zwraca {"tryb": "clone", "zrodlo": url_albo_sciezka} albo {"tryb": "init"}."""
     task = task or {}
+    z_projektu = _zamiar_z_projektu(task, client)
+    if z_projektu:
+        return z_projektu
+
     jawne = str(task.get("repo_url") or "").strip()
     if jawne:
         return {"tryb": "clone", "zrodlo": jawne}
@@ -212,7 +254,7 @@ def _przelacz_na_branch(docelowy, branch, runner):
     return {"ok": True}
 
 
-def przygotuj(task, config=None, runner=subprocess.run):
+def przygotuj(task, config=None, runner=subprocess.run, client=None):
     """Przygotowuje piaskownice repo dla zadania. Nigdy nie rzuca.
 
     None            -> zadanie nie dotyczy repozytorium (subagent pracuje jak dotad),
@@ -221,7 +263,7 @@ def przygotuj(task, config=None, runner=subprocess.run):
 
     Idempotentne: powtorzone wywolanie dla tego samego zadania (retry) wchodzi
     do istniejacej piaskownicy zamiast klonowac od nowa."""
-    zamiar = wykryj(task)
+    zamiar = wykryj(task, client=client)
     if not zamiar:
         return None
     cfg = config or load_config()

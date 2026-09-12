@@ -75,7 +75,8 @@ def run():
                        "T-INTEGR" in comments and len(comments["T-INTEGR"]) == 1))
 
         onedrive_root = Path(os.environ["ONEDRIVE_TASKS_ROOT"])
-        folders = list(onedrive_root.glob("T-INTEGR_*"))
+        folders = list(# Folder zadania leży pod folderem projektu (task_folder.py, 12.09.2026).
+        onedrive_root.rglob("T-INTEGR_*"))
         checks.append(("Dokładnie jeden folder wyniku dla zadania głównego", len(folders) == 1))
         if folders:
             wynik_files = list(folders[0].glob("wynik_*.*"))

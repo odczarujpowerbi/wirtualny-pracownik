@@ -43,6 +43,7 @@ import sharepoint_link
 import skill_usage_logger
 import state_store
 import task_decomposer
+import task_folder
 import task_router
 import task_thinker
 import usage_monitor
@@ -91,7 +92,7 @@ def _slug(text, limit=60):
     return (slug[:limit] or "zadanie")
 
 
-def _save_result_to_onedrive(task, status, comment, execution_result=None):
+def _save_result_to_onedrive(task, status, comment, execution_result=None, client=None):
     """Zapisuje wynik KAŻDEGO przetworzonego zadania do OneDrive (folder
     ONEDRIVE_TASKS_ROOT z secrets/.env, jeden podfolder per zadanie) — decyzja
     właściciela 23.08.2026: to ma być ZAWSZE, nie tylko wtedy, gdy ktoś ręcznie
@@ -120,24 +121,10 @@ def _save_result_to_onedrive(task, status, comment, execution_result=None):
     data i skrócony tytuł dla człowieka. task_id jest zawsze dostępne — to
     surowe id z Projectly (`raw.get("id")` w projectly_client._map_task),
     ten sam identyfikator używany w całym pipeline, żadna zmiana MCP niepotrzebna."""
-    root = os.environ.get("ONEDRIVE_TASKS_ROOT")
-    if not root:
-        return None
     try:
-        root_path = Path(root)
-        if not root_path.parent.exists():
-            return None  # OneDrive nie zsynchronizowany na tej maszynie — nie twórz sierocego folderu
-        effective_id = task.get("parent_task_id") or task["task_id"]
-        istniejace = sorted(root_path.glob(f"{effective_id}_*")) if root_path.exists() else []
-        if istniejace:
-            folder = istniejace[0]
-        else:
-            # Rodzic bez własnego folderu jeszcze (normalny przypadek) albo
-            # podzadanie przetworzone PRZED rodzicem (rzadki wyścig) — w obu
-            # razach tworzymy folder pod effective_id, samo-naprawiający się
-            # brak blokady, nie wymaga specjalnej obsługi.
-            data = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            folder = root_path / f"{effective_id}_{data}_{_slug(task.get('title', ''))}"
+        folder = task_folder.sciezka(task, client=client)
+        if folder is None:
+            return None
         acceptance_notes = (execution_result or {}).get("acceptance_notes") or comment
         table_rows = (execution_result or {}).get("table_rows")
         decision = output_decider.decide(task, status, comment, execution_result)
@@ -228,7 +215,7 @@ def _process_task_core(task, policy, routing, client, context=None):
         # Folder/link PRZED eskalacją (żądanie właściciela 29.08.2026: link ma
         # być na GÓRZE opisu zadania dla człowieka, nie tylko doklejony
         # później jako komentarz na oryginale).
-        folder = _save_result_to_onedrive(task, status, komentarz)
+        folder = _save_result_to_onedrive(task, status, komentarz, client=client)
         escalate_to_human(task, f"Wykryto podejrzaną treść: {prompt_check['detail']}", client,
                           severity="red", folder_link=sharepoint_link.folder_url(folder))
         state_store.log_decision(
@@ -269,7 +256,7 @@ def _process_task_core(task, policy, routing, client, context=None):
                                     assigned_to=owner, risk_level="green", now=now_iso())
             client.post_comment(task_id, wynik["comment"])
             client.update_status(task_id, status)
-            _save_result_to_onedrive(task, status, wynik["comment"])
+            _save_result_to_onedrive(task, status, wynik["comment"], client=client)
             return {"task_id": task_id, "risk": "green", "owner": owner, "status": status}
 
     # Hint ryzyka: gdy źródło nie niesie własnego (albo niesie sztywny domyślny
@@ -341,7 +328,7 @@ def _process_task_core(task, policy, routing, client, context=None):
     if execution_result.get("executed") is False:
         reason = execution_result["acceptance_notes"]
         komentarz = _comment_escalated(owner, reason)
-        folder = _save_result_to_onedrive(task, "needs_approval", komentarz, execution_result)
+        folder = _save_result_to_onedrive(task, "needs_approval", komentarz, execution_result, client=client)
         escalate_to_human(task, reason, client, severity="red", folder_link=sharepoint_link.folder_url(folder))
         state_store.log_decision(task_id, agent="pawel", decision="escalate", reason=reason,
                                  now=now_iso(), event_type="escalation")
@@ -375,7 +362,7 @@ def _process_task_core(task, policy, routing, client, context=None):
     elif risk == "red":
         reason = "Czerwona akcja — poza zakresem tego szkieletu, brak jeszcze zdefiniowanej bounded_red do sprawdzenia."
         comment = _comment_escalated(owner, reason)
-        folder = _save_result_to_onedrive(task, "needs_approval", comment, execution_result)
+        folder = _save_result_to_onedrive(task, "needs_approval", comment, execution_result, client=client)
         escalate_to_human(task, reason, client, severity="red", folder_link=sharepoint_link.folder_url(folder))
         state_store.log_decision(task_id, agent="pawel", decision="escalate", reason=reason,
                                  now=now_iso(), event_type="escalation")
@@ -419,7 +406,7 @@ def _process_task_core(task, policy, routing, client, context=None):
         else:
             reason = _gate_failure_reason(gate)
             comment = _comment_escalated(owner, reason)
-            folder = _save_result_to_onedrive(task, "needs_approval", comment, execution_result)
+            folder = _save_result_to_onedrive(task, "needs_approval", comment, execution_result, client=client)
             escalate_to_human(task, reason, client, folder_link=sharepoint_link.folder_url(folder))
             state_store.log_decision(task_id, agent="pawel", decision="escalate", reason=reason,
                                      now=now_iso(), event_type="escalation")
@@ -446,7 +433,7 @@ def _process_task_core(task, policy, routing, client, context=None):
     # `folder or ...`: gałęzie red-risk/gate-failure wyżej już policzyły folder
     # (potrzebny WCZEŚNIEJ, na link u góry opisu zadania eskalacji) — nie liczyć
     # drugi raz (podwójny koszt klasyfikacji w output_decider.decide()).
-    folder = folder or _save_result_to_onedrive(task, status, comment, execution_result)
+    folder = folder or _save_result_to_onedrive(task, status, comment, execution_result, client=client)
     link = sharepoint_link.folder_url(folder)
     if link:
         comment += f"\n\n📁 Materiały: {link}"

@@ -57,6 +57,7 @@ import model_registry
 import repo_publish
 import repo_workspace
 import task_thinker
+import task_folder
 import tool_registry
 
 APP_DIR = Path(__file__).parent
@@ -107,37 +108,18 @@ def _nie_wykonano(powod, cost_usd=0.0, output=None):
             "acceptance_notes": "NIE WYKONANO — " + powod, "output": output or {}}
 
 
-def _onedrive_task_folder(task):
-    """Folder OneDrive/SharePoint (biblioteka 'Wirtualny pracownik', root_folder
-    'Zadania-Agenta' — config/sharepoint.yaml) TEGO zadania — decyzja właściciela
-    29.08.2026: subagent ma mieć zapis TAKŻE tam, nie tylko we własnym lokalnym
-    folderze roboczym (dziś jedyny wynik trafiał tam dopiero PO fakcie, przez
-    output_decider.build_file w runner_loop._save_result_to_onedrive).
+def _onedrive_task_folder(task, client=None):
+    """Folder zadania na SharePoint (biblioteka "Wirtualny pracownik") — subagent
+    ma tam zapis, nie tylko do swojego lokalnego folderu roboczego (decyzja
+    właściciela 29.08.2026).
 
-    Kopia logiki wyszukania/nazwania folderu z runner_loop._save_result_to_onedrive
-    (NIE importować stamtąd — cykliczny import: runner_loop już importuje
-    agentic_worker). Ten sam wzorzec duplikacji co _slug() w tym pliku.
-    Idempotentne: jeśli runner_loop już utworzył ten folder wcześniej (albo
-    utworzy go PÓŹNIEJ, po zakończeniu subagenta), oba trafiają w TEN SAM
-    folder (dopasowanie po prefiksie task_id/parent_task_id).
+    Liczenie ścieżki przeniesione 12.09.2026 do task_folder.py: ta sama logika
+    stała tu i w runner_loop._save_result_to_onedrive, świadomie zduplikowana
+    (cykliczny import). Teraz oba wołają jeden moduł, więc struktura folderów
+    nie może się już rozjechać między nimi.
 
-    Fail-soft: brak ONEDRIVE_TASKS_ROOT / OneDrive niezsynchronizowane na tej
-    maszynie -> None — subagent dostaje wtedy TYLKO swój lokalny folder roboczy,
-    jak przed tą zmianą."""
-    root = os.environ.get("ONEDRIVE_TASKS_ROOT")
-    if not root:
-        return None
-    root_path = Path(root)
-    if not root_path.parent.exists():
-        return None
-    effective_id = task.get("parent_task_id") or task.get("task_id") or "zadanie"
-    istniejace = sorted(root_path.glob(f"{effective_id}_*")) if root_path.exists() else []
-    if istniejace:
-        return istniejace[0]
-    data = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    nowy_folder = root_path / f"{effective_id}_{data}_{_slug(task.get('title', ''))}"
-    nowy_folder.mkdir(parents=True, exist_ok=True)
-    return nowy_folder
+    Fail-soft: brak ONEDRIVE_TASKS_ROOT / OneDrive niezsynchronizowany -> None."""
+    return task_folder.utworz(task, client=client)
 
 
 def _opis_commita(folder, task):
@@ -223,13 +205,15 @@ def run(task, thinking, client=None, context=None):
     if not kontrakt["allowed"]:
         return _odmowa(kontrakt["reason"], cost_usd=ocena_planu["cost_usd"])
 
-    sandbox = repo_workspace.przygotuj(task)
+    # client: repozytorium bierzemy najpierw z USTAWIEN PROJEKTU w Projectly, dopiero
+    # potem z tresci zadania (repo_workspace.wykryj) — dzieki temu podzadania nie gubia repo.
+    sandbox = repo_workspace.przygotuj(task, client=client)
     if sandbox and not sandbox.get("ok"):
         return _nie_wykonano("nie udało się przygotować repozytorium zadania: "
                              + str(sandbox.get("powod") or "nieznany powód"),
                              cost_usd=ocena_planu["cost_usd"])
 
-    sharepoint_folder = _onedrive_task_folder(task)
+    sharepoint_folder = _onedrive_task_folder(task, client=client)
     prompt = agentic_prompt.build(task, plan_text, folder, client,
                                   sharepoint_folder=sharepoint_folder, context=context,
                                   sandbox=sandbox)

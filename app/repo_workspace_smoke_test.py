@@ -35,6 +35,68 @@ def _log(repo_dir):
                           capture_output=True, text=True).stdout.strip()
 
 
+class _KlientProjektu:
+    """Atrapa Projectly: zwraca ustawienia repo projektu. Zero sieci."""
+
+    def __init__(self, repo):
+        self._repo = repo
+        self.pytania = []
+
+    def project_repo(self, project_id):
+        self.pytania.append(project_id)
+        return self._repo
+
+
+class _KlientPadajacy:
+    """Projectly nieosiagalne — wykrywanie repo ma to przezyc, nie wywalic zadania."""
+
+    def project_repo(self, project_id):
+        raise RuntimeError("Projectly nieosiagalne")
+
+
+def _checki_repo_z_projektu():
+    """Repozytorium wziete z USTAWIEN PROJEKTU (12.09.2026) — najwazniejszy skutek:
+    podzadania (tytul + opis od modelu, bez linku) nie gubia juz repozytorium."""
+    checks = []
+    zadanie = {"task_id": "T-500", "title": "Dodaj formularz", "project_id": "P-1"}
+
+    zrodlo_repo = Path(tempfile.mkdtemp()) / "kod-projektu"
+    (zrodlo_repo / ".git").mkdir(parents=True, exist_ok=True)
+    klient = _KlientProjektu({"local_path": str(zrodlo_repo), "url": "https://github.com/firma/kod.git",
+                              "branch": "main", "init_at": "2026-09-12T10:00:00Z"})
+
+    zamiar = repo_workspace.wykryj(zadanie, client=klient)
+    checks.append(("Projekt z kodem: zrodlem jest folder firmowy, nie GitHub",
+                   zamiar is not None and zamiar["tryb"] == "clone"
+                   and str(zrodlo_repo.resolve()) == str(Path(zamiar["zrodlo"]).resolve())))
+    checks.append(("Projekt z kodem: pytamy Projectly o WLASCIWY projekt", klient.pytania == ["P-1"]))
+
+    klient_url = _KlientProjektu({"local_path": "", "url": "https://github.com/firma/kod.git",
+                                  "branch": "main", "init_at": None})
+    checks.append(("Projekt z kodem bez folderu: klonujemy z GitHuba",
+                   repo_workspace.wykryj(zadanie, client=klient_url)
+                   == {"tryb": "clone", "zrodlo": "https://github.com/firma/kod.git",
+                       "zrodlo_opis": "GitHub projektu"}))
+
+    klient_pusty = _KlientProjektu({"local_path": None, "url": None, "branch": "main", "init_at": None})
+    checks.append(("Projekt z kodem bez adresow: tryb zakladania repozytorium",
+                   repo_workspace.wykryj(zadanie, client=klient_pusty)["tryb"] == "init"))
+
+    podzadanie = {"task_id": "T-501", "title": "Popraw walidacje pola e-mail",
+                  "description": "Bez zadnego linku", "project_id": "P-1"}
+    checks.append(("Podzadanie bez linku w tresci dziedziczy repozytorium po projekcie",
+                   repo_workspace.wykryj(podzadanie, client=klient) is not None))
+    checks.append(("Projekt bez wlasnego kodu: zadanie zostaje bez repozytorium",
+                   repo_workspace.wykryj(podzadanie, client=_KlientProjektu(None)) is None))
+    checks.append(("Blad Projectly nie blokuje: dziala detekcja z tresci zadania",
+                   repo_workspace.wykryj({"task_id": "T-502", "title": "Popraw",
+                                          "description": "repo https://github.com/firma/x.git",
+                                          "project_id": "P-1"},
+                                         client=_KlientPadajacy())
+                   == {"tryb": "clone", "zrodlo": "https://github.com/firma/x.git"}))
+    return checks
+
+
 def run():
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -108,6 +170,8 @@ def run():
                                                _konfiguracja(korzen, new_projects_root=str(projekty)))
     checks.append(("new_projects_root: nowy projekt idzie do wlasnego korzenia",
                    str(projekty) in str(folder)))
+
+    checks += _checki_repo_z_projektu()
 
     print("\n--- Wynik testu dymnego repo_workspace ---")
     all_passed = True
